@@ -1,4 +1,5 @@
 import { type Lang, t } from '@trainmore/i18n';
+import { useEffect, useRef } from 'preact/hooks';
 import type { ChatMessage } from '../lib/chat-state.ts';
 import { safeHttpsUrl } from '../lib/urls.ts';
 
@@ -9,8 +10,14 @@ export function MessageList(props: {
   sending: boolean;
   onOpenLeadForm: () => void;
 }) {
+  const log = useRef<HTMLDivElement>(null);
+  // Keep the newest message (or the typing indicator) in view.
+  useEffect(() => {
+    log.current?.scrollTo({ top: log.current.scrollHeight });
+  }, [props.messages.length, props.sending]);
+
   return (
-    <div class="tm-messages" role="log" aria-live="polite">
+    <div class="tm-messages" role="log" aria-live="polite" ref={log}>
       {props.messages.map((message) =>
         message.role === 'user' ? (
           <p key={message.id} class="tm-bubble tm-bubble--user">

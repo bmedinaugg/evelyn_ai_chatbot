@@ -82,3 +82,18 @@ unless `APP_ENV=local` and `EVAL_CONFIRM_SPEND=yes`, and never runs in CI.
 sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
   EVAL_CONFIRM_SPEND=yes ANTHROPIC_API_KEY=... pnpm --filter @trainmore/evals eval
 ```
+
+## Chat widget (local)
+`apps/widget` is the chat shown on the help portal: `loader.js` (added to the Freshdesk portal
+layout) opens an iframe with the Preact app, which talks to the API.
+```sh
+pnpm --filter @trainmore/widget dev          # http://localhost:5173/?lang=nl (needs the API, see above)
+pnpm --filter @trainmore/widget build        # dist/: index.html + assets, loader.js, loader.css
+pnpm --filter @trainmore/widget e2e          # Playwright (API and Turnstile mocked)
+```
+Embed on the portal (after deploying `dist/` to the widget host):
+```html
+<script src="https://<widget host>/loader.js" data-widget-url="https://<widget host>/" async></script>
+```
+The API's `WIDGET_ALLOWED_ORIGINS` must contain the widget host's origin.
+First time only: `pnpm --filter @trainmore/widget exec playwright install chromium`.

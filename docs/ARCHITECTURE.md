@@ -235,8 +235,10 @@ Retention (proposal, to confirm with the DPO):
 (In addition to the non-negotiable rules in `CLAUDE.md`.)
 - **Widget isolation:**
   - the widget runs in an iframe on its own origin
-  - CORS restricted to `WIDGET_ALLOWED_ORIGINS`
-  - strict CSP
+  - CORS restricted to `WIDGET_ALLOWED_ORIGINS`: the widget iframe host's origin (the iframe, not
+    the portal page, calls the API)
+  - strict CSP; no external fonts or scripts except Cloudflare Turnstile, loaded only with the lead
+    form (Google Fonts would send visitor IPs to Google)
   - WAF with managed rules + rate-based rules
 - **Client IP behind proxies:** the API trusts `TRUST_PROXY_HOPS` (2 = CloudFront + ALB) only when
   the direct peer is a private VPC address. The ALB security group must accept only CloudFront's
@@ -328,6 +330,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
 - M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
 - M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval

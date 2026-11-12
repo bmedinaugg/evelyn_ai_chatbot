@@ -158,6 +158,18 @@ test('lead form: shows a verification failure', async ({ page }) => {
   await expect(page.getByText('We konden niet controleren dat je geen robot bent.')).toBeVisible();
 });
 
+test('scrolls to the newest message', async ({ page }) => {
+  await page.setViewportSize({ width: 380, height: 600 });
+  const long = { ...answer, text: 'Lang antwoord. '.repeat(20) };
+  await mockApi(page, [long, long, { ...answer, text: 'Laatste antwoord' }]);
+  await startChat(page);
+  for (const q of ['een', 'twee', 'drie']) {
+    await ask(page, q);
+    await expect(page.getByRole('textbox')).toBeEnabled();
+  }
+  await expect(page.getByText('Laatste antwoord')).toBeInViewport();
+});
+
 test('uses English when the page language is en', async ({ page }) => {
   await mockApi(page, []);
   await page.goto('/?lang=en');
