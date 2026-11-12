@@ -12,6 +12,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Environments | **Preprod only for now**; production built after preprod is tested and signed off | Product owner |
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
+| Approved answers | Exact approved text (server swaps it in); four eyes (never publish own version); side-by-side replay before publishing, human judge | Product owner (2026-11-12) |
 | Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
 | Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk) | Product owner |
 | Daily report | Email | Product owner |
@@ -255,6 +256,31 @@ Behaviour per status:
 6. **Approve** (approver role) publishes. Versions are immutable. Rollback re-publishes an
    earlier version. Every action is written to `audit_log` (who, what, when).
 
+As built (M4b, product owner decisions 2026-11-12):
+- **Exact approved text.** Published scenarios are retrieved next to the FAQ and offered to Claude
+  as data in `<approved_answers>`.
+  - **Claude's part:** it only decides *that* one fits, via `approvedAnswerId`.
+  - **What the customer sees:** the server shows that version's nl/en text word for word, plus its
+    linked article.
+  - **When it's used:** only if the scenario was retrieved this turn. Its status condition is
+    checked server-side:
+    - no condition: everyone, including people who aren't logged in;
+    - with a condition, not logged in: a login prompt;
+    - wrong status: the normal hand-off.
+  - **Metrics:** the reply stores `scenario_version_id`.
+- **Four eyes.** Anyone with a portal role writes drafts. An approver or admin publishes, never a
+  version they wrote; rollback (re-publishing a replaced version) follows the same rule.
+  - **Where it's enforced:** in SQL (`publish_scenario_version`).
+  - **Immutable content:** a trigger plus column-level grants.
+- **Replay.**
+  - **Input:** the conversation's customer questions (at most 10), with the draft offered in place
+    of the scenario's live version.
+  - **Account questions:** they use the fixed synthetic mock profile for the original status.
+  - **Storage and output:** nothing is stored; old and new answers are masked and shown side by
+    side; each run is audited.
+  - **Where it works:** only with `MAGICLINE_USE_MOCK=true`; otherwise 409.
+- **Judging:** a person judges for now; an LLM judge comes in M5.
+
 Why Supabase scenarios rather than Freshdesk write-back:
 - They give us versioning, rollback, status conditions, preprod replay and audit in one place.
 - Freshdesk stays the source of public FAQs.
@@ -415,6 +441,12 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M4b ✅ 2026-11-12: approved answers (scenarios).
+  - **In the chat:** shown word for word and status-gated server-side.
+  - **Publishing:** immutable versions, four-eyes publishing and put-back, archive.
+  - **Testing:** side-by-side replay with synthetic profiles.
+  - **Portal pages:** in nl/en.
+  - **Evals:** 4 new cases (paid run pending approval).
 - M4a ✅ 2026-11-12 (code; Entra sign-in waits for the app registration): agent portal (Preact, nl/en) under `/portal/` on the same CloudFront domain.
   - **Sign-in:** Entra ID (code + PKCE, app roles agent/approver/admin), 8 h Strict session cookie (only its hash stored).
   - **Review:** flagged conversations with personal data masked; "show original" is audited.
