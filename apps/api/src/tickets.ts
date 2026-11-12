@@ -34,15 +34,18 @@ function label(lang: Lang, value: string): string {
   return key ? t(lang, key) : value;
 }
 
-/** Synced topics, or the built-in ones when none are synced or the database is unavailable. */
-async function offeredTopics(deps: ApiDeps): Promise<string[]> {
+/**
+ * Synced topics, or the built-in ones when none are synced or the database is unavailable.
+ * Only synced topics are known Freshdesk ticket types (Freshdesk rejects an unknown type).
+ */
+async function offeredTopics(deps: ApiDeps): Promise<{ values: string[]; synced: boolean }> {
   try {
     const synced = await deps.escalations.activeTopics();
-    if (synced.length > 0) return synced;
+    if (synced.length > 0) return { values: synced, synced: true };
   } catch (error) {
     deps.logger.error({ err: error }, 'ticket topics unavailable; using built-in topics');
   }
-  return Object.keys(BUILT_IN_TOPICS);
+  return { values: Object.keys(BUILT_IN_TOPICS), synced: false };
 }
 
 /**
@@ -57,7 +60,7 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
     async (request, reply) => {
       const lang = langSchema.safeParse(request.query.lang);
       if (!lang.success) return reply.code(400).send({ error: 'invalid_request' });
-      const topics = await offeredTopics(deps);
+      const topics = (await offeredTopics(deps)).values;
       return { topics: topics.map((value) => ({ value, label: label(lang.data, value) })) };
     },
   );
@@ -71,7 +74,8 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
       const parsed = ticketBody.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
       const body = parsed.data;
-      if (!(await offeredTopics(deps)).includes(body.topic)) {
+      const topics = await offeredTopics(deps);
+      if (!topics.values.includes(body.topic)) {
         return reply.code(400).send({ error: 'invalid_request' });
       }
       if (!(await deps.verifyTurnstile(body.turnstileToken, request.ip))) {
@@ -86,7 +90,7 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
           subject: body.subject,
           descriptionText: body.description,
           tags: ['chatbot', 'escalation', body.lang],
-          type: body.topic,
+          ...(topics.synced ? { type: body.topic } : {}),
         });
         ticketId = ticket.id;
       } catch (error) {
@@ -120,6 +124,7 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
         const note = buildTicketNote({
           lang: body.lang,
           transcript,
+          topic: body.topic,
           account:
             auth.account && candidate
               ? { status: auth.account.status, clubName: candidate.studioName }

@@ -102,6 +102,7 @@ export const en = {
   // Private note on chat tickets (read by support agents).
   ticket: {
     noteTitle: 'Chatbot conversation (latest messages)',
+    topic: 'Topic: {topic}',
     account: 'Account: {status}, {club} (verified by email code)',
     notLoggedIn: 'Account: not logged in',
     customer: 'Customer',

@@ -101,7 +101,7 @@ describe('GET /widget/ticket-topics', () => {
 });
 
 describe('POST /widget/conversations/:id/tickets', () => {
-  it('creates a ticket with the topic as type, a transcript note and an escalation record', async () => {
+  it('creates a ticket with a transcript note and an escalation record', async () => {
     const api = createTestApi();
     const conv = await start(api);
     await say(api, conv, 'Ik wil een mens');
@@ -115,9 +115,9 @@ describe('POST /widget/conversations/:id/tickets', () => {
         subject: 'Dubbele afschrijving',
         descriptionText: 'Ik ben deze maand <b>twee keer</b> afgeschreven.',
         tags: ['chatbot', 'escalation', 'nl'],
-        type: 'Payments & invoices',
       },
     ]);
+    expect(api.notes[0]?.text).toContain('Onderwerp: Payments & invoices');
     expect(api.notes).toHaveLength(1);
     expect(api.notes[0]?.ticketId).toBe(777);
     expect(api.notes[0]?.text).toContain('Account: niet ingelogd');
@@ -147,6 +147,13 @@ describe('POST /widget/conversations/:id/tickets', () => {
     expect(none.statusCode).toBe(401);
     expect((await submit(api, conv, form, 'x'.repeat(43))).statusCode).toBe(404);
     expect(api.tickets).toEqual([]);
+  });
+
+  it('sends the topic as ticket type once topics are synced from Freshdesk', async () => {
+    const api = createTestApi({ topics: ['Personal training'] });
+    const conv = await start(api);
+    expect((await submit(api, conv, { ...form, topic: 'Personal training' })).statusCode).toBe(201);
+    expect(api.tickets[0]?.type).toBe('Personal training');
   });
 
   it('rejects a topic that is not offered', async () => {

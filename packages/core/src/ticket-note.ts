@@ -12,6 +12,8 @@ export function buildTicketNote(input: {
   lang: Lang;
   transcript: { role: 'user' | 'assistant'; text: string }[];
   account: { status: CustomerStatus; clubName: string } | null;
+  /** Topic chosen in the form (also the ticket type once topics are synced). */
+  topic: string;
 }): string {
   const { lang } = input;
   const accountLine = input.account
@@ -26,5 +28,11 @@ export function buildTicketNote(input: {
     const text = message.text.replace(/\s+/g, ' ').trim().slice(0, MAX_MESSAGE_CHARS);
     return `${speaker}: ${text}`;
   });
-  return [t(lang, 'ticket.noteTitle'), accountLine, '', ...messages].join('\n');
+  return [
+    t(lang, 'ticket.noteTitle'),
+    t(lang, 'ticket.topic', { topic: input.topic }),
+    accountLine,
+    '',
+    ...messages,
+  ].join('\n');
 }

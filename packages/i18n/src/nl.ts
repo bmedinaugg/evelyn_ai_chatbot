@@ -101,6 +101,7 @@ export const nl = {
   },
   ticket: {
     noteTitle: 'Chatbot-gesprek (laatste berichten)',
+    topic: 'Onderwerp: {topic}',
     account: 'Account: {status}, {club} (geverifieerd via e-mailcode)',
     notLoggedIn: 'Account: niet ingelogd',
     customer: 'Klant',
