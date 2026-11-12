@@ -20,6 +20,18 @@ describe('parseArgs', () => {
     });
   });
 
+  it('parses retention and dsar-delete --email', () => {
+    expect(parseArgs(['retention'])).toEqual({ command: 'retention', allowMassChange: false });
+    expect(parseArgs(['dsar-delete', '--email', 'a@example.com'])).toEqual({
+      command: 'dsar-delete',
+      allowMassChange: false,
+      email: 'a@example.com',
+    });
+    expect(parseArgs(['dsar-delete'])).toBeUndefined();
+    expect(parseArgs(['dsar-delete', '--email'])).toBeUndefined();
+    expect(parseArgs(['sync-faq', '--email', 'a@example.com'])).toBeUndefined();
+  });
+
   it('rejects unknown commands and flags', () => {
     expect(parseArgs(['drop-everything'])).toBeUndefined();
     expect(parseArgs(['sync-faq', '--force'])).toBeUndefined();

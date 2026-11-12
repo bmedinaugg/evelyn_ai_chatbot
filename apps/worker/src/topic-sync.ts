@@ -41,7 +41,8 @@ export async function runTopicSync(deps: TopicSyncDeps): Promise<{ topics: numbe
     throw new TopicSyncAbortedError('field_missing');
   }
 
-  const topics = [...new Set(field.choices.map((c) => c.trim()).filter((c) => c !== ''))];
+  // Values are kept exactly as Freshdesk has them: they are sent back as the ticket type.
+  const topics = [...new Set(field.choices.filter((c) => c.trim() !== ''))];
   if (topics.length === 0) {
     deps.logger.error({ field: deps.field }, 'topic sync aborted: no choices');
     throw new TopicSyncAbortedError('empty_choices');
