@@ -22,6 +22,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Chat model | **Claude Sonnet 5.5** (`claude-sonnet-5-5`), configurable via `CLAUDE_CHAT_MODEL` | Product owner (2026-11-11) |
 | Answer delivery | **Check, then show**: the full answer is validated before the customer sees it (no token streaming; plain JSON, typing indicator) | Product owner (2026-11-11) |
 | Retrieval | **Full-text search first** (Postgres `dutch` + `english`); Voyage embeddings deferred behind a retrieval interface | Product owner (2026-11-11) |
+| Retrieval ranking | Any query word may match (both languages); words are weighted by rarity across the articles (IDF), so a distinctive word ("eurokorting") beats words many articles share ("how does … work") | Architect (2026-11-12, after the first test with real articles) |
 | Hand-off | **Prefilled general ticket form for everyone**; no automatic ticket, no Magicline email lookup | Product owner (2026-11-12) |
 | Ticket topics | Membership & contract, Payments & invoices, Club & facilities, App & account as built-in defaults; **synced daily from the Freshdesk ticket field** | Product owner (2026-11-12) |
 | Transcript retention | 90 days, then anonymise (M3b) | Product owner (2026-11-12) |
