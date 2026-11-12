@@ -105,6 +105,38 @@ describe('SupabaseConversationRepository', () => {
     expect(await repo.claimTurn(id)).not.toBeNull();
   });
 
+  it('appendTurn with tool steps replays them in order between question and answer', async () => {
+    const id = await newConversation();
+    const claimId = (await repo.claimTurn(id)) as string;
+    const steps = [
+      {
+        role: 'assistant' as const,
+        content: [{ type: 'tool_use', id: 't1', name: 'get_memberships', input: {} }],
+      },
+      {
+        role: 'user' as const,
+        content: [{ type: 'tool_result', tool_use_id: 't1', content: '[]' }],
+      },
+    ];
+    await repo.appendTurn({
+      conversationId: id,
+      claimId,
+      user: { displayText: 'q', apiContent: 'q' },
+      steps,
+      assistant: {
+        displayText: 'a',
+        apiContent: [{ type: 'text', text: '{}' }],
+        outcome: 'answered',
+      },
+      flags: [],
+    });
+    expect(await repo.listApiHistory(id)).toEqual([
+      { role: 'user', content: 'q' },
+      ...steps,
+      { role: 'assistant', content: [{ type: 'text', text: '{}' }] },
+    ]);
+  });
+
   it('appendTurn without an assistant message stores the user message only', async () => {
     const id = await newConversation();
     const claimId = (await repo.claimTurn(id)) as string;

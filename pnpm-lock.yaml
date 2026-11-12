@@ -351,9 +351,15 @@ importers:
       '@trainmore/db':
         specifier: workspace:*
         version: link:../db
+      '@trainmore/email':
+        specifier: workspace:*
+        version: link:../email
       '@trainmore/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@trainmore/magicline':
+        specifier: workspace:*
+        version: link:../magicline
       '@trainmore/shared':
         specifier: workspace:*
         version: link:../shared

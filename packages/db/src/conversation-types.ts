@@ -66,6 +66,8 @@ export interface ConversationRepository {
     conversationId: string;
     claimId: string;
     user: StoredMessage;
+    /** Tool calls and results between the question and the final answer (only with an answer). */
+    steps?: ApiHistoryEntry[];
     assistant: StoredMessage | null;
     flags: FlagReason[];
   }): Promise<void>;

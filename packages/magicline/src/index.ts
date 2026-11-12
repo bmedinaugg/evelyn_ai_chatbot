@@ -1,3 +1,10 @@
+export type {
+  BalanceInfo,
+  ClassBookingInfo,
+  MembershipInfo,
+  PaymentInfo,
+  VisitInfo,
+} from './account-schemas.ts';
 export {
   createMagiclineClient,
   type MagiclineClient,

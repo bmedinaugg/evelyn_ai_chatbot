@@ -127,6 +127,8 @@ export function createTestApi(
         needsHuman: true,
       },
       assistantContent: [],
+      steps: [],
+      toolsUsed: [],
     };
     if (result instanceof Error) throw result;
     return result;
@@ -247,6 +249,14 @@ export function createTestApi(
 
   const deps: ApiDeps = {
     login,
+    capabilities: {
+      deps: {
+        studioClient: async () => ({ getContracts: async () => [{ rateName: 'Flex' }] }) as never, // only contracts are used in API tests
+        crossStudioClient: async () => ({}) as never,
+        today: () => new Date('2026-11-12T10:00:00Z'),
+      },
+      disabled: async () => new Set<string>(),
+    },
     conversations: conversationRepo,
     faq,
     answerer,

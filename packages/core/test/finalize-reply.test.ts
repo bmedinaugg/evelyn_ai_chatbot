@@ -12,8 +12,8 @@ const base: Answer = {
   needsHuman: false,
 };
 const hits = [cancelNl, lockersNl];
-const reply = (answer: Partial<Answer>, loggedIn = false) =>
-  finalizeReply({ answer: { ...base, ...answer }, hits, loggedIn });
+const reply = (answer: Partial<Answer>, loggedIn = false, accountToolsUsed = 0) =>
+  finalizeReply({ answer: { ...base, ...answer }, hits, loggedIn, accountToolsUsed });
 
 describe('finalizeReply', () => {
   it('answers an FAQ with citations from the hits (fallback-language hit kept as is)', () => {
@@ -61,7 +61,28 @@ describe('finalizeReply', () => {
     });
   });
 
-  it('hands account questions of logged-in customers to support until account tools exist', () => {
+  it('answers account questions from account data when a tool ran this turn', () => {
+    expect(
+      reply(
+        {
+          intent: 'account_question',
+          answer: 'Je contract loopt tot 31 januari 2027.',
+          citedArticleIds: [],
+        },
+        true,
+        1,
+      ),
+    ).toEqual({
+      text: 'Je contract loopt tot 31 januari 2027.',
+      lang: 'en',
+      citations: [],
+      action: 'none',
+      outcome: 'answered',
+      flags: [],
+    });
+  });
+
+  it('hands account questions of logged-in customers to support when no tool ran', () => {
     expect(reply({ intent: 'account_question' }, true)).toMatchObject({
       outcome: 'unsupported',
       action: 'contact',

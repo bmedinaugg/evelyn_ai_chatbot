@@ -102,6 +102,11 @@ export function createSupabaseConversationRepository(
         // null is a valid p_assistant (no assistant message); the generated type omits it.
         p_assistant: (input.assistant ? toJson(input.assistant) : null) as Json,
         p_flags: input.flags,
+        p_steps: JSON.parse(
+          JSON.stringify(
+            (input.steps ?? []).map((step) => ({ role: step.role, api_content: step.content })),
+          ),
+        ) as Json,
       });
       if (error?.code === 'TM001') throw new ClaimLostError();
       if (error) throw new DbError('append_chat_turn', error.code);

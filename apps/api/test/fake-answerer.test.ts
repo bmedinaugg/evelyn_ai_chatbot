@@ -34,3 +34,37 @@ describe('createFakeAnswerer (local smoke tests only)', () => {
     });
   });
 });
+
+describe('createFakeAnswerer with account tools', () => {
+  it('calls get_memberships for a membership question and answers from its data', async () => {
+    const userTurn = buildUserTurn({
+      customerMessage: 'Welk abonnement heb ik?',
+      articles: [],
+      pageLang: 'nl',
+    });
+    const executed: string[] = [];
+    const result = await createFakeAnswerer()({
+      history: [],
+      userTurn,
+      tools: {
+        definitions: [
+          {
+            name: 'get_memberships',
+            input_schema: { type: 'object', properties: {}, additionalProperties: false },
+          },
+        ],
+        execute: async (name) => {
+          executed.push(name);
+          return { ok: true, data: [{ rateName: 'Flex', endDate: '2027-01-31' }] };
+        },
+      },
+    });
+    expect(executed).toEqual(['get_memberships']);
+    expect(result).toMatchObject({
+      kind: 'answer',
+      toolsUsed: ['get_memberships'],
+      answer: { intent: 'account_question' },
+    });
+    expect(result.kind === 'answer' && result.answer.answer).toContain('Flex');
+  });
+});

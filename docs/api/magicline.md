@@ -82,6 +82,14 @@ payment data amendments, class and appointment book/cancel (`DELETE /v1/classes/
 membership switch, due-date change, communication preferences, payments.
 Kept as candidate future capabilities (milestone M7).
 
+## Parameter limits and open questions (checked 2026-11-12)
+- `activities/checkins` and `account/transactions/upcoming`: `sliceSize` 1..50 (default 10).
+- `cross-studio/customers/{id}/class-bookings`: `daysAhead` 0..6 (default 1); optional `studioId`
+  "filters bookings to a single studio while preserving cross-studio identity". The chatbot passes
+  the bound account's studio.
+- **(unverified)** Whether `customerId` is unique across studios or per studio. Until confirmed,
+  cross-studio calls always pass the bound `studioId`.
+
 ## Known limitations (for the portal "limitations" page)
 - No dedicated invoice endpoint; transactions/booking entries only. `documents` may contain
   invoices (unverified).

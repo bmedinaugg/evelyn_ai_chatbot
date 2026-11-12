@@ -49,7 +49,13 @@ describe('SYSTEM_PROMPT', () => {
   });
 
   it('states the key rules', () => {
-    for (const phrase of ['<faq_articles>', '<customer_message>', 'citedArticleIds', 'URL']) {
+    for (const phrase of [
+      '<faq_articles>',
+      '<customer_message>',
+      '<account_data>',
+      'citedArticleIds',
+      'URL',
+    ]) {
       expect(SYSTEM_PROMPT).toContain(phrase);
     }
   });

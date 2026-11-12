@@ -108,7 +108,7 @@ select is(
 
 select ok(
   not has_function_privilege('anon', 'public.claim_conversation_turn(uuid)', 'execute')
-    and not has_function_privilege('authenticated', 'public.append_chat_turn(uuid,uuid,jsonb,jsonb,text[])', 'execute')
+    and not has_function_privilege('authenticated', 'public.append_chat_turn(uuid,uuid,jsonb,jsonb,text[],jsonb)', 'execute')
     and not has_function_privilege('anon', 'public.release_conversation_turn(uuid,uuid)', 'execute'),
   'anon/authenticated cannot execute the turn functions'
 );

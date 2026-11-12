@@ -204,6 +204,8 @@ describe('account questions', () => {
           needsHuman: false,
         },
         assistantContent: [],
+        steps: [],
+        toolsUsed: [],
       },
     });
     const conv = await start(api);
@@ -214,5 +216,31 @@ describe('account questions', () => {
       payload: { text: 'Wanneer eindigt mijn contract?', pageLang: 'nl' },
     });
     expect(res.json().reply).toMatchObject({ action: 'login' });
+  });
+});
+
+describe('account answers after login', () => {
+  it('offers account tools for the bound account only after login', async () => {
+    const api = createTestApi();
+    const conv = await start(api);
+    const ask = () =>
+      api.app.inject({
+        method: 'POST',
+        url: `/widget/conversations/${conv.conversationId}/messages`,
+        headers: { origin: ORIGIN, authorization: `Bearer ${conv.token}` },
+        payload: { text: 'Welk abonnement heb ik?', pageLang: 'nl' },
+      });
+    await ask();
+    expect(api.answererCalls[0]?.tools).toBeUndefined();
+    await request(api, conv);
+    await call(api, conv, 'verify', { email: 'lead@example.com', code: api.sentCodes[0]?.code });
+    await ask();
+    expect(api.answererCalls[1]?.tools?.definitions.map((d) => d.name)).toContain(
+      'get_memberships',
+    );
+    expect(await api.answererCalls[1]?.tools?.execute('get_memberships')).toEqual({
+      ok: true,
+      data: [{ rateName: 'Flex' }],
+    });
   });
 });
