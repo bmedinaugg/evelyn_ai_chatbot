@@ -13,10 +13,12 @@ const LANGS: readonly Lang[] = ['nl', 'en'];
 const PUBLISHED = 2;
 
 export type FaqSyncDeps = {
-  freshdesk: Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder'>;
+  freshdesk: Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder' | 'getCategory'>;
   repo: FaqRepository;
   folderIds: number[];
   portalUrl: string;
+  /** The TrainMore help portal: a folder's category must be shown there. */
+  portalId: number;
   logger: Logger;
   /** Skip the mass-change guard (operator override after checking Freshdesk). */
   allowMassChange?: boolean;
@@ -54,15 +56,22 @@ type Merged = {
   seenUnpublished: boolean;
 };
 
-/** A folder is public only if it and every parent folder are visible to all users. */
+/**
+ * A folder is public only if it and every parent folder are visible to all users, and its
+ * category is shown on our help portal (the Freshdesk account also serves other brands).
+ */
 async function isPublicFolder(deps: FaqSyncDeps, folderId: number): Promise<boolean> {
   let id: number | null = folderId;
+  let categoryId: number | null = null;
   for (let depth = 0; id !== null && depth < MAX_FOLDER_DEPTH; depth += 1) {
     const folder = await deps.freshdesk.getFolder(id);
     if (folder.visibility !== FOLDER_VISIBILITY_ALL_USERS) return false;
+    categoryId ??= folder.categoryId;
     id = folder.parentFolderId;
   }
-  return id === null;
+  if (id !== null || categoryId === null) return false;
+  const category = await deps.freshdesk.getCategory(categoryId);
+  return category.visibleInPortals?.includes(deps.portalId) ?? false;
 }
 
 /**

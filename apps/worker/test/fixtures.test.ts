@@ -5,6 +5,7 @@ import { runCommand } from '../src/cli.ts';
 import { runFaqSync } from '../src/faq-sync.ts';
 import {
   FIXTURE_FOLDER_ID,
+  FIXTURE_PORTAL_ID,
   fixtureArticles,
   fixtureFreshdeskClient,
 } from '../src/fixture-source.ts';
@@ -56,6 +57,7 @@ describe('FAQ fixtures', () => {
       repo,
       folderIds: [FIXTURE_FOLDER_ID],
       portalUrl: 'https://portal.test',
+      portalId: FIXTURE_PORTAL_ID,
       logger: quietLogger,
     };
     expect((await runFaqSync(deps)).upserted).toBe(8);

@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 /** Synthetic folder used for local development and evals. Never real TrainMore content. */
 export const FIXTURE_FOLDER_ID = 900001;
+export const FIXTURE_CATEGORY_ID = 900000;
+export const FIXTURE_PORTAL_ID = 900000;
 
 const translationSchema = z.object({
   title: z.string().min(1),
@@ -31,12 +33,15 @@ export function fixtureArticles(): FixtureArticle[] {
 /** Serves the fixtures as if they were the Freshdesk Solutions folder FIXTURE_FOLDER_ID. */
 export function fixtureFreshdeskClient(): Pick<
   FreshdeskClient,
-  'listFolderArticles' | 'getFolder'
+  'listFolderArticles' | 'getFolder' | 'getCategory'
 > {
   const articles = fixtureArticles();
   return {
     async getFolder(folderId) {
-      return { id: folderId, visibility: 1, parentFolderId: null };
+      return { id: folderId, visibility: 1, parentFolderId: null, categoryId: FIXTURE_CATEGORY_ID };
+    },
+    async getCategory(categoryId) {
+      return { id: categoryId, visibleInPortals: [FIXTURE_PORTAL_ID] };
     },
     async listFolderArticles(folderId, lang) {
       if (folderId !== FIXTURE_FOLDER_ID) return [];

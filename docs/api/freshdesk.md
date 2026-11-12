@@ -41,8 +41,21 @@ Flexible Hierarchy, multiple portals) still needs a check once credentials exist
 - Folder `visibility`: 1 All Users, 2 Logged In Users, 3 Agents, 4 Selected Companies, 5 Bots,
   6 Selected Contact Segments, 7 Selected Company Segments. **The chatbot only syncs folders with
   visibility 1 whose parent folders are also 1** (public help-portal content only).
-- Category: `visible_in_portals` (portal ids; only on accounts with multiple portals). Not checked
-  by the sync yet: **(open)** confirm whether TrainMore has more than one portal.
+- View category: `GET /api/v2/solutions/categories/{id}` → `visible_in_portals` (portal ids; only on
+  accounts with multiple portals). List: `GET /api/v2/solutions/categories`,
+  `GET /api/v2/solutions/categories/{id}/folders`.
+- **Our account is multi-brand** (checked live 2026-11-12): one Freshdesk account `urbangymgroup`
+  serves the portals TrainMore (`103000108492`, www.support.trainmore.com), TrainMore UK, TrainMore IE,
+  Clubsportive, Gymbox and an internal default portal. Several non-TrainMore folders are "All Users",
+  so the sync also requires the folder's category to list `FRESHDESK_PORTAL_ID`. Live result: 10 of
+  50 folders qualify, all with `nl` and `en` translations. (Portal ids were read once via
+  `GET /api/v2/portals`, which is not in the official reference; the code does not use it.)
+- Ticket fields: `ticket_type` is shared by all brands (Club, Corporate Fitness, Membership,
+  Payments, Personal Training, Migrated from Zendesk). TrainMore's own contact forms use
+  `cf_trainmore_uk_general_contact_form` / `cf_trainmore_ie_general_contact_form` ("What do you need
+  support with?": Offering, Club, Payments, TrainMore App, Membership). **(open)** which field the
+  NL portal's form uses.
+- Languages (`GET /api/v2/settings/helpdesk`): primary `en`, supported `nl`.
 - Articles have no visibility of their own; they follow their folder.
 - List articles in folder: `GET /api/v2/solutions/folders/{folder_id}/articles`
 - Translated list: `GET /api/v2/solutions/folders/{folder_id}/articles/{language_code}`

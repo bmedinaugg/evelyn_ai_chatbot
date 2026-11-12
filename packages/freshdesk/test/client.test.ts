@@ -245,18 +245,46 @@ describe('ticket fields, notes and types', () => {
 
 describe('solution folders', () => {
   it('reads a folder with its visibility and parent', async () => {
-    queue(200, { id: 101, name: 'FAQ', visibility: 1, parent_folder_id: 100, articles_count: 3 });
-    expect(await client.getFolder(101)).toEqual({ id: 101, visibility: 1, parentFolderId: 100 });
+    queue(200, {
+      id: 101,
+      name: 'FAQ',
+      visibility: 1,
+      parent_folder_id: 100,
+      category_id: 7,
+      articles_count: 3,
+    });
+    expect(await client.getFolder(101)).toEqual({
+      id: 101,
+      visibility: 1,
+      parentFolderId: 100,
+      categoryId: 7,
+    });
     expect(requests[0]?.url).toBe('https://tm.freshdesk.com/api/v2/solutions/folders/101');
   });
 
   it('treats a missing parent as a top-level folder', async () => {
     queue(200, { id: 101, name: 'FAQ', visibility: 2 });
-    expect(await client.getFolder(101)).toEqual({ id: 101, visibility: 2, parentFolderId: null });
+    expect(await client.getFolder(101)).toEqual({
+      id: 101,
+      visibility: 2,
+      parentFolderId: null,
+      categoryId: null,
+    });
   });
 
   it('rejects a folder without visibility', async () => {
     queue(200, { id: 101, name: 'FAQ' });
     await expect(client.getFolder(101)).rejects.toBeInstanceOf(FreshdeskResponseError);
+  });
+
+  it('reads the portals a category is shown on', async () => {
+    queue(200, { id: 7, name: 'TrainMore', visible_in_portals: [5, 6] });
+    expect(await client.getCategory(7)).toEqual({ id: 7, visibleInPortals: [5, 6] });
+    expect(requests[0]?.url).toBe('https://tm.freshdesk.com/api/v2/solutions/categories/7');
+  });
+
+  it('reads a category without portal list (single-portal accounts)', async () => {
+    queue(200, { id: 7, name: 'FAQ' });
+    expect(await client.getCategory(7)).toEqual({ id: 7, visibleInPortals: null });
   });
 });

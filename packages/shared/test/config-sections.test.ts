@@ -11,6 +11,7 @@ const fd = {
   FRESHDESK_API_KEY: 'fd-key',
   FRESHDESK_FAQ_FOLDER_IDS: '101',
   FRESHDESK_PORTAL_URL: 'https://portal.test',
+  FRESHDESK_PORTAL_ID: '103000108492',
 };
 
 describe('loadFreshdeskConfig', () => {
@@ -20,8 +21,17 @@ describe('loadFreshdeskConfig', () => {
       apiKey: 'fd-key',
       faqFolderIds: [101],
       portalUrl: 'https://portal.test',
+      portalId: 103000108492,
       topicField: 'ticket_type',
     });
+  });
+
+  it('requires the help portal id (only its public articles are synced)', () => {
+    const { FRESHDESK_PORTAL_ID: _omit, ...withoutPortal } = fd;
+    expect(() => loadFreshdeskConfig(withoutPortal)).toThrow(/FRESHDESK_PORTAL_ID/);
+    expect(() => loadFreshdeskConfig({ ...fd, FRESHDESK_PORTAL_ID: 'abc' })).toThrow(
+      /FRESHDESK_PORTAL_ID/,
+    );
   });
 
   it('reads the ticket topic field name', () => {

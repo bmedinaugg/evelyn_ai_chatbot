@@ -172,7 +172,8 @@ Behaviour per status:
 
 ### 3.4 FAQ sync (worker, daily at night + manual "sync now")
 1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, check that it is **public** (folder visibility
-   "All Users", and the same for every parent folder). Non-public folders are skipped and their
+   "All Users", the same for every parent folder, and its category shown on the TrainMore portal
+   `FRESHDESK_PORTAL_ID`; the Freshdesk account also serves other brands). Non-public folders are skipped and their
    stored articles removed, without the mass-change guard. Then list articles in `nl` and `en`;
    keep published ones.
 2. Compare `updated_at` + content hash. Upsert, chunk and re-embed only what changed.

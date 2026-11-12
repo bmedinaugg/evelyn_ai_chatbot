@@ -14,6 +14,7 @@ export {
   type CreateTicketInput,
   FOLDER_VISIBILITY_ALL_USERS,
   type FreshdeskArticle,
+  type SolutionCategory,
   type SolutionFolder,
   type TicketField,
 } from './schemas.ts';
