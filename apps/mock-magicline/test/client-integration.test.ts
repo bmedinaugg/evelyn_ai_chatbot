@@ -16,7 +16,7 @@ afterAll(async () => {
 it('the real client finds both accounts for one email', async () => {
   const client = createMagiclineClient({ baseUrl, apiKey: 'cross-key' });
   expect(await client.searchCustomersCrossStudio(' Multi@Example.com ')).toEqual([
-    { customerId: 4, studioId: 1001, status: 'MEMBER' },
-    { customerId: 5, studioId: 1002, status: 'MEMBER' },
+    { customerId: 4, studioId: 1001, status: 'MEMBER', customerNumber: 'M-0004' },
+    { customerId: 5, studioId: 1002, status: 'MEMBER', customerNumber: 'M-0005' },
   ]);
 });

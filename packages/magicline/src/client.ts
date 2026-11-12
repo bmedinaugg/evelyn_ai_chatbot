@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { MagiclineError, MagiclineRateLimitError, MagiclineResponseError } from './errors.ts';
 import type { paths } from './generated/schema.d.ts';
-import { type CustomerLookup, customerLookupSchema, emailSchema } from './schemas.ts';
+import {
+  type CustomerLookup,
+  customerLookupSchema,
+  emailSchema,
+  type StudioInformation,
+  studioInformationSchema,
+} from './schemas.ts';
 
 type CrossStudioSearchBody =
   paths['/v1/cross-studio/customers/search']['post']['requestBody']['content']['application/json'];
@@ -14,17 +20,27 @@ export type MagiclineClientOptions = {
 
 export interface MagiclineClient {
   searchCustomersCrossStudio(email: string): Promise<CustomerLookup[]>;
+  /** The studio that owns this client's API key. */
+  getStudioInformation(): Promise<StudioInformation>;
 }
 
 export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineClient {
   const doFetch = opts.fetch ?? fetch;
   const baseUrl = opts.baseUrl.replace(/\/+$/, '');
 
-  async function post<T>(endpoint: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+  async function request<T>(
+    method: 'GET' | 'POST',
+    endpoint: string,
+    schema: z.ZodType<T>,
+    body?: unknown,
+  ): Promise<T> {
     const response = await doFetch(`${baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers: { 'X-API-KEY': opts.apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      method,
+      headers: {
+        'X-API-KEY': opts.apiKey,
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     if (response.status === 429) {
       await response.body?.cancel();
@@ -45,7 +61,16 @@ export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineCl
   return {
     async searchCustomersCrossStudio(email) {
       const body: CrossStudioSearchBody = { email: emailSchema.parse(email) };
-      return post('/v1/cross-studio/customers/search', body, z.array(customerLookupSchema));
+      return request(
+        'POST',
+        '/v1/cross-studio/customers/search',
+        z.array(customerLookupSchema),
+        body,
+      );
+    },
+
+    async getStudioInformation() {
+      return request('GET', '/v1/studios/information', studioInformationSchema);
     },
   };
 }
