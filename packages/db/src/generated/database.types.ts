@@ -154,7 +154,7 @@ isOneToOne: false
           }
           Functions: {
             "append_chat_turn":
-{ Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_user": Json }; Returns: undefined
+{ Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_steps"?: Json,"p_user": Json }; Returns: undefined
                            },
 "bind_account":
 { Args: { "p_conversation_id": string,"p_index": number }; Returns: boolean
