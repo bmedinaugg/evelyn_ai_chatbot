@@ -2,9 +2,11 @@ import type { components } from '@trainmore/magicline';
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyInstance,
+  type FastifyReply,
   type FastifyRequest,
 } from 'fastify';
 import { z } from 'zod';
+import { accountData } from '../fixtures/account-data.ts';
 import { studios } from '../fixtures/studios.ts';
 
 type Customer = components['schemas']['Customer'];
@@ -67,6 +69,49 @@ export function buildMockServer(opts: MockServerOptions): FastifyInstance {
     if (studioId === undefined) return reply.code(401).send();
     const studio = (opts.studios ?? studios).find((s) => s.studioId === studioId);
     return studio ?? reply.code(404).send();
+  });
+
+  // Account data: the studio key only sees its own customers (404 otherwise), like the real API.
+  const studioCustomer = (request: FastifyRequest, reply: FastifyReply) => {
+    const key = apiKey(request);
+    const studioId = typeof key === 'string' ? studioForKey.get(key) : undefined;
+    if (studioId === undefined) {
+      void reply.code(401).send();
+      return undefined;
+    }
+    const params = customerParamsSchema.safeParse(request.params);
+    const customer = params.success
+      ? opts.profiles.find((c) => c.id === params.data.customerId && c.studioId === studioId)
+      : undefined;
+    if (!customer) {
+      void reply.code(404).send();
+      return undefined;
+    }
+    return accountData[customer.id];
+  };
+  const sliced = (result: unknown[]) => ({ result, hasNext: false, offset: '0' });
+
+  app.get(
+    '/v1/customers/:customerId/contracts',
+    async (request, reply) => studioCustomer(request, reply)?.contracts ?? reply,
+  );
+  app.get(
+    '/v1/customers/:customerId/account/balances',
+    async (request, reply) => studioCustomer(request, reply)?.balance ?? reply,
+  );
+  app.get('/v1/customers/:customerId/account/transactions/upcoming', async (request, reply) => {
+    const data = studioCustomer(request, reply);
+    return data ? sliced(data.upcoming) : reply;
+  });
+  app.get('/v1/customers/:customerId/activities/checkins', async (request, reply) => {
+    const data = studioCustomer(request, reply);
+    return data ? sliced(data.checkins) : reply;
+  });
+  app.get('/v1/cross-studio/customers/:customerId/class-bookings', async (request, reply) => {
+    if (apiKey(request) !== opts.keys.crossStudio) return reply.code(401).send();
+    const params = customerParamsSchema.safeParse(request.params);
+    const data = params.success ? accountData[params.data.customerId] : undefined;
+    return data ? sliced(data.classBookings) : reply.code(404).send();
   });
 
   app.get('/v1/customers/:customerId', async (request, reply) => {

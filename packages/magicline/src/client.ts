@@ -1,4 +1,16 @@
 import { z } from 'zod';
+import {
+  type BalanceInfo,
+  balanceSchema,
+  type ClassBookingInfo,
+  checkinsSchema,
+  classBookingsSchema,
+  type MembershipInfo,
+  membershipSchema,
+  type PaymentInfo,
+  upcomingPaymentsSchema,
+  type VisitInfo,
+} from './account-schemas.ts';
 import { MagiclineError, MagiclineRateLimitError, MagiclineResponseError } from './errors.ts';
 import type { paths } from './generated/schema.d.ts';
 import {
@@ -22,6 +34,13 @@ export interface MagiclineClient {
   searchCustomersCrossStudio(email: string): Promise<CustomerLookup[]>;
   /** The studio that owns this client's API key. */
   getStudioInformation(): Promise<StudioInformation>;
+  getContracts(customerId: number): Promise<MembershipInfo[]>;
+  getAccountBalance(customerId: number): Promise<BalanceInfo>;
+  getUpcomingTransactions(customerId: number, limit: number): Promise<PaymentInfo[]>;
+  /** fromDate/toDate as YYYY-MM-DD (at most 365 days apart). */
+  getCheckins(customerId: number, fromDate: string, toDate: string): Promise<VisitInfo[]>;
+  /** Needs the cross-studio key. */
+  getCrossStudioClassBookings(customerId: number, daysAhead: number): Promise<ClassBookingInfo[]>;
 }
 
 export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineClient {
@@ -72,6 +91,43 @@ export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineCl
     async getStudioInformation() {
       return request('GET', '/v1/studios/information', studioInformationSchema);
     },
+
+    async getContracts(customerId) {
+      return request('GET', `/v1/customers/${id(customerId)}/contracts`, z.array(membershipSchema));
+    },
+
+    async getAccountBalance(customerId) {
+      return request('GET', `/v1/customers/${id(customerId)}/account/balances`, balanceSchema);
+    },
+
+    async getUpcomingTransactions(customerId, limit) {
+      return request(
+        'GET',
+        `/v1/customers/${id(customerId)}/account/transactions/upcoming?sliceSize=${id(limit)}`,
+        upcomingPaymentsSchema,
+      );
+    },
+
+    async getCheckins(customerId, fromDate, toDate) {
+      const query = new URLSearchParams({
+        fromDate: isoDate(fromDate),
+        toDate: isoDate(toDate),
+        sliceSize: '100',
+      });
+      return request(
+        'GET',
+        `/v1/customers/${id(customerId)}/activities/checkins?${query}`,
+        checkinsSchema,
+      );
+    },
+
+    async getCrossStudioClassBookings(customerId, daysAhead) {
+      return request(
+        'GET',
+        `/v1/cross-studio/customers/${id(customerId)}/class-bookings?daysAhead=${id(daysAhead)}&sliceSize=20`,
+        classBookingsSchema,
+      );
+    },
   };
 }
 
@@ -79,4 +135,15 @@ function parseSeconds(headers: Headers): number | undefined {
   const raw = headers.get('x-ratelimit-reset') ?? headers.get('retry-after');
   const seconds = raw === null ? Number.NaN : Number(raw);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+}
+
+/** Path/query integers only: never interpolate anything else into a Magicline URL. */
+function id(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('Invalid Magicline id');
+  return String(value);
+}
+
+function isoDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('Invalid date');
+  return value;
 }
