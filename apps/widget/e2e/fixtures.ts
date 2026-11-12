@@ -11,6 +11,7 @@ type Reply = {
   citations: { articleId: number; title: string; url: string }[];
   action: 'none' | 'lead_form' | 'ticket_form' | 'login';
   contactUrl?: string;
+  messageId?: number;
 };
 
 export type MockApi = { requests: { path: string; body: unknown }[] };
@@ -95,6 +96,7 @@ export async function mockApi(
         },
       });
     }
+    if (path.endsWith('/feedback')) return route.fulfill({ status: 204, headers: cors });
     if (path.endsWith('/tickets')) {
       return route.fulfill({
         status: ticketStatus,

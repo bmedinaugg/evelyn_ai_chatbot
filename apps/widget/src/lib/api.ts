@@ -7,6 +7,8 @@ const replySchema = z.object({
   citations: z.array(z.object({ articleId: z.number(), title: z.string(), url: z.string() })),
   action: z.enum(['none', 'lead_form', 'ticket_form', 'login']),
   contactUrl: z.string().optional(),
+  /** Id of the stored reply, for thumbs up/down. */
+  messageId: z.number().int().positive().optional(),
 });
 export type ApiReply = z.infer<typeof replySchema>;
 
@@ -104,7 +106,7 @@ export function createWidgetApi(opts: {
   const doFetch = opts.fetch ?? fetch.bind(globalThis);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  async function call<T>(path: string, init: RequestInit, schema: z.ZodType<T>): Promise<T> {
+  async function call<T>(path: string, init: RequestInit, schema: z.ZodType<T> | null): Promise<T> {
     let response: Response;
     try {
       response = await doFetch(`${base}${path}`, {
@@ -115,12 +117,19 @@ export function createWidgetApi(opts: {
       throw new WidgetApiError('network');
     }
     if (!response.ok) throw new WidgetApiError(await errorKind(response));
+    // No response body expected (204).
+    if (schema === null) return undefined as T;
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) throw new WidgetApiError('server');
     return parsed.data;
   }
 
-  function post<T>(path: string, body: unknown, schema: z.ZodType<T>, token?: string): Promise<T> {
+  function post<T>(
+    path: string,
+    body: unknown,
+    schema: z.ZodType<T> | null,
+    token?: string,
+  ): Promise<T> {
     return call(
       path,
       {
@@ -186,6 +195,14 @@ export function createWidgetApi(opts: {
         z.object({ topics: z.array(topicSchema) }),
       );
       return topics;
+    },
+    async sendFeedback(session: Session, messageId: number, rating: 'up' | 'down'): Promise<void> {
+      await post<void>(
+        `/widget/conversations/${encodeURIComponent(session.conversationId)}/feedback`,
+        { messageId, rating },
+        null,
+        session.token,
+      );
     },
     async submitTicket(session: Session, input: TicketInput): Promise<void> {
       await post(

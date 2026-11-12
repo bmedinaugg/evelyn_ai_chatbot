@@ -125,4 +125,18 @@ describe('createWidgetApi', () => {
     );
     expect((await api.sendMessage(session, 'q', 'nl')).action).toBe('ticket_form');
   });
+
+  it('keeps the reply id and sends feedback for it', async () => {
+    responses.push(
+      json(200, { reply: { text: 'x', lang: 'nl', citations: [], action: 'none', messageId: 42 } }),
+    );
+    expect((await api.sendMessage(session, 'q', 'nl')).messageId).toBe(42);
+    responses.push(new Response(null, { status: 204 }));
+    await api.sendFeedback(session, 42, 'down');
+    expect(requests[1]?.url).toBe(
+      `https://api.test/widget/conversations/${session.conversationId}/feedback`,
+    );
+    expect(requests[1]?.headers.get('authorization')).toBe(`Bearer ${session.token}`);
+    expect(await requests[1]?.json()).toEqual({ messageId: 42, rating: 'down' });
+  });
 });

@@ -11,6 +11,7 @@ export function MessageList(props: {
   onOpenLeadForm: () => void;
   onOpenTicketForm: () => void;
   onOpenLogin: () => void;
+  onRate: (id: number, rating: 'up' | 'down') => void;
 }) {
   const log = useRef<HTMLDivElement>(null);
   // Keep the newest message (or the typing indicator) in view.
@@ -53,6 +54,13 @@ export function MessageList(props: {
                 </ul>
               </div>
             )}
+            {message.messageId !== undefined && (
+              <Feedback
+                lang={props.lang}
+                rating={message.rating}
+                onRate={(rating) => props.onRate(message.id, rating)}
+              />
+            )}
             {message.action === 'ticket_form' && (
               <button
                 type="button"
@@ -89,6 +97,59 @@ export function MessageList(props: {
         ),
       )}
       {props.sending && <p class="tm-typing">{t(props.lang, 'widget.typing')}</p>}
+    </div>
+  );
+}
+
+function Thumb(props: { down?: boolean }) {
+  // Inline icon (no icon font): a thumb, mirrored for "not helpful".
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      style={props.down ? { transform: 'rotate(180deg)' } : undefined}
+    >
+      <path
+        fill="currentColor"
+        d="M2 21h4V9H2v12zm20-11a2 2 0 0 0-2-2h-6.3l1-4.6v-.3c0-.4-.2-.8-.4-1.1L13.2 1 6.6 7.6c-.4.4-.6.9-.6 1.4v10a2 2 0 0 0 2 2h9c.8 0 1.5-.5 1.8-1.2l3-7.1c.1-.2.2-.5.2-.7v-2z"
+      />
+    </svg>
+  );
+}
+
+/** Thumbs up/down under a bot reply; the choice can be changed. */
+function Feedback(props: {
+  lang: Lang;
+  rating: 'up' | 'down' | undefined;
+  onRate: (rating: 'up' | 'down') => void;
+}) {
+  return (
+    <div class="tm-feedback">
+      <button
+        type="button"
+        class="tm-thumb"
+        aria-label={t(props.lang, 'widget.feedback.helpful')}
+        aria-pressed={props.rating === 'up'}
+        onClick={() => props.onRate('up')}
+      >
+        <Thumb />
+      </button>
+      <button
+        type="button"
+        class="tm-thumb"
+        aria-label={t(props.lang, 'widget.feedback.notHelpful')}
+        aria-pressed={props.rating === 'down'}
+        onClick={() => props.onRate('down')}
+      >
+        <Thumb down />
+      </button>
+      {props.rating && (
+        <span class="tm-feedback__thanks" role="status">
+          {t(props.lang, 'widget.feedback.thanks')}
+        </span>
+      )}
     </div>
   );
 }

@@ -47,7 +47,7 @@ test('ticket form: prefilled from the chat, sent with topic and Turnstile token'
   await form.getByRole('button', { name: 'Versturen' }).click();
   await expect(
     page.getByText('Bedankt! Ons supportteam heeft je bericht ontvangen en reageert per e-mail.'),
-  ).toBeVisible();
+  ).toBeFocused();
   await expect(ticketForm(page)).toHaveCount(0);
 
   const ticket = api.requests.find((r) => r.path.endsWith('/tickets'));
@@ -189,4 +189,43 @@ test('ticket form: in English', async ({ page }) => {
   const form = page.getByRole('form', { name: 'Contact support' });
   await expect(form.getByLabel('Topic', { exact: true })).toBeVisible();
   await expect(form.getByRole('option', { name: 'Payments & invoices' })).toHaveCount(1);
+});
+
+test('ticket form: says the topics are loading', async ({ page }) => {
+  await mockApi(page, [handoff]);
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('https://api.test/widget/ticket-topics**', async (route) => {
+    await gate;
+    await route.fallback();
+  });
+  await startChat(page);
+  await ask(page, 'Vraag');
+  await page.getByRole('button', { name: 'Contact met support' }).click();
+  await expect(ticketForm(page).getByRole('option', { name: 'Categorieën laden…' })).toHaveCount(1);
+  release();
+  await expect(ticketForm(page).getByRole('option', { name: 'Betalingen & facturen' })).toHaveCount(
+    1,
+  );
+});
+
+test('ticket form: an error is linked to the form', async ({ page }) => {
+  await mockApi(page, [handoff], 201, undefined, 400);
+  await startChat(page);
+  await ask(page, 'Vraag');
+  await page.getByRole('button', { name: 'Contact met support' }).click();
+  const form = ticketForm(page);
+  await form
+    .getByLabel('Categorie', { exact: true })
+    .selectOption({ label: 'Betalingen & facturen' });
+  await form.getByLabel('E-mailadres', { exact: true }).fill('sam@example.com');
+  await form
+    .getByLabel(
+      'TrainMore mag dit chatgesprek delen met het supportteam om mijn vraag te behandelen.',
+    )
+    .check();
+  await form.getByRole('button', { name: 'Versturen' }).click();
+  await expect(form).toHaveAccessibleDescription(/We konden niet controleren/);
 });

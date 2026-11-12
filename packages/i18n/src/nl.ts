@@ -89,10 +89,16 @@ export const nl = {
       unavailable:
         'De controle kon niet laden. Probeer het later opnieuw of neem contact op met ons supportteam.',
     },
+    feedback: {
+      helpful: 'Nuttig',
+      notHelpful: 'Niet nuttig',
+      thanks: 'Bedankt voor je feedback.',
+    },
     ticket: {
       title: 'Contact met support',
       topic: 'Categorie',
       chooseTopic: 'Kies een categorie',
+      loadingTopics: 'Categorieën laden…',
       email: 'E-mailadres',
       name: 'Naam (optioneel)',
       subject: 'Onderwerp',

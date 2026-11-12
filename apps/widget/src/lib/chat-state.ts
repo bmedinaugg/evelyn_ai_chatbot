@@ -11,6 +11,9 @@ export type ChatMessage =
       citations: ApiReply['citations'];
       action: ReplyAction;
       contactUrl?: string;
+      /** Stored reply id (thumbs up/down are only offered when present). */
+      messageId?: number;
+      rating?: 'up' | 'down';
     };
 
 export type Notice = 'busy' | 'rate_limited' | 'network' | 'error';
@@ -39,6 +42,7 @@ export type ChatEvent =
   | { type: 'login_opened' }
   | { type: 'login_closed' }
   | { type: 'logged_in'; note: string }
+  | { type: 'feedback_given'; id: number; rating: 'up' | 'down' | undefined }
   | { type: 'new_chat' };
 
 export function initialChatState(consentGiven: boolean): ChatState {
@@ -80,6 +84,7 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
             citations: reply.citations,
             action: reply.action,
             ...(reply.contactUrl === undefined ? {} : { contactUrl: reply.contactUrl }),
+            ...(reply.messageId === undefined ? {} : { messageId: reply.messageId }),
           },
         ],
         nextId: state.nextId + 1,
@@ -109,6 +114,15 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         loginForm: 'closed',
         messages: [...state.messages, { id: state.nextId, role: 'note', text: event.note }],
         nextId: state.nextId + 1,
+      };
+    case 'feedback_given':
+      return {
+        ...state,
+        messages: state.messages.map((message) => {
+          if (message.id !== event.id || message.role !== 'bot') return message;
+          const { rating: _previous, ...rest } = message;
+          return event.rating === undefined ? rest : { ...rest, rating: event.rating };
+        }),
       };
     case 'new_chat':
       return { ...initialChatState(true), nextId: state.nextId };

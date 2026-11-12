@@ -26,6 +26,8 @@ function noticeFor(error: unknown): Notice {
   return 'error';
 }
 
+const focusOnMount = (element: HTMLElement | null) => element?.focus();
+
 function closeChat(): void {
   // No data in the message; the loader only accepts it from the widget's origin.
   window.parent.postMessage({ type: CLOSE_MESSAGE }, '*');
@@ -65,6 +67,20 @@ export function App(props: {
     const session = await api.createConversation(lang);
     remember(session);
     return session;
+  }
+
+  // Optimistic: show the rating at once; undo it if it could not be saved.
+  async function rate(id: number, rating: 'up' | 'down') {
+    const message = state.messages.find((m) => m.id === id);
+    const session = stored.current.session;
+    if (message?.role !== 'bot' || message.messageId === undefined || !session) return;
+    const previous = message.rating;
+    dispatch({ type: 'feedback_given', id, rating });
+    try {
+      await api.sendFeedback(session, message.messageId, rating);
+    } catch {
+      dispatch({ type: 'feedback_given', id, rating: previous });
+    }
   }
 
   async function send(event: Event) {
@@ -129,6 +145,7 @@ export function App(props: {
             sending={state.phase === 'sending'}
             onOpenLeadForm={() => dispatch({ type: 'lead_form_opened' })}
             onOpenTicketForm={() => dispatch({ type: 'ticket_form_opened' })}
+            onRate={rate}
             onOpenLogin={() => dispatch({ type: 'login_opened' })}
           />
           {state.notice && (
@@ -178,12 +195,13 @@ export function App(props: {
             />
           )}
           {state.ticketForm === 'submitted' && (
-            <p class="tm-success" role="status">
+            // Focus moves here: the form that had focus is gone.
+            <p class="tm-success" role="status" tabIndex={-1} ref={focusOnMount}>
               {t(lang, 'widget.ticket.success')}
             </p>
           )}
           {state.leadForm === 'submitted' && (
-            <p class="tm-success" role="status">
+            <p class="tm-success" role="status" tabIndex={-1} ref={focusOnMount}>
               {t(lang, 'widget.lead.success')}
             </p>
           )}
