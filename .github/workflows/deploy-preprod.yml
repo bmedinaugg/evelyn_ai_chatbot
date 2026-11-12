@@ -28,6 +28,8 @@ jobs:
         -c widgetDistPath=../apps/widget/dist
         -c portal=${{ vars.PORTAL_ENABLED == 'true' && 'on' || 'off' }}
         -c portalDistPath=../apps/portal/dist
+        -c reportRecipients=${{ vars.DAILY_REPORT_RECIPIENTS }}
+        -c reportLang=${{ vars.DAILY_REPORT_LANG || 'nl' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

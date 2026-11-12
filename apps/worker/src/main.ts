@@ -3,7 +3,7 @@ import { COMMANDS, parseArgs, runCommand } from './cli.ts';
 const args = parseArgs(process.argv.slice(2));
 if (!args) {
   process.stderr.write(
-    `Usage: main.ts <${COMMANDS.join('|')}> [--allow-mass-change]\n       main.ts dsar-delete            (asks for the email address)\n`,
+    `Usage: main.ts <${COMMANDS.join('|')}> [--allow-mass-change]\n       main.ts dsar-delete            (asks for the email address)\n       main.ts daily-report [--resend] [--day YYYY-MM-DD]   (--day: local only)\n`,
   );
   process.exit(2);
 }

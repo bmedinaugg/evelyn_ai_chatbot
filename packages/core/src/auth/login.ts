@@ -17,7 +17,7 @@ export type OtpConfig = {
 
 export type LoginDeps = {
   auth: AuthRepository;
-  email: EmailSender;
+  email: Pick<EmailSender, 'sendLoginCode'>;
   magicline: {
     searchByEmail(email: string): Promise<CustomerLookup[]>;
     studioName(studioId: number): Promise<string>;

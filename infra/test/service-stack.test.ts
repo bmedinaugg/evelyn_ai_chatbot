@@ -19,6 +19,7 @@ const PREPROD_TEST_CONFIG = {
     topicField: 'ticket_type',
   },
   chatModel: 'claude-sonnet-5-5',
+  fastModel: 'claude-haiku-5-5',
 };
 let template: Template;
 let portalTemplate: Template;
@@ -173,6 +174,7 @@ describe('ServiceStack (preprod)', () => {
       MAGICLINE_USE_MOCK: 'true',
       MAGICLINE_BASE_URL: 'http://localhost:4010',
       FRESHDESK_PORTAL_ID: '103000108492',
+      CLAUDE_FAST_MODEL: 'claude-haiku-5-5',
     });
   });
 

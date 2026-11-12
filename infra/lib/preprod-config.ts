@@ -18,4 +18,5 @@ export const PREPROD_CONFIG: ServiceConfig = {
     topicField: 'ticket_type',
   },
   chatModel: 'claude-sonnet-5-5',
+  fastModel: 'claude-haiku-5-5',
 };

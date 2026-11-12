@@ -231,6 +231,43 @@ export function loadMagiclineKeysConfig(env: Env = process.env): MagiclineKeysCo
     : { kind: 'secret', secretName: e.MAGICLINE_KEYS_SECRET_NAME ?? '' };
 }
 
+export type ReportConfig = { recipients: string[]; lang: 'nl' | 'en'; portalBaseUrl: string };
+
+const portalBaseUrl = z
+  .url({ protocol: /^https?$/ })
+  .refine(
+    (url) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url),
+    {
+      message: 'must be https (http only for localhost)',
+    },
+  )
+  .transform((url) => url.replace(/\/+$/, ''));
+
+/** Daily report email (worker `daily-report`). */
+export function loadReportConfig(env: Env = process.env): ReportConfig {
+  const e = parseEnv(
+    z.object({
+      DAILY_REPORT_RECIPIENTS: z
+        .string()
+        .transform((raw) =>
+          raw
+            .split(',')
+            .map((address) => address.trim())
+            .filter(Boolean),
+        )
+        .pipe(z.array(z.email()).min(1).max(50)),
+      DAILY_REPORT_LANG: z.enum(['nl', 'en']).default('nl'),
+      PORTAL_BASE_URL: portalBaseUrl,
+    }),
+    env,
+  );
+  return {
+    recipients: e.DAILY_REPORT_RECIPIENTS,
+    lang: e.DAILY_REPORT_LANG,
+    portalBaseUrl: e.PORTAL_BASE_URL,
+  };
+}
+
 export type PortalConfig = {
   tenantId: string;
   clientId: string;
@@ -257,15 +294,7 @@ export function loadPortalConfig(env: Env = process.env): PortalConfig | null {
       ENTRA_TENANT_ID: z.uuid(),
       ENTRA_CLIENT_ID: z.uuid(),
       ENTRA_CLIENT_SECRET: z.string().min(1),
-      PORTAL_BASE_URL: z
-        .url({ protocol: /^https?$/ })
-        .refine(
-          (url) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url),
-          {
-            message: 'must be https (http only for localhost)',
-          },
-        )
-        .transform((url) => url.replace(/\/+$/, '')),
+      PORTAL_BASE_URL: portalBaseUrl,
       PORTAL_SESSION_SECRET: z.string().min(32),
     }),
     env,

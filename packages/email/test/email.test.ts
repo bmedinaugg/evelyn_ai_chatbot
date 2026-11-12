@@ -40,6 +40,39 @@ describe('createSesEmailSender', () => {
   });
 });
 
+describe('sendDailyReport', () => {
+  it('sends the plain-text report to all recipients', async () => {
+    const commands: SendEmailCommand[] = [];
+    const sender = createSesEmailSender({
+      client: { send: async (command: SendEmailCommand) => void commands.push(command) },
+      from: 'TrainMore <no-reply@example.com>',
+    });
+    await sender.sendDailyReport({
+      to: ['a@example.com', 'b@example.com'],
+      subject: 'Report',
+      text: 'Body',
+    });
+    expect(commands[0]?.input).toEqual({
+      FromEmailAddress: 'TrainMore <no-reply@example.com>',
+      Destination: { ToAddresses: ['a@example.com', 'b@example.com'] },
+      Content: {
+        Simple: {
+          Subject: { Data: 'Report', Charset: 'UTF-8' },
+          Body: { Text: { Data: 'Body', Charset: 'UTF-8' } },
+        },
+      },
+    });
+  });
+
+  it('prints the report locally', async () => {
+    const lines: string[] = [];
+    const outbox = createLocalOutbox({ appEnv: 'local', write: (line) => lines.push(line) });
+    await outbox.sendDailyReport({ to: ['a@example.com'], subject: 'Report', text: 'Body' });
+    expect(lines.join('\n')).toContain('Report');
+    expect(lines.join('\n')).toContain('Body');
+  });
+});
+
 describe('createLocalOutbox', () => {
   it('only works with APP_ENV=local and prints the code, not the address', async () => {
     expect(() => createLocalOutbox({ appEnv: 'preprod', write: () => {} })).toThrow(/local/);

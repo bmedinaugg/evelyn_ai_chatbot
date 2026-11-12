@@ -288,12 +288,21 @@ importers:
 
   apps/worker:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 1.8.0
+        version: 1.8.0(zod@4.6.7)
+      '@aws-sdk/client-sesv2':
+        specifier: 3.1166.0
+        version: 3.1166.0
       '@trainmore/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@trainmore/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@trainmore/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@trainmore/freshdesk':
         specifier: workspace:*
         version: link:../../packages/freshdesk
