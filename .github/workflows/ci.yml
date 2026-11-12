@@ -46,6 +46,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @trainmore/widget exec playwright install --with-deps chromium
       - run: pnpm --filter @trainmore/widget e2e
+      - run: pnpm --filter @trainmore/portal e2e
 
   db:
     runs-on: ubuntu-latest

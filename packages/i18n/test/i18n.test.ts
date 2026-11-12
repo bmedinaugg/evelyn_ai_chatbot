@@ -74,3 +74,13 @@ describe('widget texts', () => {
     );
   });
 });
+
+describe('portal texts', () => {
+  it('has the portal texts in both languages', () => {
+    expect(t('nl', 'portal.signIn')).toBe('Inloggen met Microsoft');
+    expect(t('en', 'portal.conversation.revealNote')).toBe(
+      'Showing the original text is recorded in the audit log.',
+    );
+    expect(t('nl', 'portal.reasons.thumbs_down')).toBe('Duim omlaag');
+  });
+});
