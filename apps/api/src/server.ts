@@ -7,6 +7,7 @@ import type { Logger } from '@trainmore/shared';
 import Fastify, { type FastifyError } from 'fastify';
 import { z } from 'zod';
 import { newConversationToken, tokenMatches } from './conversation-token.ts';
+import { registerLeadRoutes } from './leads.ts';
 
 export type ApiDeps = {
   conversations: ConversationRepository;
@@ -102,6 +103,8 @@ export function buildApiServer(deps: ApiDeps) {
         }
       },
     );
+
+    registerLeadRoutes(widget, deps);
   });
 
   return app;
