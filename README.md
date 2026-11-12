@@ -21,3 +21,14 @@ cp .env.example .env   # fill in values; never commit .env
 | `pnpm format` | Apply Biome fixes |
 | `pnpm typecheck` | `tsc --noEmit` in every package |
 | `pnpm test` | Vitest in every package |
+
+## CI
+GitHub Actions (`.github/workflows/`):
+- `ci.yml` → job `check`: lint, typecheck, tests, generated Magicline types up to date, CDK synth.
+- `ci.yml` → job `db`: starts Supabase locally and runs the pgTAP tests in `packages/db`.
+- `codeql.yml`: CodeQL security analysis (PRs, main, weekly).
+- `.github/dependabot.yml`: weekly npm and GitHub Actions updates.
+
+### Repository settings to enable manually (GitHub → Settings)
+- Code security: **Secret scanning** with **push protection**, **Dependabot alerts**.
+- Branches: protect `main`, require PRs and the status checks `check` and `db`.
