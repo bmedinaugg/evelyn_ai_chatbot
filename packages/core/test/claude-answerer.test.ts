@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import type { Answer } from '../src/answer-schema.ts';
-import { createClaudeAnswerer, type ParseClient } from '../src/claude-answerer.ts';
+import { type CreateClient, createClaudeAnswerer } from '../src/claude-answerer.ts';
 
 const answer: Answer = {
   language: 'nl',
@@ -12,33 +12,34 @@ const answer: Answer = {
   needsHuman: false,
 };
 
-function fakeParse(response: Record<string, unknown> | Error): {
-  client: ParseClient;
+function fakeCreate(response: Record<string, unknown> | Error): {
+  client: CreateClient;
   calls: Record<string, unknown>[];
 } {
   const calls: Record<string, unknown>[] = [];
   const client = {
-    // The SDK's parse is generic; the fake only needs to record params and return a canned message.
-    parse: (async (params: Record<string, unknown>) => {
+    // The SDK's create is overloaded (streaming/non-streaming); the fake records params and returns a message.
+    create: (async (params: Record<string, unknown>) => {
       calls.push(params);
       if (response instanceof Error) throw response;
       return response;
-    }) as unknown as ParseClient['parse'],
+    }) as unknown as CreateClient['create'],
   };
   return { client, calls };
 }
 
-function parsedMessage(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  const textBlock = { type: 'text', text: JSON.stringify(answer), citations: null };
-  Object.defineProperty(textBlock, 'parsed_output', { value: answer, enumerable: false });
+function message(text: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'msg_1',
     type: 'message',
     role: 'assistant',
     model: 'claude-sonnet-5-5',
     stop_reason: 'end_turn',
-    content: [{ type: 'thinking', thinking: '', signature: 'sig-1' }, textBlock],
-    parsed_output: answer,
+    content: [
+      { type: 'thinking', thinking: '', signature: 'sig-1' },
+      { type: 'text', text, citations: null },
+    ],
+    usage: { input_tokens: 10, output_tokens: 5 },
     ...overrides,
   };
 }
@@ -47,10 +48,12 @@ const history = [
   { role: 'user' as const, content: 'earlier question' },
   { role: 'assistant' as const, content: [{ type: 'text', text: '{}' }] },
 ];
+const run = (client: CreateClient) =>
+  createClaudeAnswerer({ client, model: 'm' })({ history: [], userTurn: 'q' });
 
 describe('createClaudeAnswerer', () => {
-  it('sends the exact request shape', async () => {
-    const { client, calls } = fakeParse(parsedMessage());
+  it('sends the exact request shape, with caching on the newest turn', async () => {
+    const { client, calls } = fakeCreate(message(JSON.stringify(answer)));
     await createClaudeAnswerer({ client, model: 'claude-sonnet-5-5' })({
       history,
       userTurn: 'new turn',
@@ -61,55 +64,50 @@ describe('createClaudeAnswerer', () => {
       max_tokens: 16000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
+      cache_control: { type: 'ephemeral' },
       system: [{ type: 'text', cache_control: { type: 'ephemeral' } }],
-      output_config: { effort: 'low' },
+      output_config: { effort: 'low', format: { type: 'json_schema' } },
       messages: [...history, { role: 'user', content: 'new turn' }],
     });
-    expect(params).not.toHaveProperty('thinking');
-    expect(params).not.toHaveProperty('temperature');
-    expect(params).not.toHaveProperty('tool_choice');
-    expect((params.output_config as { format?: unknown }).format).toBeDefined();
+    for (const key of ['thinking', 'temperature', 'tool_choice', 'stream'])
+      expect(params).not.toHaveProperty(key);
+    // Plain JSON schema: nothing that can't be serialised (no parse function).
+    const format = (params.output_config as { format: unknown }).format;
+    expect(JSON.parse(JSON.stringify(format))).toEqual(format);
   });
 
-  it('returns the answer and content without SDK-only fields', async () => {
-    const { client } = fakeParse(parsedMessage());
-    const result = await createClaudeAnswerer({ client, model: 'm' })({
-      history: [],
-      userTurn: 'q',
-    });
-    expect(result.kind).toBe('answer');
-    if (result.kind !== 'answer') return;
-    expect(result.answer).toEqual(answer);
-    expect(JSON.stringify(result.assistantContent)).not.toContain('parsed_output');
-    expect(result.assistantContent).toEqual([
-      { type: 'thinking', thinking: '', signature: 'sig-1' },
-      { type: 'text', text: JSON.stringify(answer), citations: null },
-    ]);
-  });
-
-  it('maps a refusal', async () => {
-    const { client } = fakeParse(parsedMessage({ stop_reason: 'refusal', parsed_output: null }));
-    expect(
-      await createClaudeAnswerer({ client, model: 'm' })({ history: [], userTurn: 'q' }),
-    ).toEqual({
-      kind: 'refusal',
+  it('returns the validated answer and the content unchanged', async () => {
+    const result = await run(fakeCreate(message(JSON.stringify(answer))).client);
+    expect(result).toEqual({
+      kind: 'answer',
+      answer,
+      assistantContent: [
+        { type: 'thinking', thinking: '', signature: 'sig-1' },
+        { type: 'text', text: JSON.stringify(answer), citations: null },
+      ],
     });
   });
 
-  it('maps unparseable output to invalid', async () => {
-    const { client } = fakeParse(parsedMessage({ parsed_output: null }));
-    expect(
-      await createClaudeAnswerer({ client, model: 'm' })({ history: [], userTurn: 'q' }),
-    ).toEqual({
+  it('maps a refusal even when it carries partial text', async () => {
+    const { client } = fakeCreate(message('{"language": "en", "ans', { stop_reason: 'refusal' }));
+    expect(await run(client)).toEqual({ kind: 'refusal' });
+  });
+
+  it('maps non-JSON, truncated or schema-violating output to invalid', async () => {
+    for (const text of [
+      'Sorry, I cannot',
+      '{"language": "nl"',
+      JSON.stringify({ ...answer, intent: 'chitchat' }),
+    ]) {
+      expect(await run(fakeCreate(message(text)).client)).toEqual({ kind: 'invalid' });
+    }
+    expect(await run(fakeCreate(message('x', { stop_reason: 'max_tokens' })).client)).toEqual({
       kind: 'invalid',
     });
   });
 
   it('lets SDK errors propagate', async () => {
     const error = new Anthropic.RateLimitError(429, undefined, 'rate limited', new Headers());
-    const { client } = fakeParse(error);
-    await expect(
-      createClaudeAnswerer({ client, model: 'm' })({ history: [], userTurn: 'q' }),
-    ).rejects.toBeInstanceOf(Anthropic.RateLimitError);
+    await expect(run(fakeCreate(error).client)).rejects.toBeInstanceOf(Anthropic.RateLimitError);
   });
 });

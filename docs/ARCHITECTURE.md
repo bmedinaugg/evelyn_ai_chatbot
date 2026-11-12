@@ -90,7 +90,8 @@ Prod preferably goes in a separate AWS account.
 2. Detect language (nl/en). The reply and UI labels follow the user.
 3. Classify the message: on-topic FAQ, account question, sales lead, wants a human, off-topic.
    Off-topic questions are politely declined.
-4. Retrieve: Postgres full-text search (`dutch` + `english`) over whole FAQ articles and published
+4. Retrieve: Postgres full-text search (`dutch` + `english`, any significant word may match, ranked)
+   over whole FAQ articles (bodies capped at 3,000 characters in the prompt) and published
    scenarios. Scenarios rank first. Voyage embeddings can be added later behind the same interface.
 5. Call Claude with:
    - system prompt and guardrails
@@ -237,6 +238,9 @@ Retention (proposal, to confirm with the DPO):
   - CORS restricted to `WIDGET_ALLOWED_ORIGINS`
   - strict CSP
   - WAF with managed rules + rate-based rules
+- **Client IP behind proxies:** the API trusts `TRUST_PROXY_HOPS` (2 = CloudFront + ALB) only when
+  the direct peer is a private VPC address. The ALB security group must accept only CloudFront's
+  managed prefix list, otherwise a client could reach the ALB directly and spoof `X-Forwarded-For`.
 - **Consent notice** before the first message, with a link to the privacy policy.
 - **Logging**: pino with redaction; hashed IDs allowed; no email, phone or name.
 - **LLM minimisation**: allowlisted fields only, no names, emails or phone numbers, pseudonymous references.

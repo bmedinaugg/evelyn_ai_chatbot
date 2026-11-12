@@ -58,7 +58,12 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
 }
 
 export type ClaudeConfig = { chatModel: string };
-export type ApiConfig = { port: number; allowedOrigins: string[]; supportContactUrl: string };
+export type ApiConfig = {
+  port: number;
+  trustProxyHops: number;
+  allowedOrigins: string[];
+  supportContactUrl: string;
+};
 export type TurnstileConfig = { secretKey: string };
 
 export function loadClaudeConfig(env: Env = process.env): ClaudeConfig {
@@ -85,6 +90,12 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
       .object({
         APP_ENV: runtimeEnvShape.APP_ENV,
         API_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+        // Proxies in front of the API: CloudFront + ALB = 2; 0 when exposed directly (local).
+        TRUST_PROXY_HOPS: z
+          .string()
+          .regex(/^[0-5]$/)
+          .default('0')
+          .transform(Number),
         WIDGET_ALLOWED_ORIGINS: z.string().transform((raw) =>
           raw
             .split(',')
@@ -111,6 +122,7 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
   );
   return {
     port: e.API_PORT,
+    trustProxyHops: e.TRUST_PROXY_HOPS,
     allowedOrigins: e.WIDGET_ALLOWED_ORIGINS,
     supportContactUrl: e.SUPPORT_CONTACT_URL,
   };

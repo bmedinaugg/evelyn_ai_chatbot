@@ -70,6 +70,23 @@ describe('POST /widget/leads', () => {
     expect(api.leads).toHaveLength(0);
   });
 
+  it('still confirms the lead when recording it fails after the ticket exists (no duplicate tickets)', async () => {
+    const api = createTestApi({ recordLeadError: 'always' });
+    const res = await submit(api, lead);
+    expect(res.statusCode).toBe(201);
+    expect(api.tickets).toHaveLength(1);
+  });
+
+  it('drops an unknown conversation link instead of failing', async () => {
+    const api = createTestApi({ recordLeadError: 'with-conversation' });
+    const res = await submit(api, {
+      ...lead,
+      conversationId: '00000000-0000-4000-8000-0000000000ff',
+    });
+    expect(res.statusCode).toBe(201);
+    expect(api.leads).toEqual([{ conversationId: null, freshdeskTicketId: 777, lang: 'nl' }]);
+  });
+
   it('never logs the email or the question', async () => {
     const api = createTestApi({ ticketError: new Error('boom') });
     await submit(api, lead);

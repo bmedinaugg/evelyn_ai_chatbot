@@ -1,5 +1,9 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { createServiceClient, createSupabaseConversationRepository } from '../src/index.ts';
+import {
+  ClaimLostError,
+  createServiceClient,
+  createSupabaseConversationRepository,
+} from '../src/index.ts';
 
 const url = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,12 +49,30 @@ describe('SupabaseConversationRepository', () => {
     expect(await repo.get('not-a-uuid')).toBeNull();
   });
 
-  it('claims one turn at a time and releases', async () => {
+  it('claims one turn at a time and releases only with the claim id', async () => {
     const id = await newConversation();
-    expect(await repo.claimTurn(id)).toBe(true);
-    expect(await repo.claimTurn(id)).toBe(false);
-    await repo.releaseTurn(id);
-    expect(await repo.claimTurn(id)).toBe(true);
+    const claim = await repo.claimTurn(id);
+    expect(claim).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await repo.claimTurn(id)).toBeNull();
+    await repo.releaseTurn(id, '00000000-0000-4000-8000-000000000000');
+    expect(await repo.claimTurn(id)).toBeNull();
+    await repo.releaseTurn(id, claim as string);
+    expect(await repo.claimTurn(id)).not.toBeNull();
+  });
+
+  it('appendTurn with a lost claim throws ClaimLostError and stores nothing', async () => {
+    const id = await newConversation();
+    await repo.claimTurn(id);
+    await expect(
+      repo.appendTurn({
+        conversationId: id,
+        claimId: '00000000-0000-4000-8000-000000000000',
+        user: { displayText: 'x', apiContent: 'x' },
+        assistant: null,
+        flags: [],
+      }),
+    ).rejects.toBeInstanceOf(ClaimLostError);
+    expect(await repo.listApiHistory(id)).toEqual([]);
   });
 
   it('appendTurn then listApiHistory replays content unchanged', async () => {
@@ -59,9 +81,10 @@ describe('SupabaseConversationRepository', () => {
       { type: 'thinking', thinking: '', signature: 'sig-abc' },
       { type: 'text', text: '{"answer":"Via de app."}' },
     ];
-    await repo.claimTurn(id);
+    const claimId = (await repo.claimTurn(id)) as string;
     await repo.appendTurn({
       conversationId: id,
+      claimId,
       user: {
         displayText: 'Hoe zeg ik op?',
         apiContent: '<customer_message>Hoe zeg ik op?</customer_message>',
@@ -79,13 +102,15 @@ describe('SupabaseConversationRepository', () => {
       { role: 'assistant', content: assistantContent },
     ]);
     expect((await repo.get(id))?.userMessageCount).toBe(1);
-    expect(await repo.claimTurn(id)).toBe(true);
+    expect(await repo.claimTurn(id)).not.toBeNull();
   });
 
   it('appendTurn without an assistant message stores the user message only', async () => {
     const id = await newConversation();
+    const claimId = (await repo.claimTurn(id)) as string;
     await repo.appendTurn({
       conversationId: id,
+      claimId,
       user: { displayText: 'x', apiContent: 'x' },
       assistant: null,
       flags: ['error'],

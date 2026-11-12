@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(16);
 
 -- Isolate from locally seeded articles; the transaction is rolled back at the end.
 delete from public.faq_articles;
@@ -45,6 +45,17 @@ select results_eq(
   $$select lang from public.search_faq('guest pass', 'nl')$$,
   $$values ('en'::text)$$,
   'fallback to the available language (en-only)'
+);
+
+select results_eq(
+  $$select article_id from public.search_faq('Hoi, ik wil mijn lidmaatschap opzeggen, hoe werkt dat?', 'nl') limit 1$$,
+  $$values (1::bigint)$$,
+  'a conversational question still finds the article (any word may match)'
+);
+select results_eq(
+  $$select article_id from public.search_faq('Hi there, how can I cancel my membership please?', 'en') limit 1$$,
+  $$values (1::bigint)$$,
+  'conversational English question'
 );
 
 select is_empty(

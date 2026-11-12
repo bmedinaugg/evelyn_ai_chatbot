@@ -17,6 +17,9 @@ export const nl = {
     wantsHuman: 'Natuurlijk. Je kunt ons supportteam bereiken via de contactpagina.',
     error: 'Er ging aan onze kant iets mis. Probeer het zo nog eens.',
     conversationLimit: 'Dit gesprek heeft de limiet bereikt. Start een nieuwe chat.',
+    greeting: 'Hoi! Waarmee kan ik je helpen?',
+    salesLead:
+      'Leuk dat je interesse hebt in TrainMore! Laat je gegevens achter in het formulier hieronder, dan neemt ons team contact met je op.',
   },
   lead: {
     subject: 'Nieuwe lidmaatschapsvraag via websitechat',

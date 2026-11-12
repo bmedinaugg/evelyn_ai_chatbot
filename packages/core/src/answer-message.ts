@@ -1,8 +1,9 @@
-import type {
-  ConversationRepository,
-  FaqRepository,
-  FlagReason,
-  StoredMessage,
+import {
+  ClaimLostError,
+  type ConversationRepository,
+  type FaqRepository,
+  type FlagReason,
+  type StoredMessage,
 } from '@trainmore/db';
 import { type Lang, t } from '@trainmore/i18n';
 import type { Logger } from '@trainmore/shared';
@@ -52,7 +53,8 @@ export async function answerMessage(
   input: { conversationId: string; text: string; pageLang: Lang },
 ): Promise<Reply> {
   const { conversations, logger } = deps;
-  if (!(await conversations.claimTurn(input.conversationId))) throw new ConversationBusyError();
+  const claimId = await conversations.claimTurn(input.conversationId);
+  if (!claimId) throw new ConversationBusyError();
 
   let appended = false;
   try {
@@ -104,12 +106,19 @@ export async function answerMessage(
             citations: reply.citations,
           }
         : null;
-    await conversations.appendTurn({
-      conversationId: input.conversationId,
-      user,
-      assistant,
-      flags: reply.flags,
-    });
+    try {
+      await conversations.appendTurn({
+        conversationId: input.conversationId,
+        claimId,
+        user,
+        assistant,
+        flags: reply.flags,
+      });
+    } catch (error) {
+      // A newer request took over after our claim expired: drop this result instead of forking history.
+      if (error instanceof ClaimLostError) throw new ConversationBusyError();
+      throw error;
+    }
     appended = true;
 
     logger.info(
@@ -123,6 +132,6 @@ export async function answerMessage(
     );
     return reply;
   } finally {
-    if (!appended) await conversations.releaseTurn(input.conversationId);
+    if (!appended) await conversations.releaseTurn(input.conversationId, claimId);
   }
 }

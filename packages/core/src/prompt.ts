@@ -22,9 +22,16 @@ Choose intent:
 
 Set needsHuman to true when the customer clearly needs a person to resolve their issue.`;
 
+/** Keeps the replayed history (and its cost) bounded; FAQ answers are short. */
+const MAX_ARTICLE_BODY = 3000;
+
 /** Escapes untrusted text so it cannot open or close the tags around it. */
 export function escapeForPrompt(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function capBody(body: string): string {
+  return body.length > MAX_ARTICLE_BODY ? `${body.slice(0, MAX_ARTICLE_BODY)} [...]` : body;
 }
 
 export function buildUserTurn(input: {
@@ -39,7 +46,7 @@ export function buildUserTurn(input: {
           '<faq_articles>',
           ...input.articles.map(
             (a) =>
-              `<article id="${a.articleId}" lang="${a.lang}"><title>${escapeForPrompt(a.title)}</title><body>${escapeForPrompt(a.body)}</body></article>`,
+              `<article id="${a.articleId}" lang="${a.lang}"><title>${escapeForPrompt(a.title)}</title><body>${escapeForPrompt(capBody(a.body))}</body></article>`,
           ),
           '</faq_articles>',
         ].join('\n');

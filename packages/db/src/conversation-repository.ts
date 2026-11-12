@@ -1,10 +1,11 @@
 import type { Lang } from '@trainmore/i18n';
 import { z } from 'zod';
 import { DbError, type ServiceClient } from './client.ts';
-import type {
-  ApiHistoryEntry,
-  ConversationRepository,
-  StoredMessage,
+import {
+  type ApiHistoryEntry,
+  ClaimLostError,
+  type ConversationRepository,
+  type StoredMessage,
 } from './conversation-types.ts';
 import type { Json } from './generated/database.types.ts';
 
@@ -69,15 +70,15 @@ export function createSupabaseConversationRepository(
     async claimTurn(id) {
       const { data, error } = await client.rpc('claim_conversation_turn', { p_id: id });
       if (error) throw new DbError('claim_conversation_turn', error.code);
-      return z.boolean().parse(data);
+      return z.uuid().nullable().parse(data);
     },
 
-    async releaseTurn(id) {
-      const { error } = await client
-        .from('conversations')
-        .update({ turn_claimed_at: null })
-        .eq('id', id);
-      if (error) throw new DbError('conversations release', error.code);
+    async releaseTurn(id, claimId) {
+      const { error } = await client.rpc('release_conversation_turn', {
+        p_id: id,
+        p_claim_id: claimId,
+      });
+      if (error) throw new DbError('release_conversation_turn', error.code);
     },
 
     async listApiHistory(id): Promise<ApiHistoryEntry[]> {
@@ -96,11 +97,13 @@ export function createSupabaseConversationRepository(
     async appendTurn(input) {
       const { error } = await client.rpc('append_chat_turn', {
         p_conversation_id: input.conversationId,
+        p_claim_id: input.claimId,
         p_user: toJson(input.user),
         // null is a valid p_assistant (no assistant message); the generated type omits it.
         p_assistant: (input.assistant ? toJson(input.assistant) : null) as Json,
         p_flags: input.flags,
       });
+      if (error?.code === 'TM001') throw new ClaimLostError();
       if (error) throw new DbError('append_chat_turn', error.code);
     },
 

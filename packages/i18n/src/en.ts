@@ -16,6 +16,9 @@ export const en = {
     wantsHuman: 'Of course. You can reach our support team via the contact page.',
     error: 'Something went wrong on our side. Please try again in a moment.',
     conversationLimit: 'This conversation has reached its limit. Please start a new chat.',
+    greeting: 'Hi! How can I help you today?',
+    salesLead:
+      "Great that you're interested in joining TrainMore! Leave your details in the form below and our team will contact you.",
   },
   lead: {
     subject: 'New membership question via website chat',

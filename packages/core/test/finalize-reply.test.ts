@@ -67,14 +67,29 @@ describe('finalizeReply', () => {
     });
   });
 
-  it('answers greetings without citations', () => {
+  it('answers greetings with the fixed greeting, never model text', () => {
     expect(
-      reply({ intent: 'greeting', answer: 'Hi! How can I help?', citedArticleIds: [] }),
+      reply({ intent: 'greeting', answer: 'Hi! Memberships cost €10.', citedArticleIds: [] }),
     ).toMatchObject({
       outcome: 'answered',
       citations: [],
-      text: 'Hi! How can I help?',
+      action: 'none',
+      text: 'Hi! How can I help you today?',
     });
+  });
+
+  it('sales questions without a cited article get the fixed lead text (no invented prices)', () => {
+    expect(
+      reply({ intent: 'sales_lead', answer: 'Membership is €24.99 a month!', citedArticleIds: [] }),
+    ).toMatchObject({
+      outcome: 'answered',
+      action: 'lead_form',
+      citations: [],
+      text: "Great that you're interested in joining TrainMore! Leave your details in the form below and our team will contact you.",
+    });
+    expect(reply({ intent: 'sales_lead', confidence: 'low' }).text).toMatch(
+      /^Great that you're interested/,
+    );
   });
 
   it('offers the lead form for sales questions', () => {

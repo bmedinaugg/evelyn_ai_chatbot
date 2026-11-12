@@ -21,14 +21,14 @@ export type Database = {
                   ]
                 },"conversations": {
                   Row: {
-                    "created_at": string,"id": string,"lang": string,"last_message_at": string | null,"token_hash": string,"turn_claimed_at": string | null,"user_message_count": number
+                    "created_at": string,"id": string,"lang": string,"last_message_at": string | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"lang": string,"last_message_at"?: string | null,"token_hash": string,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                    "created_at"?: string,"id"?: string,"lang": string,"last_message_at"?: string | null,"token_hash": string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"token_hash"?: string,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                    "created_at"?: string,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"token_hash"?: string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number
                   }
                   Relationships: [
                     
@@ -120,10 +120,13 @@ isOneToOne: false
           }
           Functions: {
             "append_chat_turn":
-{ Args: { "p_assistant": Json,"p_conversation_id": string,"p_flags": (string)[],"p_user": Json }; Returns: undefined
+{ Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_user": Json }; Returns: undefined
                            },
 "claim_conversation_turn":
-{ Args: { "p_id": string }; Returns: boolean
+{ Args: { "p_id": string }; Returns: string
+                           },
+"release_conversation_turn":
+{ Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
                            },
 "search_faq":
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {

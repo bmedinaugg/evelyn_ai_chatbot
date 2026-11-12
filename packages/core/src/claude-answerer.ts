@@ -4,7 +4,7 @@ import type { ApiHistoryEntry } from '@trainmore/db';
 import { type Answer, answerSchema } from './answer-schema.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 
-export type ParseClient = Pick<Anthropic['beta']['messages'], 'parse'>;
+export type CreateClient = Pick<Anthropic['beta']['messages'], 'create'>;
 
 export type AnswererResult =
   | { kind: 'answer'; answer: Answer; assistantContent: unknown }
@@ -16,20 +16,26 @@ export type Answerer = (input: {
   userTurn: string;
 }) => Promise<AnswererResult>;
 
+// Plain JSON schema for output_config.format. We parse ourselves (not messages.parse) so that a
+// refusal is recognised before any parsing, and malformed output never throws with model text.
+const { parse: _sdkParse, ...ANSWER_FORMAT } = betaZodOutputFormat(answerSchema);
+
 /**
- * One Claude call per customer message: structured output (validated by the SDK against
- * answerSchema), adaptive thinking at low effort (chat), and server-side refusal fallback.
+ * One Claude call per customer message: structured output, adaptive thinking at low effort (chat),
+ * server-side refusal fallback, and caching of the system prompt and the conversation so far.
  * SDK errors propagate; the caller turns them into a generic reply.
  */
-export function createClaudeAnswerer(opts: { client: ParseClient; model: string }): Answerer {
+export function createClaudeAnswerer(opts: { client: CreateClient; model: string }): Answerer {
   return async ({ history, userTurn }) => {
-    const response = await opts.client.parse({
+    const response = await opts.client.create({
       model: opts.model,
       max_tokens: 16000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
+      // Top-level breakpoint caches the newest turn, so earlier history is a cache read next time.
+      cache_control: { type: 'ephemeral' },
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      output_config: { effort: 'low', format: betaZodOutputFormat(answerSchema) },
+      output_config: { effort: 'low', format: ANSWER_FORMAT },
       // Stored history is replayed exactly as it was received (append-only, preserved thinking).
       messages: [
         ...(history as Anthropic.Beta.BetaMessageParam[]),
@@ -38,11 +44,20 @@ export function createClaudeAnswerer(opts: { client: ParseClient; model: string 
     });
 
     if (response.stop_reason === 'refusal') return { kind: 'refusal' };
-    if (response.parsed_output === null) return { kind: 'invalid' };
+    if (response.stop_reason !== 'end_turn') return { kind: 'invalid' };
+    const text = response.content.find((block) => block.type === 'text')?.text;
+    if (text === undefined) return { kind: 'invalid' };
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return { kind: 'invalid' };
+    }
+    const parsed = answerSchema.safeParse(json);
+    if (!parsed.success) return { kind: 'invalid' };
     return {
       kind: 'answer',
-      answer: response.parsed_output,
-      // JSON round trip drops the SDK's non-enumerable parsed_output; blocks stay unchanged.
+      answer: parsed.data,
       assistantContent: JSON.parse(JSON.stringify(response.content)),
     };
   };

@@ -1,4 +1,10 @@
-import { answerMessage, createClaudeAnswerer, type ParseClient, type Reply } from '@trainmore/core';
+import type Anthropic from '@anthropic-ai/sdk';
+import {
+  answerMessage,
+  type CreateClient,
+  createClaudeAnswerer,
+  type Reply,
+} from '@trainmore/core';
 import type { ConversationRepository, FaqRepository } from '@trainmore/db';
 import type { Logger } from '@trainmore/shared';
 import { checkReply } from './assertions.ts';
@@ -21,11 +27,11 @@ export function estimateUsd(usage: Usage): number {
 }
 
 /** Wraps the SDK client to record token usage per call. */
-function recordUsage(inner: ParseClient, onUsage: (usage: Usage) => void): ParseClient {
+function recordUsage(inner: CreateClient, onUsage: (usage: Usage) => void): CreateClient {
   return {
-    // Cast: parse is generic over its params; this wrapper only observes the result.
-    parse: (async (...args: Parameters<ParseClient['parse']>) => {
-      const response = await inner.parse(...args);
+    // Cast: create is overloaded (streaming/non-streaming); the answerer never streams.
+    create: (async (...args: Parameters<CreateClient['create']>) => {
+      const response = (await inner.create(...args)) as Anthropic.Beta.BetaMessage;
       onUsage({
         input: response.usage.input_tokens,
         output: response.usage.output_tokens,
@@ -33,7 +39,7 @@ function recordUsage(inner: ParseClient, onUsage: (usage: Usage) => void): Parse
         cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
       });
       return response;
-    }) as unknown as ParseClient['parse'],
+    }) as unknown as CreateClient['create'],
   };
 }
 
@@ -41,7 +47,7 @@ export async function runEvals(
   deps: {
     faq: FaqRepository;
     conversations: ConversationRepository;
-    client: ParseClient;
+    client: CreateClient;
     model: string;
     logger: Logger;
   },

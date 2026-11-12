@@ -3,6 +3,7 @@ export { createSupabaseConversationRepository } from './conversation-repository.
 export {
   type ApiHistoryEntry,
   type Citation,
+  ClaimLostError,
   type ConversationRecord,
   type ConversationRepository,
   FLAG_REASONS,

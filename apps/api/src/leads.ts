@@ -46,7 +46,8 @@ export function registerLeadRoutes(app: FastifyInstance, deps: ApiDeps): void {
         return reply.code(502).send({ error: 'unavailable' });
       }
 
-      await deps.conversations.recordLead({
+      // The ticket exists now: never fail the request (the customer would resubmit and duplicate it).
+      await recordLeadSafely(deps, {
         conversationId: body.conversationId ?? null,
         freshdeskTicketId: ticketId,
         lang: body.lang,
@@ -55,4 +56,26 @@ export function registerLeadRoutes(app: FastifyInstance, deps: ApiDeps): void {
       return reply.code(201).send({ ok: true });
     },
   );
+}
+
+async function recordLeadSafely(
+  deps: ApiDeps,
+  lead: Parameters<ApiDeps['conversations']['recordLead']>[0],
+): Promise<void> {
+  try {
+    await deps.conversations.recordLead(lead);
+    return;
+  } catch (error) {
+    deps.logger.warn({ err: error }, 'recording lead failed');
+  }
+  if (lead.conversationId === null) return;
+  // Most likely an unknown conversation id: keep the record without the link.
+  try {
+    await deps.conversations.recordLead({ ...lead, conversationId: null });
+  } catch (error) {
+    deps.logger.error(
+      { err: error, freshdeskTicketId: lead.freshdeskTicketId },
+      'recording lead failed',
+    );
+  }
 }

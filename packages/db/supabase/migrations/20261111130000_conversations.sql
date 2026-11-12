@@ -9,7 +9,8 @@ create table public.conversations (
   created_at timestamptz not null default now(),
   last_message_at timestamptz,
   user_message_count int not null default 0,
-  turn_claimed_at timestamptz -- one turn in flight; see claim_conversation_turn
+  turn_claimed_at timestamptz, -- one turn in flight; see claim_conversation_turn
+  turn_claim_id uuid -- only the current claim holder may append or release
 );
 
 create table public.messages (
@@ -50,26 +51,42 @@ create table public.lead_submissions (
   created_at timestamptz not null default now()
 );
 
--- Claims the conversation for one turn. Claims older than 60 seconds count as abandoned.
+-- Claims the conversation for one turn and returns the claim id (null if another turn is in
+-- flight). Claims older than 60 seconds count as abandoned and can be taken over; the previous
+-- holder then can no longer append or release (its id no longer matches).
 create or replace function public.claim_conversation_turn(p_id uuid)
-returns boolean
+returns uuid
 language plpgsql
 security invoker
 set search_path = ''
 as $$
+declare
+  v_claim_id uuid := gen_random_uuid();
 begin
   update public.conversations
-  set turn_claimed_at = now()
+  set turn_claimed_at = now(), turn_claim_id = v_claim_id
   where id = p_id
     and (turn_claimed_at is null or turn_claimed_at < now() - interval '60 seconds');
-  return found;
+  return case when found then v_claim_id else null end;
 end;
 $$;
 
+create or replace function public.release_conversation_turn(p_id uuid, p_claim_id uuid)
+returns void
+language sql
+security invoker
+set search_path = ''
+as $$
+  update public.conversations
+  set turn_claimed_at = null, turn_claim_id = null
+  where id = p_id and turn_claim_id = p_claim_id;
+$$;
+
 -- Appends the user message, the optional assistant message and the flags in one transaction,
--- then bumps the counters and releases the claim.
+-- then bumps the counters and releases the claim. Raises TM001 if the caller lost its claim.
 create or replace function public.append_chat_turn(
   p_conversation_id uuid,
+  p_claim_id uuid,
   p_user jsonb,
   p_assistant jsonb,
   p_flags text[]
@@ -83,6 +100,13 @@ declare
   v_message_id bigint;
   v_reason text;
 begin
+  perform 1 from public.conversations
+  where id = p_conversation_id and turn_claim_id = p_claim_id
+  for update;
+  if not found then
+    raise exception 'turn claim lost' using errcode = 'TM001';
+  end if;
+
   insert into public.messages (conversation_id, role, display_text, api_content, outcome, citations)
   values (
     p_conversation_id, 'user', p_user ->> 'display_text', p_user -> 'api_content',
@@ -107,12 +131,15 @@ begin
   update public.conversations
   set user_message_count = user_message_count + 1,
       last_message_at = now(),
-      turn_claimed_at = null
+      turn_claimed_at = null,
+      turn_claim_id = null
   where id = p_conversation_id;
 end;
 $$;
 
 revoke execute on function public.claim_conversation_turn(uuid) from public, anon, authenticated;
-revoke execute on function public.append_chat_turn(uuid, jsonb, jsonb, text[]) from public, anon, authenticated;
+revoke execute on function public.release_conversation_turn(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.append_chat_turn(uuid, uuid, jsonb, jsonb, text[]) from public, anon, authenticated;
 grant execute on function public.claim_conversation_turn(uuid) to service_role;
-grant execute on function public.append_chat_turn(uuid, jsonb, jsonb, text[]) to service_role;
+grant execute on function public.release_conversation_turn(uuid, uuid) to service_role;
+grant execute on function public.append_chat_turn(uuid, uuid, jsonb, jsonb, text[]) to service_role;

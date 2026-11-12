@@ -36,7 +36,13 @@ export function finalizeReply(input: { answer: Answer; hits: FaqSearchHit[] }): 
   const { answer, hits } = input;
   const lang = answer.language;
   const fixed = (
-    key: 'bot.noMatch' | 'bot.offTopic' | 'bot.accountQuestion' | 'bot.wantsHuman',
+    key:
+      | 'bot.noMatch'
+      | 'bot.offTopic'
+      | 'bot.accountQuestion'
+      | 'bot.wantsHuman'
+      | 'bot.greeting'
+      | 'bot.salesLead',
     action: ReplyAction,
     outcome: Outcome,
     flags: FlagReason[],
@@ -60,18 +66,13 @@ export function finalizeReply(input: { answer: Answer; hits: FaqSearchHit[] }): 
     case 'wants_human':
       return fixed('bot.wantsHuman', 'contact', 'handoff', ['wants_human']);
     case 'greeting':
-      return text
-        ? { text, lang, citations: [], action: 'none', outcome: 'answered', flags: [] }
-        : fixed('bot.noMatch', 'contact', 'no_match', ['no_match']);
+      // Fixed text: model-written small talk could still invent offers or prices.
+      return fixed('bot.greeting', 'none', 'answered', []);
     case 'sales_lead':
-      return {
-        text: text || t(lang, 'bot.noMatch'),
-        lang,
-        citations,
-        action: 'lead_form',
-        outcome: 'answered',
-        flags: [],
-      };
+      // Model text only when grounded in a cited article; otherwise a fixed text (no invented prices).
+      return citations.length > 0 && answer.confidence !== 'low' && text
+        ? { text, lang, citations, action: 'lead_form', outcome: 'answered', flags: [] }
+        : fixed('bot.salesLead', 'lead_form', 'answered', []);
     case 'faq': {
       const flags: FlagReason[] = [];
       if (citations.length === 0) flags.push('no_match');

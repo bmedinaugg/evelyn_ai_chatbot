@@ -1,11 +1,12 @@
-import type {
-  ApiHistoryEntry,
-  ConversationRecord,
-  ConversationRepository,
-  FaqRepository,
-  FaqSearchHit,
-  FlagReason,
-  StoredMessage,
+import {
+  type ApiHistoryEntry,
+  ClaimLostError,
+  type ConversationRecord,
+  type ConversationRepository,
+  type FaqRepository,
+  type FaqSearchHit,
+  type FlagReason,
+  type StoredMessage,
 } from '@trainmore/db';
 
 export type StoredTurn = {
@@ -14,8 +15,12 @@ export type StoredTurn = {
   flags: FlagReason[];
 };
 
-export function fakeConversations(record: ConversationRecord) {
+export function fakeConversations(
+  record: ConversationRecord,
+  options: { loseClaim?: boolean } = {},
+) {
   const turns: StoredTurn[] = [];
+  const releases: string[] = [];
   let claimed = false;
   const repo: ConversationRepository = {
     async create() {
@@ -27,11 +32,12 @@ export function fakeConversations(record: ConversationRecord) {
         : null;
     },
     async claimTurn() {
-      if (claimed) return false;
+      if (claimed) return null;
       claimed = true;
-      return true;
+      return 'claim-1';
     },
-    async releaseTurn() {
+    async releaseTurn(_id, claimId) {
+      releases.push(claimId);
       claimed = false;
     },
     async listApiHistory(): Promise<ApiHistoryEntry[]> {
@@ -43,12 +49,13 @@ export function fakeConversations(record: ConversationRecord) {
       ]);
     },
     async appendTurn(input) {
+      if (options.loseClaim) throw new ClaimLostError();
       turns.push({ user: input.user, assistant: input.assistant, flags: input.flags });
       claimed = false;
     },
     async recordLead() {},
   };
-  return { repo, turns, isClaimed: () => claimed, claim: () => (claimed = true) };
+  return { repo, turns, releases, isClaimed: () => claimed, claim: () => (claimed = true) };
 }
 
 export function fakeFaq(hits: FaqSearchHit[]): FaqRepository {

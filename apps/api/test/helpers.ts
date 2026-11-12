@@ -19,6 +19,8 @@ export function createTestApi(
     turnstileOk?: boolean;
     ticketError?: Error;
     claimError?: Error;
+    trustProxyHops?: number;
+    recordLeadError?: 'with-conversation' | 'always';
   } = {},
 ) {
   const conversations = new Map<
@@ -28,6 +30,7 @@ export function createTestApi(
   const leads: { conversationId: string | null; freshdeskTicketId: number; lang: string }[] = [];
   const tickets: CreateTicketInput[] = [];
   const answererCalls: Parameters<Answerer>[0][] = [];
+  const turnstileIps: string[] = [];
   let logOutput = '';
   let counter = 0;
 
@@ -54,9 +57,9 @@ export function createTestApi(
     async claimTurn(id) {
       if (options.claimError) throw options.claimError;
       const c = conversations.get(id);
-      if (!c || c.claimed) return false;
+      if (!c || c.claimed) return null;
       c.claimed = true;
-      return true;
+      return 'claim-1';
     },
     async releaseTurn(id) {
       const c = conversations.get(id);
@@ -74,6 +77,10 @@ export function createTestApi(
       c.claimed = false;
     },
     async recordLead(input) {
+      if (options.recordLeadError === 'always') throw new Error('db down');
+      if (options.recordLeadError === 'with-conversation' && input.conversationId !== null) {
+        throw new Error('foreign key violation');
+      }
       leads.push(input);
     },
   };
@@ -126,8 +133,15 @@ export function createTestApi(
         return { id: 777 };
       },
     },
-    verifyTurnstile: async () => options.turnstileOk ?? true,
-    config: { allowedOrigins: [ORIGIN], supportContactUrl: CONTACT_URL },
+    verifyTurnstile: async (_token, remoteIp) => {
+      turnstileIps.push(remoteIp);
+      return options.turnstileOk ?? true;
+    },
+    config: {
+      allowedOrigins: [ORIGIN],
+      supportContactUrl: CONTACT_URL,
+      trustProxyHops: options.trustProxyHops ?? 0,
+    },
     logger: createLogger({
       name: 'api-test',
       level: 'info',
@@ -146,6 +160,7 @@ export function createTestApi(
     leads,
     tickets,
     answererCalls,
+    turnstileIps,
     logs: () => logOutput,
   };
 }

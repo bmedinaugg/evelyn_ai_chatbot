@@ -137,6 +137,22 @@ describe('answerMessage', () => {
     expect(calls[1]?.history[0]?.content).toBe(conv.turns[0]?.user.apiContent);
   });
 
+  it('drops the result when the claim was lost (a newer turn took over)', async () => {
+    const conv = fakeConversations(
+      { id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 },
+      { loseClaim: true },
+    );
+    const { answerer } = recordingAnswerer(answered);
+    await expect(
+      answerMessage(
+        { faq: fakeFaq([cancelNl]), conversations: conv.repo, answerer, logger },
+        { conversationId: ID, text: 'x', pageLang: 'nl' },
+      ),
+    ).rejects.toBeInstanceOf(ConversationBusyError);
+    expect(conv.turns).toHaveLength(0);
+    expect(conv.releases).toEqual(['claim-1']);
+  });
+
   it('never logs the customer text', async () => {
     const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
     const { answerer } = recordingAnswerer(answered);

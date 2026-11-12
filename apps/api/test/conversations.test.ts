@@ -79,7 +79,12 @@ describe('widget conversations', () => {
     });
     const { body } = await start(api);
     const res = await send(api, body.conversationId, body.token, { text: 'hello', pageLang: 'en' });
-    expect(res.json().reply).toEqual({ text: 'Hi!', lang: 'en', citations: [], action: 'none' });
+    expect(res.json().reply).toEqual({
+      text: 'Hi! How can I help you today?',
+      lang: 'en',
+      citations: [],
+      action: 'none',
+    });
   });
 
   it('rejects a wrong token or another conversation’s token with 404, without calling Claude', async () => {
@@ -149,6 +154,50 @@ describe('widget conversations', () => {
     const api = createTestApi();
     for (let i = 0; i < 10; i += 1) expect((await start(api)).res.statusCode).toBe(201);
     expect((await start(api)).res.statusCode).toBe(429);
+  });
+
+  it('behind CloudFront + ALB, rate limits and Turnstile use the visitor IP, not the proxy', async () => {
+    const api = createTestApi({ trustProxyHops: 2 });
+    const create = (visitor: string) =>
+      api.app.inject({
+        method: 'POST',
+        url: '/widget/conversations',
+        remoteAddress: '10.0.1.20',
+        headers: { origin: ORIGIN, 'x-forwarded-for': `${visitor}, 130.176.0.10` },
+        payload: { lang: 'en' },
+      });
+    for (let i = 0; i < 10; i += 1) expect((await create('203.0.113.5')).statusCode).toBe(201);
+    expect((await create('203.0.113.5')).statusCode).toBe(429);
+    expect((await create('198.51.100.7')).statusCode).toBe(201);
+
+    await api.app.inject({
+      method: 'POST',
+      url: '/widget/leads',
+      remoteAddress: '10.0.1.20',
+      headers: { origin: ORIGIN, 'x-forwarded-for': '198.51.100.7, 130.176.0.10' },
+      payload: {
+        email: 'a@example.com',
+        question: 'q',
+        lang: 'en',
+        turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX',
+        consent: true,
+      },
+    });
+    expect(api.turnstileIps).toEqual(['198.51.100.7']);
+  });
+
+  it('ignores X-Forwarded-For from a client connecting directly (no spoofing)', async () => {
+    const api = createTestApi({ trustProxyHops: 2 });
+    const create = (spoofed: string) =>
+      api.app.inject({
+        method: 'POST',
+        url: '/widget/conversations',
+        remoteAddress: '203.0.113.99',
+        headers: { origin: ORIGIN, 'x-forwarded-for': `${spoofed}, 1.2.3.4` },
+        payload: { lang: 'en' },
+      });
+    for (let i = 0; i < 10; i += 1) expect((await create(`198.51.100.${i}`)).statusCode).toBe(201);
+    expect((await create('198.51.100.200')).statusCode).toBe(429);
   });
 
   it('hides internal errors', async () => {

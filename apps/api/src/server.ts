@@ -8,6 +8,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { z } from 'zod';
 import { newConversationToken, tokenMatches } from './conversation-token.ts';
 import { registerLeadRoutes } from './leads.ts';
+import { proxyTrust } from './proxy-trust.ts';
 
 export type ApiDeps = {
   conversations: ConversationRepository;
@@ -15,7 +16,12 @@ export type ApiDeps = {
   answerer: Answerer;
   freshdesk: Pick<FreshdeskClient, 'createTicket'>;
   verifyTurnstile: (token: string, remoteIp: string) => Promise<boolean>;
-  config: { allowedOrigins: string[]; supportContactUrl: string };
+  config: {
+    allowedOrigins: string[];
+    supportContactUrl: string;
+    /** Proxies in front of the API (CloudFront + ALB = 2); 0 when exposed directly. */
+    trustProxyHops: number;
+  };
   logger: Logger;
 };
 
@@ -27,7 +33,14 @@ const BEARER = /^Bearer (\S+)$/;
 export type ApiServer = ReturnType<typeof buildApiServer>;
 
 export function buildApiServer(deps: ApiDeps) {
-  const app = Fastify({ loggerInstance: deps.logger, bodyLimit: 16 * 1024 });
+  const app = Fastify({
+    loggerInstance: deps.logger,
+    bodyLimit: 16 * 1024,
+    // request.ip must be the visitor (rate limits, Turnstile): trust exactly our own proxy hops.
+    ...(deps.config.trustProxyHops > 0
+      ? { trustProxy: proxyTrust(deps.config.trustProxyHops) }
+      : {}),
+  });
 
   // Browsers always send Origin on cross-site POSTs: anything not on the allowlist is refused.
   app.addHook('onRequest', async (request, reply) => {

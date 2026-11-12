@@ -47,14 +47,22 @@ export type ApiHistoryEntry = { role: 'user' | 'assistant'; content: unknown };
 export interface ConversationRepository {
   create(input: { tokenHash: string; lang: Lang }): Promise<{ id: string }>;
   get(id: string): Promise<ConversationRecord | null>;
-  /** true if this caller now owns the turn; false if another turn is in flight (claims expire after 60 s). */
-  claimTurn(id: string): Promise<boolean>;
-  releaseTurn(id: string): Promise<void>;
+  /**
+   * Claims the next turn and returns a claim id, or null if another turn is in flight.
+   * Claims expire after 60 s; a newer claim makes the old one invalid.
+   */
+  claimTurn(id: string): Promise<string | null>;
+  /** No-op unless claimId is still the current claim. */
+  releaseTurn(id: string, claimId: string): Promise<void>;
   /** Ordered (by message id) API history for replay. */
   listApiHistory(id: string): Promise<ApiHistoryEntry[]>;
-  /** Atomically inserts the user message, optional assistant message and flags; bumps counters; releases the claim. */
+  /**
+   * Atomically inserts the user message, optional assistant message and flags; bumps counters;
+   * releases the claim. Throws ClaimLostError if claimId is no longer the current claim.
+   */
   appendTurn(input: {
     conversationId: string;
+    claimId: string;
     user: StoredMessage;
     assistant: StoredMessage | null;
     flags: FlagReason[];
@@ -64,4 +72,12 @@ export interface ConversationRepository {
     freshdeskTicketId: number;
     lang: Lang;
   }): Promise<void>;
+}
+
+/** The turn's claim expired and another request took it over; this turn's result must be dropped. */
+export class ClaimLostError extends Error {
+  constructor() {
+    super('Conversation turn claim lost');
+    this.name = 'ClaimLostError';
+  }
 }

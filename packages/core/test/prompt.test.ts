@@ -26,6 +26,16 @@ describe('buildUserTurn', () => {
     expect(turn).toContain('<page_language>en</page_language>');
   });
 
+  it('caps long article bodies with a visible marker', () => {
+    const turn = buildUserTurn({
+      customerMessage: 'x',
+      articles: [{ ...cancelNl, body: 'a'.repeat(5000) }],
+      pageLang: 'nl',
+    });
+    expect(turn).toContain(`${'a'.repeat(3000)} [...]</body>`);
+    expect(turn).not.toContain('a'.repeat(3001));
+  });
+
   it('renders an empty article list', () => {
     expect(buildUserTurn({ customerMessage: 'hi', articles: [], pageLang: 'nl' })).toContain(
       '<faq_articles/>',

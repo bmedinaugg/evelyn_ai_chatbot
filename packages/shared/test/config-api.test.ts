@@ -27,9 +27,16 @@ describe('loadApiConfig', () => {
       }),
     ).toEqual({
       port: 8080,
+      trustProxyHops: 0,
       allowedOrigins: ['https://www.support.trainmore.com', 'https://www.trainmore.nl'],
       supportContactUrl: 'https://www.support.trainmore.com/en/support/tickets/new',
     });
+  });
+
+  it('parses the proxy hop count (0..5)', () => {
+    expect(loadApiConfig({ ...api, TRUST_PROXY_HOPS: '2' }).trustProxyHops).toBe(2);
+    expect(() => loadApiConfig({ ...api, TRUST_PROXY_HOPS: '9' })).toThrow(/TRUST_PROXY_HOPS/);
+    expect(() => loadApiConfig({ ...api, TRUST_PROXY_HOPS: 'true' })).toThrow(/TRUST_PROXY_HOPS/);
   });
 
   it('rejects an origin with a path', () => {

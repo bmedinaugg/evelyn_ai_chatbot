@@ -30,7 +30,8 @@ const useFake = runtime.appEnv === 'local' && env.CHAT_FAKE_ANSWERER === '1';
 const answerer = useFake
   ? createFakeAnswerer()
   : createClaudeAnswerer({
-      client: new Anthropic().beta.messages,
+      // Bounded so a turn finishes well before its 60 s claim can be taken over (at most ~2 x 25 s).
+      client: new Anthropic({ timeout: 25_000, maxRetries: 1 }).beta.messages,
       model: loadClaudeConfig(env).chatModel,
     });
 if (useFake) logger.warn('using the fake answerer (local smoke tests only)');
@@ -41,7 +42,11 @@ const app = buildApiServer({
   answerer,
   freshdesk: createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey }),
   verifyTurnstile: createTurnstileVerifier({ secretKey: loadTurnstileConfig(env).secretKey }),
-  config: { allowedOrigins: api.allowedOrigins, supportContactUrl: api.supportContactUrl },
+  config: {
+    allowedOrigins: api.allowedOrigins,
+    supportContactUrl: api.supportContactUrl,
+    trustProxyHops: api.trustProxyHops,
+  },
   logger,
 });
 
