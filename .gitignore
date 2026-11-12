@@ -7,3 +7,6 @@ cdk.out
 coverage
 supabase/.temp
 .DS_Store
+dist
+test-results
+playwright-report

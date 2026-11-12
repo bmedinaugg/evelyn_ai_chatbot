@@ -1,0 +1,18 @@
+{
+  "name": "@trainmore/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@trainmore/core": "workspace:*",
+    "@trainmore/db": "workspace:*",
+    "@trainmore/i18n": "workspace:*",
+    "@trainmore/shared": "workspace:*"
+  }
+}

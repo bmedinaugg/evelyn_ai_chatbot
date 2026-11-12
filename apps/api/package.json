@@ -1,0 +1,28 @@
+{
+  "name": "@trainmore/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@aws-sdk/client-secrets-manager": "3.1166.0",
+    "@aws-sdk/client-sesv2": "3.1166.0",
+    "@fastify/cors": "11.4.1",
+    "@fastify/rate-limit": "11.2.2",
+    "@trainmore/core": "workspace:*",
+    "@trainmore/db": "workspace:*",
+    "@trainmore/email": "workspace:*",
+    "@trainmore/freshdesk": "workspace:*",
+    "@trainmore/i18n": "workspace:*",
+    "@trainmore/magicline": "workspace:*",
+    "@trainmore/shared": "workspace:*",
+    "fastify": "5.12.8",
+    "zod": "4.6.7"
+  }
+}

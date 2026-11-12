@@ -90,7 +90,8 @@ Prod preferably goes in a separate AWS account.
 2. Detect language (nl/en). The reply and UI labels follow the user.
 3. Classify the message: on-topic FAQ, account question, sales lead, wants a human, off-topic.
    Off-topic questions are politely declined.
-4. Retrieve: Postgres full-text search (`dutch` + `english`) over whole FAQ articles and published
+4. Retrieve: Postgres full-text search (`dutch` + `english`, any significant word may match, ranked)
+   over whole FAQ articles (bodies capped at 3,000 characters in the prompt) and published
    scenarios. Scenarios rank first. Voyage embeddings can be added later behind the same interface.
 5. Call Claude with:
    - system prompt and guardrails
@@ -102,7 +103,9 @@ Prod preferably goes in a separate AWS account.
    Policies, prices and account facts may only come from retrieved content or tool results.
 7. Return the validated reply as JSON (the widget shows a typing indicator meanwhile). Store the turn,
    set flags, and log without personal data.
-8. Assistant turns are stored verbatim (API content blocks, including thinking blocks) and the
+8. Only one turn per conversation is in flight (claimed in the database, expires after 60 s); a second
+   concurrent message gets "busy". A conversation allows at most 20 customer messages.
+9. Assistant turns are stored verbatim (API content blocks, including thinking blocks) and the
    history sent to Claude is append-only, as Sonnet 5.5's preserved thinking requires.
 
 ### 3.2 Authentication (OTP)
@@ -110,6 +113,9 @@ Prod preferably goes in a separate AWS account.
 2. Server creates a 6-digit code and stores only an HMAC-SHA256 hash.
    - Expires after `OTP_EXPIRY_SECONDS` (300).
    - Single use.
+   - Per email: at most 3 codes per 15 minutes, and at most 10 codes or 15 wrong attempts per 24
+     hours (stops slow, long-running guessing). Checked under a per-email lock.
+   - A new login in the same conversation replaces the earlier account binding (shared devices).
    - Lockout after `OTP_MAX_ATTEMPTS` (5) failures.
    - Sent via SES in the user's language.
 3. On success, the server issues an opaque session token (only its hash is stored).
@@ -175,6 +181,8 @@ Behaviour per status:
     subject, description, consent checkbox
   - topic maps to Freshdesk `type`/tags; the mapping is configured in code and agreed with support
   - subject and description are pre-filled from the conversation and editable
+- **Until M3** adds the general ticket form, a hand-off shows a contact link (`SUPPORT_CONTACT_URL`);
+  the bot never writes links itself.
 - **Auto-escalation** on a stuck conversation: two low-confidence turns in a row, an explicit
   request for a human, or the same question repeated. It creates a ticket with:
   - the transcript as a private note
@@ -230,9 +238,14 @@ Retention (proposal, to confirm with the DPO):
 (In addition to the non-negotiable rules in `CLAUDE.md`.)
 - **Widget isolation:**
   - the widget runs in an iframe on its own origin
-  - CORS restricted to `WIDGET_ALLOWED_ORIGINS`
-  - strict CSP
+  - CORS restricted to `WIDGET_ALLOWED_ORIGINS`: the widget iframe host's origin (the iframe, not
+    the portal page, calls the API)
+  - strict CSP; no external fonts or scripts except Cloudflare Turnstile, loaded only with the lead
+    form (Google Fonts would send visitor IPs to Google)
   - WAF with managed rules + rate-based rules
+- **Client IP behind proxies:** the API trusts `TRUST_PROXY_HOPS` (2 = CloudFront + ALB) only when
+  the direct peer is a private VPC address. The ALB security group must accept only CloudFront's
+  managed prefix list, otherwise a client could reach the ALB directly and spoof `X-Forwarded-For`.
 - **Consent notice** before the first message, with a link to the privacy policy.
 - **Logging**: pino with redaction; hashed IDs allowed; no email, phone or name.
 - **LLM minimisation**: allowlisted fields only, no names, emails or phone numbers, pseudonymous references.
@@ -320,6 +333,9 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
+- M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
+- M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
 - M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE

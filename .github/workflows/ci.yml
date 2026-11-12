@@ -33,6 +33,19 @@ jobs:
       - name: CDK synth
         run: pnpm --filter @trainmore/infra exec cdk synth --quiet
 
+  widget-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @trainmore/widget exec playwright install --with-deps chromium
+      - run: pnpm --filter @trainmore/widget e2e
+
   db:
     runs-on: ubuntu-latest
     defaults:

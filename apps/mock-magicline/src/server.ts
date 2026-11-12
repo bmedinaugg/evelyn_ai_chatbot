@@ -5,6 +5,7 @@ import Fastify, {
   type FastifyRequest,
 } from 'fastify';
 import { z } from 'zod';
+import { studios } from '../fixtures/studios.ts';
 
 type Customer = components['schemas']['Customer'];
 
@@ -13,6 +14,7 @@ export type MockKeys = { crossStudio: string; studios: Record<number, string> };
 export type MockServerOptions = {
   keys: MockKeys;
   profiles: Customer[];
+  studios?: components['schemas']['StudioInformation'][];
   logger?: FastifyBaseLogger;
 };
 
@@ -57,6 +59,14 @@ export function buildMockServer(opts: MockServerOptions): FastifyInstance {
     // Assumption: case-insensitive exact match (real Magicline behaviour unverified).
     const email = body.data.email.toLowerCase();
     return opts.profiles.filter((customer) => customer.email?.toLowerCase() === email);
+  });
+
+  app.get('/v1/studios/information', async (request, reply) => {
+    const key = apiKey(request);
+    const studioId = typeof key === 'string' ? studioForKey.get(key) : undefined;
+    if (studioId === undefined) return reply.code(401).send();
+    const studio = (opts.studios ?? studios).find((s) => s.studioId === studioId);
+    return studio ?? reply.code(404).send();
   });
 
   app.get('/v1/customers/:customerId', async (request, reply) => {

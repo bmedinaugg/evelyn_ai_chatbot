@@ -1,0 +1,17 @@
+{
+  "name": "@trainmore/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sesv2": "3.1166.0",
+    "@trainmore/i18n": "workspace:*"
+  }
+}

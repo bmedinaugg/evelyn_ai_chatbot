@@ -51,7 +51,14 @@ describe('searchCustomersCrossStudio', () => {
       },
     ]);
     expect(await client.searchCustomersCrossStudio('jan@example.com')).toEqual([
-      { customerId: 1, studioId: 1001, status: 'MEMBER' },
+      { customerId: 1, studioId: 1001, status: 'MEMBER', customerNumber: null },
+    ]);
+  });
+
+  it('keeps the customer number when present', async () => {
+    respond(200, [{ id: 2, studioId: 1002, status: 'PROSPECT', customerNumber: 'M-0002' }]);
+    expect(await client.searchCustomersCrossStudio('b@example.com')).toEqual([
+      { customerId: 2, studioId: 1002, status: 'PROSPECT', customerNumber: 'M-0002' },
     ]);
   });
 
@@ -80,5 +87,20 @@ describe('searchCustomersCrossStudio', () => {
   it('rejects an empty email before calling the API', async () => {
     await expect(client.searchCustomersCrossStudio('  ')).rejects.toThrow();
     expect(calls).toBe(0);
+  });
+});
+
+describe('getStudioInformation', () => {
+  it('returns the studio id and name only', async () => {
+    respond(200, {
+      studioId: 1001,
+      name: 'Club A',
+      email: 'club@example.com',
+      accessCodeConfiguration: {},
+    });
+    expect(await client.getStudioInformation()).toEqual({ studioId: 1001, name: 'Club A' });
+    expect(req.method).toBe('GET');
+    expect(req.url).toBe('http://mock/v1/studios/information');
+    expect(req.headers.get('X-API-KEY')).toBe('k');
   });
 });

@@ -15,6 +15,7 @@
     "openapi-typescript": "7.13.0"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "3.1166.0",
     "zod": "4.6.7"
   }
 }

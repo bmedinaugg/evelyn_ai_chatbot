@@ -59,3 +59,57 @@ while we have content for it, or if it would delete articles or drop translation
 After checking Freshdesk, an intended large change runs with `sync-faq --allow-mass-change`.
 `pnpm --filter @trainmore/db test:integration` runs the repository tests against the local stack.
 `pnpm --filter @trainmore/db db:types` regenerates `packages/db/src/generated/database.types.ts`.
+
+## Chat API (local)
+`apps/api` serves the widget: `POST /widget/conversations`, `POST /widget/conversations/:id/messages`
+(bearer conversation token), `POST /widget/leads` (Turnstile + Freshdesk ticket), `GET /health`.
+Answers come from Claude Sonnet 5.5 (`CLAUDE_CHAT_MODEL`) with structured output; the server checks
+every answer (cited articles must exist, no model-written links, fixed texts for declines and
+hand-offs) before it is returned.
+
+```sh
+# Needs local Supabase with FAQ fixtures (see above) and the env keys in .env.example.
+# Smoke test without Claude spend: CHAT_FAKE_ANSWERER=1 (only honoured with APP_ENV=local).
+sh packages/db/scripts/with-local-env.sh env APP_ENV=local CHAT_FAKE_ANSWERER=1 ... pnpm --filter @trainmore/api dev
+```
+Local Turnstile: use Cloudflare's test secret `1x0000000000000000000000000000000AA` (see `docs/api/turnstile.md`).
+
+## Evals (spend money)
+`packages/evals` runs 24 bilingual questions against the synthetic FAQ fixtures with the real Claude
+API and prints pass/fail, tokens and an estimated cost (about $0.25–0.40 per run). It refuses to run
+unless `APP_ENV=local` and `EVAL_CONFIRM_SPEND=yes`, and never runs in CI.
+```sh
+sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
+  EVAL_CONFIRM_SPEND=yes ANTHROPIC_API_KEY=... pnpm --filter @trainmore/evals eval
+```
+
+## Chat widget (local)
+`apps/widget` is the chat shown on the help portal: `loader.js` (added to the Freshdesk portal
+layout) opens an iframe with the Preact app, which talks to the API.
+```sh
+pnpm --filter @trainmore/widget dev          # http://localhost:5173/?lang=nl (needs the API, see above)
+pnpm --filter @trainmore/widget build        # dist/: index.html + assets, loader.js, loader.css
+pnpm --filter @trainmore/widget e2e          # Playwright (API and Turnstile mocked)
+```
+Embed on the portal (after deploying `dist/` to the widget host):
+```html
+<script src="https://<widget host>/loader.js" data-widget-url="https://<widget host>/" async></script>
+```
+The API's `WIDGET_ALLOWED_ORIGINS` must contain the widget host's origin.
+First time only: `pnpm --filter @trainmore/widget exec playwright install chromium`.
+
+## Customer login (local)
+Visitors log in with a one-time code sent to their email; the server then looks up their Magicline
+account(s) with the cross-studio key and binds the chosen account to the conversation.
+- Locally (`APP_ENV=local`) codes are printed by the API (`[local outbox] login code …`) instead of emailed.
+- Run the mock Magicline server (`pnpm --filter @trainmore/mock-magicline dev`, port 4010) and set
+  `MAGICLINE_BASE_URL=http://localhost:4010`, `MAGICLINE_USE_MOCK=true`, `MOCK_MAGICLINE_KEYS=…`,
+  `OTP_HMAC_SECRET` (≥ 32 characters).
+- Synthetic logins: `member.single@example.com`, `prospect@example.com`, `former@example.com`,
+  `multi@example.com` (two clubs).
+
+In AWS, codes go out through Amazon SES (`EMAIL_FROM`, optional `SES_CONFIGURATION_SET`) and the
+Magicline keys come from one Secrets Manager secret per environment (`MAGICLINE_KEYS_SECRET_NAME`):
+```json
+{ "crossStudio": "<cross-studio key>", "studios": { "1001": "<key>", "1002": "<key>" } }
+```

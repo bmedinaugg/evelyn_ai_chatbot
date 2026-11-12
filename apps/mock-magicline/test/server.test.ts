@@ -69,6 +69,29 @@ describe('get customer by id', () => {
   });
 });
 
+describe('studio information', () => {
+  it('returns the studio of the key', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/v1/studios/information',
+      headers: { 'x-api-key': 'key-1002' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ studioId: 1002, name: 'TrainMore Utrecht (test)' });
+  });
+
+  it('401 for the cross-studio key or an unknown key', async () => {
+    for (const key of ['cross-key', 'nope']) {
+      const res = await server.inject({
+        method: 'GET',
+        url: '/v1/studios/information',
+        headers: { 'x-api-key': key },
+      });
+      expect(res.statusCode).toBe(401);
+    }
+  });
+});
+
 describe('parseMockKeys', () => {
   it('parses cross and studio keys', () => {
     expect(parseMockKeys('cross:a,1001:b,1002:c')).toEqual({
