@@ -19,6 +19,11 @@ export {
   type Outcome,
   type StoredMessage,
 } from './conversation-types.ts';
+export {
+  createSupabaseEscalationRepository,
+  type EscalationReason,
+  type EscalationRepository,
+} from './escalation-repository.ts';
 export { createSupabaseFaqRepository } from './faq-repository.ts';
 export type {
   ActiveFaqSummary,

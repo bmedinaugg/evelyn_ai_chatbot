@@ -61,6 +61,21 @@ export function fakeConversations(
       claimed = false;
     },
     async recordLead() {},
+    async lastAssistantOutcome() {
+      for (let i = turns.length - 1; i >= 0; i -= 1) {
+        const outcome = turns[i]?.assistant?.outcome;
+        if (outcome) return outcome;
+      }
+      return null;
+    },
+    async listTranscript() {
+      return turns.flatMap((turn) => [
+        { role: 'user' as const, text: turn.user.displayText },
+        ...(turn.assistant
+          ? [{ role: 'assistant' as const, text: turn.assistant.displayText }]
+          : []),
+      ]);
+    },
   };
   return { repo, turns, releases, isClaimed: () => claimed, claim: () => (claimed = true) };
 }

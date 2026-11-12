@@ -58,6 +58,10 @@ export interface ConversationRepository {
   releaseTurn(id: string, claimId: string): Promise<void>;
   /** Ordered (by message id) API history for replay. */
   listApiHistory(id: string): Promise<ApiHistoryEntry[]>;
+  /** Outcome of the latest assistant message, if any. */
+  lastAssistantOutcome(id: string): Promise<Outcome | null>;
+  /** What the customer saw and typed (no tool steps), oldest first, at most the last 50 messages. */
+  listTranscript(id: string): Promise<{ role: 'user' | 'assistant'; text: string }[]>;
   /**
    * Atomically inserts the user message, optional assistant message and flags; bumps counters;
    * releases the claim. Throws ClaimLostError if claimId is no longer the current claim.

@@ -5,6 +5,7 @@ import {
   type ApiHistoryEntry,
   ClaimLostError,
   type ConversationRepository,
+  OUTCOMES,
   type StoredMessage,
 } from './conversation-types.ts';
 import type { Json } from './generated/database.types.ts';
@@ -92,6 +93,39 @@ export function createSupabaseConversationRepository(
         .array(historyRowSchema)
         .parse(data)
         .map((row) => ({ role: row.role, content: row.api_content }));
+    },
+
+    async lastAssistantOutcome(id) {
+      const { data, error } = await client
+        .from('messages')
+        .select('outcome')
+        .eq('conversation_id', id)
+        .eq('role', 'assistant')
+        .neq('display_text', '')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new DbError('messages outcome select', error.code);
+      return z
+        .enum(OUTCOMES)
+        .nullable()
+        .parse(data?.outcome ?? null);
+    },
+
+    async listTranscript(id) {
+      const { data, error } = await client
+        .from('messages')
+        .select('role, display_text')
+        .eq('conversation_id', id)
+        .neq('display_text', '')
+        .order('id', { ascending: false })
+        .limit(50);
+      if (error) throw new DbError('messages transcript select', error.code);
+      return z
+        .array(z.object({ role: z.enum(['user', 'assistant']), display_text: z.string() }))
+        .parse(data)
+        .reverse()
+        .map((row) => ({ role: row.role, text: row.display_text }));
     },
 
     async appendTurn(input) {

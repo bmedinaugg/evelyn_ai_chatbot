@@ -93,6 +93,16 @@ export function createTestApi(
       }
       leads.push(input);
     },
+    async lastAssistantOutcome(id) {
+      const turns = conversations.get(id)?.turns ?? [];
+      return turns.findLast((m) => m.outcome !== undefined)?.outcome ?? null;
+    },
+    async listTranscript(id) {
+      return (conversations.get(id)?.turns ?? []).map((m) => ({
+        role: m.outcome === undefined ? ('user' as const) : ('assistant' as const),
+        text: m.displayText,
+      }));
+    },
   };
 
   const faq: FaqRepository = {
