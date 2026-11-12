@@ -48,3 +48,14 @@ describe('bot texts', () => {
     expect(t('en', 'lead.subject')).toBe('New membership question via website chat');
   });
 });
+
+describe('widget texts', () => {
+  it('has the widget texts in both languages', () => {
+    expect(t('en', 'widget.consent.accept')).toBe('I understand, start chat');
+    expect(t('nl', 'widget.consent.accept')).toBe('Begrepen, start de chat');
+    expect(t('nl', 'widget.input.placeholder')).toBe('Stel je vraag…');
+    expect(t('en', 'widget.lead.success')).toBe(
+      "Thanks! We've received your question and will get back to you by email.",
+    );
+  });
+});
