@@ -7,5 +7,5 @@ export {
   type RuntimeConfig,
   type SupabaseConfig,
 } from './config-sections.ts';
-export { createLogger, type LoggerOptions } from './logger.ts';
+export { createLogger, type Logger, type LoggerOptions } from './logger.ts';
 export { isPiiKey, redactDeep, scrubText } from './redact.ts';

@@ -1,0 +1,18 @@
+{
+  "name": "@trainmore/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-faq": "tsx src/main.ts sync-faq",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@trainmore/db": "workspace:*",
+    "@trainmore/freshdesk": "workspace:*",
+    "@trainmore/i18n": "workspace:*",
+    "@trainmore/shared": "workspace:*",
+    "zod": "4.6.7"
+  }
+}
