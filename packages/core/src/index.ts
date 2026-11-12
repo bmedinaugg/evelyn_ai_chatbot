@@ -1,4 +1,16 @@
+export {
+  type AnswerMessageDeps,
+  answerMessage,
+  ConversationBusyError,
+  MAX_CUSTOMER_MESSAGES,
+} from './answer-message.ts';
 export { type Answer, answerSchema } from './answer-schema.ts';
+export {
+  type Answerer,
+  type AnswererResult,
+  createClaudeAnswerer,
+  type ParseClient,
+} from './claude-answerer.ts';
 export {
   finalizeReply,
   type Reply,

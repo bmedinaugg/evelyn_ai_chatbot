@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@trainmore/db": "workspace:*",
     "@trainmore/i18n": "workspace:*",
     "@trainmore/shared": "workspace:*",
