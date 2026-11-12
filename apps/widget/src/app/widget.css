@@ -1,0 +1,253 @@
+/* TrainMore brand: black background, white text, red (#fa194a) only as accent. No external fonts. */
+:root {
+  --tm-red: #fa194a;
+  --tm-black: #000000;
+  --tm-white: #ffffff;
+  --tm-grey-light: #cacaca;
+  --tm-grey-dark: #2c2c2c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--tm-black);
+  color: var(--tm-white);
+  font:
+    400 15px / 1.4 Roboto,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.tm-widget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  gap: 12px;
+}
+
+.tm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--tm-red);
+}
+
+.tm-header h1 {
+  margin: 0 0 6px;
+  font:
+    900 20px / 0.9 Montserrat,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.tm-header p {
+  margin: 0;
+  color: var(--tm-grey-light);
+  font-size: 13px;
+}
+
+.tm-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tm-bubble {
+  max-width: 88%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tm-bubble p {
+  margin: 0;
+}
+
+.tm-bubble--user {
+  align-self: flex-end;
+  background: var(--tm-white);
+  color: var(--tm-black);
+}
+
+.tm-bubble--bot {
+  align-self: flex-start;
+  background: var(--tm-grey-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-sources__label {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.tm-sources ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+a {
+  color: var(--tm-white);
+  text-decoration-color: var(--tm-red);
+  text-underline-offset: 3px;
+}
+
+.tm-cta {
+  font-weight: 700;
+}
+
+.tm-typing,
+.tm-notice,
+.tm-success {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tm-typing {
+  color: var(--tm-grey-light);
+}
+
+.tm-notice {
+  color: var(--tm-red);
+}
+
+.tm-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tm-consent p {
+  margin: 0;
+}
+
+.tm-composer {
+  display: flex;
+  gap: 8px;
+}
+
+textarea,
+input[type="email"],
+input[type="tel"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--tm-grey-light);
+  border-radius: 8px;
+  background: var(--tm-black);
+  color: var(--tm-white);
+  font: inherit;
+  resize: none;
+}
+
+.tm-button {
+  padding: 10px 14px;
+  border: 1px solid var(--tm-white);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tm-white);
+  font:
+    700 13px / 1 Roboto,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.tm-button--primary {
+  border-color: var(--tm-red);
+  background: var(--tm-red);
+}
+
+.tm-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tm-icon-button,
+.tm-link-button {
+  border: 0;
+  background: transparent;
+  color: var(--tm-white);
+  cursor: pointer;
+  font: inherit;
+}
+
+.tm-icon-button {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.tm-link-button {
+  align-self: flex-start;
+  text-decoration: underline;
+  text-decoration-color: var(--tm-red);
+  font-size: 13px;
+}
+
+.tm-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--tm-red);
+  border-radius: 12px;
+}
+
+.tm-lead h2 {
+  margin: 0;
+  font:
+    700 14px / 1 Roboto,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tm-lead label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.tm-lead .tm-check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tm-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tm-red);
+  outline-offset: 2px;
+}
