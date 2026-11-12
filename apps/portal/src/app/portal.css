@@ -233,14 +233,14 @@ select {
   color: var(--tm-black);
 }
 
-.tm-message--user .tm-message__who {
-  color: var(--tm-grey-mid);
-}
-
 .tm-message__who {
   margin: 0 0 4px;
   color: var(--tm-grey-light);
   font-size: 12px;
+}
+
+.tm-message--user .tm-message__who {
+  color: var(--tm-grey-mid);
 }
 
 .tm-message__text {

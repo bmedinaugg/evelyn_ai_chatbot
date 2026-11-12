@@ -1,4 +1,5 @@
 import { type Lang, t } from '@trainmore/i18n';
+import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { type Me, type PortalApi, PortalApiError } from '../lib/api.ts';
 import { CapabilitiesPage } from './CapabilitiesPage.tsx';
@@ -101,7 +102,7 @@ export function App(props: {
     </header>
   );
 
-  let content;
+  let content: JSX.Element;
   if (auth === 'loading') content = <p role="status">{t(lang, 'portal.loading')}</p>;
   else if (auth === 'signed_out')
     content = (
