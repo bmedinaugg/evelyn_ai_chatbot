@@ -24,6 +24,7 @@ export const FLAG_REASONS = [
   'account_question',
   'refusal',
   'error',
+  'thumbs_down',
 ] as const;
 export type FlagReason = (typeof FLAG_REASONS)[number];
 
@@ -66,6 +67,7 @@ export interface ConversationRepository {
    * Atomically inserts the user message, optional assistant message and flags; bumps counters;
    * releases the claim. Throws ClaimLostError if claimId is no longer the current claim.
    */
+  /** Returns the id of the stored assistant reply (null without one), used for feedback. */
   appendTurn(input: {
     conversationId: string;
     claimId: string;
@@ -74,7 +76,13 @@ export interface ConversationRepository {
     steps?: ApiHistoryEntry[];
     assistant: StoredMessage | null;
     flags: FlagReason[];
-  }): Promise<void>;
+  }): Promise<number | null>;
+  /** Rates a visible assistant reply of this conversation; false for any other message. */
+  recordFeedback(
+    conversationId: string,
+    messageId: number,
+    rating: 'up' | 'down',
+  ): Promise<boolean>;
   recordLead(input: {
     conversationId: string | null;
     freshdeskTicketId: number;

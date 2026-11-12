@@ -50,6 +50,9 @@ export function createTestApi(
   const turnstileIps: string[] = [];
   let logOutput = '';
   let counter = 0;
+  let messageIds = 0;
+  const replies = new Map<number, string>();
+  const feedback: { conversationId: string; messageId: number; rating: 'up' | 'down' }[] = [];
 
   const conversationRepo: ConversationRepository = {
     async create(input) {
@@ -87,11 +90,20 @@ export function createTestApi(
     },
     async appendTurn(input) {
       const c = conversations.get(input.conversationId);
-      if (!c) return;
+      if (!c) return null;
       c.turns.push(input.user);
       if (input.assistant) c.turns.push(input.assistant);
       c.userMessageCount += 1;
       c.claimed = false;
+      if (!input.assistant) return null;
+      messageIds += 1;
+      replies.set(messageIds, input.conversationId);
+      return messageIds;
+    },
+    async recordFeedback(conversationId, messageId, rating) {
+      if (replies.get(messageId) !== conversationId) return false;
+      feedback.push({ conversationId, messageId, rating });
+      return true;
     },
     async recordLead(input) {
       if (options.recordLeadError === 'always') throw new Error('db down');
@@ -327,6 +339,7 @@ export function createTestApi(
     tickets,
     notes,
     escalations,
+    feedback,
     answererCalls,
     turnstileIps,
     logs: () => logOutput,

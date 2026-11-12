@@ -35,14 +35,14 @@ export type Database = {
                   ]
                 },"conversations": {
                   Row: {
-                    "account_candidates": Json | null,"created_at": string,"customer_id": number | null,"customer_status": string | null,"id": string,"lang": string,"last_message_at": string | null,"studio_id": number | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number,"verified_at": string | null,"verified_email_hash": string | null
+                    "account_candidates": Json | null,"anonymised_at": string | null,"created_at": string,"customer_id": number | null,"customer_status": string | null,"id": string,"lang": string,"last_message_at": string | null,"studio_id": number | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number,"verified_at": string | null,"verified_email_hash": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "account_candidates"?: Json | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang": string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash": string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
+                    "account_candidates"?: Json | null,"anonymised_at"?: string | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang": string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash": string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
                   }
                   Update: {
-                    "account_candidates"?: Json | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash"?: string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
+                    "account_candidates"?: Json | null,"anonymised_at"?: string | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash"?: string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
                   }
                   Relationships: [
                     
@@ -127,6 +127,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"message_feedback": {
+                  Row: {
+                    "created_at": string,"message_id": number,"rating": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"message_id": number,"rating": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"message_id"?: number,"rating"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "message_feedback_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: true
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"messages": {
                   Row: {
                     "api_content": NonNullable<Json>,"citations": NonNullable<Json>,"conversation_id": string,"created_at": string,"display_text": string,"id": number,"outcome": string | null,"role": string
@@ -187,8 +207,11 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "append_chat_turn":
-{ Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_steps"?: Json,"p_user": Json }; Returns: undefined
+            "anonymise_conversations":
+{ Args: { "p_before": string,"p_limit": number }; Returns: number
+                           },
+"append_chat_turn":
+{ Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_steps"?: Json,"p_user": Json }; Returns: number
                            },
 "bind_account":
 { Args: { "p_conversation_id": string,"p_index": number }; Returns: boolean
@@ -196,8 +219,22 @@ isOneToOne: false
 "claim_conversation_turn":
 { Args: { "p_id": string }; Returns: string
                            },
+"clear_account_bindings":
+{ Args: { "p_before": string }; Returns: number
+                           },
 "create_otp_challenge":
 { Args: { "p_code_hash": string,"p_conversation_id": string,"p_email_hash": string,"p_id": string,"p_max_per_window": number,"p_ttl_seconds": number,"p_window_seconds": number }; Returns: boolean
+                           },
+"dsar_delete":
+{ Args: { "p_email_hash": string }; Returns: {
+              "conversations": number,"otp_challenges": number
+            }[]
+                           },
+"purge_otp_challenges":
+{ Args: { "p_before": string }; Returns: number
+                           },
+"record_feedback":
+{ Args: { "p_conversation_id": string,"p_message_id": number,"p_rating": string }; Returns: boolean
                            },
 "release_conversation_turn":
 { Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
