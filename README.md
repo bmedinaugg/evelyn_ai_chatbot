@@ -75,12 +75,17 @@ sh packages/db/scripts/with-local-env.sh env APP_ENV=local CHAT_FAKE_ANSWERER=1 
 Local Turnstile: use Cloudflare's test secret `1x0000000000000000000000000000000AA` (see `docs/api/turnstile.md`).
 
 ## Evals (spend money)
-`packages/evals` runs 24 bilingual questions against the synthetic FAQ fixtures with the real Claude
-API and prints pass/fail, tokens and an estimated cost (about $0.25–0.40 per run). It refuses to run
-unless `APP_ENV=local` and `EVAL_CONFIRM_SPEND=yes`, and never runs in CI.
+`packages/evals` runs 31 bilingual cases (24 anonymous, 7 logged in as synthetic profiles of the
+mock Magicline) against the synthetic FAQ fixtures with the real Claude API, and prints pass/fail,
+tokens and an estimated cost (first run 2026-11-12: 30/31, about $0.06 thanks to prompt caching).
+It refuses to run unless `APP_ENV=local`, `EVAL_CONFIRM_SPEND=yes` and Magicline is a localhost mock,
+and never runs in CI. Needs local Supabase with seeded FAQ fixtures and the mock Magicline running.
 ```sh
-sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
-  EVAL_CONFIRM_SPEND=yes ANTHROPIC_API_KEY=... pnpm --filter @trainmore/evals eval
+MOCK_MAGICLINE_KEYS=cross:dev-cross,1001:dev-1001,1002:dev-1002 pnpm --filter @trainmore/mock-magicline start &
+cd packages/evals && sh ../db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local \
+  AWS_REGION=eu-west-1 EVAL_CONFIRM_SPEND=yes MAGICLINE_USE_MOCK=true MAGICLINE_BASE_URL=http://localhost:4010 \
+  MOCK_MAGICLINE_KEYS=cross:dev-cross,1001:dev-1001,1002:dev-1002 LOG_LEVEL=error \
+  node --env-file=../../.env --import tsx src/main.ts   # ANTHROPIC_API_KEY comes from .env
 ```
 
 ## Chat widget (local)

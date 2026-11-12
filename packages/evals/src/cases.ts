@@ -130,7 +130,7 @@ export const CASES: EvalCase[] = [
     id: 'en-account',
     pageLang: 'en',
     turns: ['When does my contract end?'],
-    expect: { outcome: ['unsupported'], action: 'ticket_form' },
+    expect: { outcome: ['unsupported'], action: 'login' },
   },
   {
     id: 'nl-human',

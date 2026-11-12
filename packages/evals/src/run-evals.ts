@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
   type AnswerMessageDeps,
@@ -59,7 +60,7 @@ export type EvalDeps = {
   capabilities?: AnswerMessageDeps['capabilities'];
 };
 
-async function logIn(
+export async function logIn(
   login: Omit<LoginDeps, 'email'>,
   conversationId: string,
   email: string,
@@ -67,6 +68,9 @@ async function logIn(
   let code = '';
   const deps: LoginDeps = {
     ...login,
+    // A fresh secret per eval login: cases reuse synthetic profiles more often than the per-email
+    // code limit allows, and eval logins must never count against each other (or the app's).
+    config: { ...login.config, secret: randomBytes(32).toString('hex') },
     email: {
       sendLoginCode: async (message) => {
         code = message.code;
