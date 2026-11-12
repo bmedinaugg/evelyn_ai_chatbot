@@ -139,6 +139,54 @@ describe('answerMessage', () => {
       });
     });
 
+    describe('members-only answers', () => {
+      const transfer = {
+        ...freeze,
+        versionId: 42,
+        answerNl: 'GEHEIM: overzetten kan eenmalig gratis.',
+        answerEn: 'SECRET: you can transfer once for free.',
+        statuses: ['MEMBER' as const],
+      };
+      async function promptFor(account: Parameters<typeof answerMessage>[1]['account']) {
+        const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+        const { answerer, calls } = recordingAnswerer(answered);
+        await answerMessage(
+          {
+            faq: fakeFaq([]),
+            conversations: conv.repo,
+            answerer,
+            logger,
+            scenarios: { search: async () => [transfer] },
+          },
+          {
+            conversationId: ID,
+            text: 'Kan ik mijn abonnement overzetten?',
+            pageLang: 'nl',
+            ...(account ? { account } : {}),
+          },
+        );
+        return calls[0]?.userTurn ?? '';
+      }
+
+      it('a visitor who is not logged in: the bot knows it exists (to ask for a login) but never sees its text', async () => {
+        const turn = await promptFor(null);
+        expect(turn).toContain('<approved_answer id="42" requires_login="true">');
+        expect(turn).not.toContain('GEHEIM');
+        expect(turn).not.toContain('SECRET');
+      });
+
+      it('a prospect: the bot does not see the members-only answer at all', async () => {
+        const turn = await promptFor({ customerId: 2, studioId: 1001, status: 'PROSPECT' });
+        expect(turn).not.toContain('id="42"');
+        expect(turn).not.toContain('GEHEIM');
+      });
+
+      it('a member: the bot sees the answer', async () => {
+        const turn = await promptFor({ customerId: 1, studioId: 1001, status: 'MEMBER' });
+        expect(turn).toContain('GEHEIM: overzetten kan eenmalig gratis.');
+      });
+    });
+
     it('keeps answering when approved answers cannot be searched', async () => {
       const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
       const reply = await answerMessage(

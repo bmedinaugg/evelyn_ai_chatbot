@@ -12,9 +12,8 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Environments | **Preprod only for now**; production built after preprod is tested and signed off | Product owner |
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
-| Approved answers | Exact approved text (server swaps it in); four eyes (never publish own version); side-by-side replay before publishing, human judge | Product owner (2026-11-12) |
 | Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
-| Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk) | Product owner |
+| Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk); shown word for word (server swaps the approved text in); four eyes (never publish your own version); side-by-side replay before publishing, human judge | Product owner (2026-11-11, details 2026-11-12) |
 | Daily report | Email | Product owner |
 | Account questions | Everything Magicline can answer, as a **capability catalogue** with examples and an on/off switch per capability | Product owner |
 | Magicline lookup | Cross-studio customer search; an org-wide key will be requested | Product owner |
@@ -263,10 +262,11 @@ As built (M4b, product owner decisions 2026-11-12):
   - **What the customer sees:** the server shows that version's nl/en text word for word, plus its
     linked article.
   - **When it's used:** only if the scenario was retrieved this turn. Its status condition is
-    checked server-side:
-    - no condition: everyone, including people who aren't logged in;
-    - with a condition, not logged in: a login prompt;
-    - wrong status: the normal hand-off.
+    applied in code **before the prompt is built** (`scenariosFor`; the same in replay):
+    - no condition: offered to everyone, including people who aren't logged in;
+    - with a condition, not logged in: offered **without its text** (the bot can only ask the
+      customer to log in);
+    - logged in with another status: not offered at all, so the normal answer path applies.
   - **Metrics:** the reply stores `scenario_version_id`.
 - **Four eyes.** Anyone with a portal role writes drafts. An approver or admin publishes, never a
   version they wrote; rollback (re-publishing a replaced version) follows the same rule.
@@ -427,20 +427,7 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 ## 8. Milestones
 Each milestone ends with tests passing and a preprod deploy.
 
-**M0: Foundations** ✅ done 2026-11-11 (branch `m0-foundations`, plan `docs/superpowers/plans/2026-11-11-m0-foundations.md`)
-- monorepo, lint/typecheck, CI, CodeQL, Dependabot
-- Supabase baseline migrations with RLS
-- config loader, redacting logger, i18n package
-- CDK skeleton for preprod
-- generated Magicline types, mock server skeleton
-- Deviations:
-  - TypeScript 6.0.3 and Biome instead of TypeScript 7 (tooling compatibility)
-  - Node 26 instead of 24
-  - Types generated with `--default-non-nullable false`
-  - Database denies `anon`/`authenticated` by both grants and RLS
-  - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
-
-**M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+**Progress (newest first)**
 - M4b ✅ 2026-11-12: approved answers (scenarios).
   - **In the chat:** shown word for word and status-gated server-side.
   - **Publishing:** immutable versions, four-eyes publishing and put-back, archive.
@@ -460,6 +447,22 @@ Each milestone ends with tests passing and a preprod deploy.
 - M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
 - M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
 - M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
+
+
+**M0: Foundations** ✅ done 2026-11-11 (branch `m0-foundations`, plan `docs/superpowers/plans/2026-11-11-m0-foundations.md`)
+- monorepo, lint/typecheck, CI, CodeQL, Dependabot
+- Supabase baseline migrations with RLS
+- config loader, redacting logger, i18n package
+- CDK skeleton for preprod
+- generated Magicline types, mock server skeleton
+- Deviations:
+  - TypeScript 6.0.3 and Biome instead of TypeScript 7 (tooling compatibility)
+  - Node 26 instead of 24
+  - Types generated with `--default-non-nullable false`
+  - Database denies `anon`/`authenticated` by both grants and RLS
+  - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
+
+**M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE
 - widget with consent notice, language detection, citations with NL/EN URLs

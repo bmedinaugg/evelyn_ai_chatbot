@@ -78,18 +78,19 @@ export function finalizeReply(input: {
     answer.intent === 'off_topic'
       ? undefined
       : input.scenarios?.find((s) => s.versionId === answer.approvedAnswerId);
-  if (approvedHit) {
-    const status = input.accountStatus ?? null;
-    if (approvedHit.statuses.length > 0 && status === null) {
-      return fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
-    }
-    if (
-      approvedHit.statuses.length > 0 &&
-      status !== null &&
-      !approvedHit.statuses.includes(status)
-    ) {
-      return fixed('bot.noMatch', 'ticket_form', 'no_match', ['no_match']);
-    }
+  const status = input.accountStatus ?? null;
+  if (approvedHit && approvedHit.statuses.length > 0 && status === null) {
+    return fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
+  }
+  // Defence in depth (scenariosFor already leaves these out): never for another status and never
+  // without its text; otherwise the normal answer path applies.
+  const allowed =
+    approvedHit &&
+    (approvedHit.statuses.length === 0 ||
+      (status !== null && approvedHit.statuses.includes(status))) &&
+    approvedHit.answerNl !== '' &&
+    approvedHit.answerEn !== '';
+  if (approvedHit && allowed) {
     return {
       text: lang === 'nl' ? approvedHit.answerNl : approvedHit.answerEn,
       lang,

@@ -137,4 +137,18 @@ describe('replayConversation', () => {
     expect(member.calls[0]?.tools?.definitions.map((d) => d.name)).toContain('get_memberships');
     expect(REPLAY_PROFILES.MEMBER).toEqual({ customerId: 1, studioId: 1001, status: 'MEMBER' });
   });
+
+  it('applies the same members-only rule as the live bot', async () => {
+    const { answerer, calls } = fakeAnswerer(null);
+    await replayConversation(
+      { faq: fakeFaq([]), scenarios: { search: async () => [] }, answerer, capabilities, logger },
+      {
+        questions: ['Overzetten?'],
+        pageLang: 'nl',
+        status: 'PROSPECT',
+        draft: { ...draft, statuses: ['MEMBER'], answerNl: 'GEHEIM' },
+      },
+    );
+    expect(calls[0]?.userTurn).not.toContain('GEHEIM');
+  });
 });

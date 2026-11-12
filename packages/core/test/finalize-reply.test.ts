@@ -235,11 +235,12 @@ describe('finalizeReply with approved answers', () => {
     });
   });
 
-  it('never shows a members-only answer to a prospect', () => {
+  it('never shows a members-only answer to a prospect (falls back to the normal answer path)', () => {
     const membersOnly = { ...freeze, statuses: ['MEMBER' as const] };
     const result = approved({}, { scenarios: [membersOnly], accountStatus: 'PROSPECT' });
-    expect(result).toMatchObject({ action: 'ticket_form', outcome: 'no_match' });
     expect(result.scenarioVersionId).toBeUndefined();
+    expect(result.text).not.toContain('freeze for up to 6 months');
+    expect(result.text).toBe('You can cancel in the app.');
   });
 
   it('shows a members-only answer to a logged-in member', () => {

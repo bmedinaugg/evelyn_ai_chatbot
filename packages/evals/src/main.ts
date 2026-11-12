@@ -19,7 +19,7 @@ import {
 } from '@trainmore/shared';
 import { CASES } from './cases.ts';
 import { estimateUsd, runEvals } from './run-evals.ts';
-import { isLocalMagicline } from './safety.ts';
+import { isLocalMagicline, isLocalSupabase } from './safety.ts';
 import { EVAL_SCENARIOS } from './scenarios.ts';
 
 const PASS_RATE_REQUIRED = 0.9;
@@ -33,7 +33,13 @@ if (env.EVAL_CONFIRM_SPEND !== 'yes' || runtime.appEnv !== 'local') {
   process.exit(2);
 }
 
-const db = createServiceClient(loadSupabaseConfig(env));
+// Evals publish synthetic approved answers: only into the local Supabase stack.
+const supabaseConfig = loadSupabaseConfig(env);
+if (!isLocalSupabase(supabaseConfig.url)) {
+  process.stderr.write('Evals only run against the local Supabase stack (localhost URL).\n');
+  process.exit(2);
+}
+const db = createServiceClient(supabaseConfig);
 const logger = createLogger({ name: 'evals', level: 'warn' });
 
 // Logged-in cases use the mock Magicline server (synthetic profiles) — never real customer data.
@@ -59,53 +65,57 @@ const scenarios = createSupabaseScenarioRepository(db);
 const author = { oid: 'eval-author', name: 'Eval author' };
 const approver = { oid: 'eval-approver', name: 'Eval approver' };
 const evalScenarioIds: string[] = [];
-for (const content of Object.values(EVAL_SCENARIOS)) {
-  const created = await scenarios.create(content, author);
-  evalScenarioIds.push(created.scenarioId);
-  if ((await scenarios.publish(created.versionId, approver)) !== 'ok') {
-    throw new Error('could not publish an eval scenario');
+let results: Awaited<ReturnType<typeof runEvals>>;
+try {
+  for (const content of Object.values(EVAL_SCENARIOS)) {
+    const created = await scenarios.create(content, author);
+    evalScenarioIds.push(created.scenarioId);
+    if ((await scenarios.publish(created.versionId, approver)) !== 'ok') {
+      throw new Error('could not publish an eval scenario');
+    }
   }
-}
 
-const results = await runEvals(
-  {
-    faq: createSupabaseFaqRepository(db),
-    scenarios,
-    conversations: createSupabaseConversationRepository(db),
-    client: new Anthropic().beta.messages,
-    model,
-    logger,
-    login: {
-      auth: createSupabaseAuthRepository(db),
-      magicline: {
-        searchByEmail: async (email) =>
-          magicline(await keys.crossStudioKey()).searchCustomersCrossStudio(email),
-        studioName: async (studioId) =>
-          (await magicline(await keys.studioKey(studioId)).getStudioInformation()).name,
-      },
-      // A fresh secret per run: eval logins never share hashes with the app.
-      config: {
-        secret: randomBytes(32).toString('hex'),
-        ttlSeconds: 300,
-        maxAttempts: 5,
-        maxPerWindow: 3,
-        windowSeconds: 900,
-      },
+  results = await runEvals(
+    {
+      faq: createSupabaseFaqRepository(db),
+      scenarios,
+      conversations: createSupabaseConversationRepository(db),
+      client: new Anthropic().beta.messages,
+      model,
       logger,
-    },
-    capabilities: {
-      deps: {
-        studioClient: async (studioId) => magicline(await keys.studioKey(studioId)),
-        crossStudioClient: async () => magicline(await keys.crossStudioKey()),
-        today: () => new Date(),
+      login: {
+        auth: createSupabaseAuthRepository(db),
+        magicline: {
+          searchByEmail: async (email) =>
+            magicline(await keys.crossStudioKey()).searchCustomersCrossStudio(email),
+          studioName: async (studioId) =>
+            (await magicline(await keys.studioKey(studioId)).getStudioInformation()).name,
+        },
+        // A fresh secret per run: eval logins never share hashes with the app.
+        config: {
+          secret: randomBytes(32).toString('hex'),
+          ttlSeconds: 300,
+          maxAttempts: 5,
+          maxPerWindow: 3,
+          windowSeconds: 900,
+        },
+        logger,
       },
-      disabled: () => flags.disabledCapabilities(),
+      capabilities: {
+        deps: {
+          studioClient: async (studioId) => magicline(await keys.studioKey(studioId)),
+          crossStudioClient: async () => magicline(await keys.crossStudioKey()),
+          today: () => new Date(),
+        },
+        disabled: () => flags.disabledCapabilities(),
+      },
     },
-  },
-  CASES,
-);
-
-for (const id of evalScenarioIds) await scenarios.archive(id, approver);
+    CASES,
+  );
+} finally {
+  // Never leave synthetic answers live, also when the run fails or is interrupted.
+  for (const id of evalScenarioIds) await scenarios.archive(id, approver);
+}
 
 const rows = results.map((r) => ({
   case: r.id,

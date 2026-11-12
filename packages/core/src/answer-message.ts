@@ -5,7 +5,6 @@ import {
   type FaqRepository,
   type FlagReason,
   type Outcome,
-  type ScenarioHit,
   type ScenarioRepository,
   type StoredMessage,
 } from '@trainmore/db';
@@ -22,6 +21,7 @@ import {
 import type { Answerer, AnswererResult, AnswererTools } from './claude-answerer.ts';
 import { finalizeReply, type Reply } from './finalize-reply.ts';
 import { buildUserTurn } from './prompt.ts';
+import { type OfferedScenario, scenariosFor } from './scenario-access.ts';
 
 export const MAX_CUSTOMER_MESSAGES = 20;
 const SEARCH_LIMIT = 5;
@@ -96,10 +96,14 @@ export async function answerMessage(
     }
 
     const hits = await deps.faq.search(input.text, input.pageLang, SEARCH_LIMIT);
-    let scenarios: ScenarioHit[] = [];
+    let scenarios: OfferedScenario[] = [];
     if (deps.scenarios) {
       try {
-        scenarios = await deps.scenarios.search(input.text, input.pageLang, SCENARIO_LIMIT);
+        // Members-only answers are filtered here, before the model sees anything.
+        scenarios = scenariosFor(
+          await deps.scenarios.search(input.text, input.pageLang, SCENARIO_LIMIT),
+          input.account?.status ?? null,
+        );
       } catch (error) {
         // The bot still answers from the help articles.
         logger.warn(

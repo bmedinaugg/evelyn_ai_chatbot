@@ -12,6 +12,7 @@ import {
 import type { Answerer, AnswererTools } from './claude-answerer.ts';
 import { finalizeReply, type Reply } from './finalize-reply.ts';
 import { buildUserTurn } from './prompt.ts';
+import { scenariosFor } from './scenario-access.ts';
 
 export const MAX_REPLAY_QUESTIONS = 10;
 const SEARCH_LIMIT = 5;
@@ -50,10 +51,14 @@ export async function replayConversation(
   for (const question of input.questions.slice(0, MAX_REPLAY_QUESTIONS)) {
     const hits = await deps.faq.search(question, input.pageLang, SEARCH_LIMIT);
     const live = await deps.scenarios.search(question, input.pageLang, SCENARIO_LIMIT);
-    const scenarios = [
-      input.draft,
-      ...live.filter((s) => s.scenarioId !== input.draft.scenarioId),
-    ].slice(0, SCENARIO_LIMIT);
+    // The same members-only rule as the live bot (scenariosFor).
+    const scenarios = scenariosFor(
+      [input.draft, ...live.filter((s) => s.scenarioId !== input.draft.scenarioId)].slice(
+        0,
+        SCENARIO_LIMIT,
+      ),
+      input.status,
+    );
     const userTurn = buildUserTurn({
       customerMessage: question,
       articles: hits,
