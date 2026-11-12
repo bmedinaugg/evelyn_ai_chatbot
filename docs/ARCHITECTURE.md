@@ -113,6 +113,9 @@ Prod preferably goes in a separate AWS account.
 2. Server creates a 6-digit code and stores only an HMAC-SHA256 hash.
    - Expires after `OTP_EXPIRY_SECONDS` (300).
    - Single use.
+   - Per email: at most 3 codes per 15 minutes, and at most 10 codes or 15 wrong attempts per 24
+     hours (stops slow, long-running guessing). Checked under a per-email lock.
+   - A new login in the same conversation replaces the earlier account binding (shared devices).
    - Lockout after `OTP_MAX_ATTEMPTS` (5) failures.
    - Sent via SES in the user's language.
 3. On success, the server issues an opaque session token (only its hash is stored).

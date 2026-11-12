@@ -138,6 +138,27 @@ describe('login', () => {
     expect((await api.authState(conv.conversationId)).account?.customerId).toBe(5);
   });
 
+  it('a second login in the same conversation replaces the first account (shared device)', async () => {
+    const api = createTestApi({
+      accounts: [{ customerId: 4, studioId: 1001, status: 'MEMBER', customerNumber: 'M-0004' }],
+    });
+    const conv = await start(api);
+    await request(api, conv, 'first@example.com');
+    await call(api, conv, 'verify', { email: 'first@example.com', code: api.sentCodes[0]?.code });
+    expect((await api.authState(conv.conversationId)).account?.customerId).toBe(4);
+
+    await request(api, conv, 'second@example.com');
+    const verified = await call(api, conv, 'verify', {
+      email: 'second@example.com',
+      code: api.sentCodes[1]?.code,
+    });
+    expect(verified.json()).toMatchObject({ selected: 0 });
+    const state = await api.authState(conv.conversationId);
+    expect(state.verifiedEmailHash).not.toBeNull();
+    expect(state.account?.customerId).toBe(4);
+    expect(state.candidates).toHaveLength(1);
+  });
+
   it('selecting before verification is refused', async () => {
     const api = createTestApi();
     const conv = await start(api);

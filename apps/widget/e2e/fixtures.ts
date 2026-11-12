@@ -88,7 +88,16 @@ export async function mockApi(
   await page.route('https://challenges.cloudflare.com/**', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
-      body: `window.turnstile = { render(el, opts) { setTimeout(() => opts.callback('XXXX.DUMMY.TOKEN.XXXX'), 10); return 'w1'; }, reset() {}, remove() {} };`,
+      body: `(() => {
+        let issued = 0;
+        let current;
+        const next = () => setTimeout(() => current && current.callback(issued++ === 0 ? 'XXXX.DUMMY.TOKEN.XXXX' : 'XXXX.DUMMY.TOKEN.' + issued), 10);
+        window.turnstile = {
+          render(el, opts) { current = opts; next(); return 'w1'; },
+          reset() { next(); },
+          remove() { current = undefined; },
+        };
+      })();`,
     }),
   );
   return api;

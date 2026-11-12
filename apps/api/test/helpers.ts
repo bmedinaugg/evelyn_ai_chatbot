@@ -175,7 +175,12 @@ export function createTestApi(
       if (c.attempts >= maxAttempts) return 'locked';
       if (c.codeHash === codeHash) {
         c.consumed = true;
-        authOf(conversationId).emailHash = c.emailHash;
+        // Mirrors verify_otp_attempt: a new login replaces any earlier binding.
+        authByConversation.set(conversationId, {
+          emailHash: c.emailHash,
+          candidates: null,
+          bound: null,
+        });
         return 'ok';
       }
       c.attempts += 1;

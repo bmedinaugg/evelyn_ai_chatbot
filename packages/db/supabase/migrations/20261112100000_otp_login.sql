@@ -23,7 +23,10 @@ alter table public.conversations
   add column studio_id bigint,
   add column customer_status text check (customer_status in ('MEMBER', 'PROSPECT', 'FORMER_MEMBER'));
 
--- Creates a challenge unless the email already had p_max_per_window challenges in the window.
+-- Creates a challenge unless the email is over a limit:
+--   p_max_per_window challenges in the short window (3 per 15 min),
+--   10 challenges or 15 failed attempts in the last 24 hours (stops slow, long-running guessing).
+-- An advisory lock per email hash makes count-then-insert safe under parallel requests.
 create or replace function public.create_otp_challenge(
   p_id uuid,
   p_conversation_id uuid,
@@ -39,11 +42,21 @@ security invoker
 set search_path = ''
 as $$
 begin
+  perform pg_advisory_xact_lock(hashtext('otp:' || p_email_hash));
+
   if (
     select count(*) from public.otp_challenges
     where email_hash = p_email_hash
       and created_at > now() - make_interval(secs => p_window_seconds)
   ) >= p_max_per_window then
+    return false;
+  end if;
+
+  if exists (
+    select 1 from public.otp_challenges
+    where email_hash = p_email_hash and created_at > now() - interval '24 hours'
+    having count(*) >= 10 or coalesce(sum(attempts), 0) >= 15
+  ) then
     return false;
   end if;
 
@@ -85,8 +98,15 @@ begin
 
   if v.code_hash = p_code_hash then
     update public.otp_challenges set consumed_at = now() where id = v.id;
+    -- A new login replaces any earlier one in this conversation (shared devices): drop the
+    -- previous candidates and account binding.
     update public.conversations
-    set verified_email_hash = v.email_hash, verified_at = now()
+    set verified_email_hash = v.email_hash,
+        verified_at = now(),
+        account_candidates = null,
+        customer_id = null,
+        studio_id = null,
+        customer_status = null
     where id = p_conversation_id;
     return 'ok';
   end if;

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(23);
 
 delete from public.conversations where id in (
   '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1');
@@ -46,6 +46,24 @@ select results_eq(
   $$values (5::bigint, 1002::bigint, 'MEMBER'::text)$$,
   'bound to the chosen candidate'
 );
+
+-- A second login in the same conversation replaces the earlier binding (shared devices).
+select ok(public.create_otp_challenge('10000000-0000-4000-8000-000000000009', '00000000-0000-4000-8000-0000000000a1', 'email-2', 'code-9', 300, 3, 900), 'challenge for a second email');
+select is(public.verify_otp_attempt('10000000-0000-4000-8000-000000000009'::uuid, '00000000-0000-4000-8000-0000000000a1'::uuid, 'code-9', 5), 'ok', 'second login succeeds');
+select results_eq(
+  $$select verified_email_hash, account_candidates is null, customer_id is null, customer_status is null
+    from public.conversations where id = '00000000-0000-4000-8000-0000000000a1'$$,
+  $$values ('email-2'::text, true, true, true)$$,
+  'the earlier account binding is cleared'
+);
+
+-- Long-run guessing: 15 failed attempts in 24 hours block new codes for that email.
+insert into public.otp_challenges (id, conversation_id, email_hash, code_hash, created_at, expires_at, attempts)
+select gen_random_uuid(), '00000000-0000-4000-8000-0000000000b1', 'email-slow', 'x',
+  now() - interval '2 hours', now() - interval '1 hour', 5
+from generate_series(1, 3);
+select ok(not public.create_otp_challenge('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-0000000000b1', 'email-slow', 'code-a', 300, 3, 900),
+  'no new code after 15 failed attempts in 24 hours');
 
 select * from finish();
 rollback;

@@ -144,7 +144,7 @@ export async function lookupAccounts(
     const lookups = await deps.magicline.searchByEmail(emailSchema.parse(input.email));
     const names = new Map<number, string>();
     for (const studioId of new Set(lookups.map((l) => l.studioId))) {
-      names.set(studioId, await deps.magicline.studioName(studioId));
+      names.set(studioId, await studioNameOrBrand(deps, studioId, input.conversationId));
     }
     candidates = lookups.map((lookup) => ({
       customerId: lookup.customerId,
@@ -169,6 +169,20 @@ export async function lookupAccounts(
     'accounts found',
   );
   return { kind: 'verified', accounts: candidates.map(toChoice), selected };
+}
+
+/** A club without a configured key (e.g. closed) must not block the customer's login. */
+async function studioNameOrBrand(
+  deps: LoginDeps,
+  studioId: number,
+  conversationId: string,
+): Promise<string> {
+  try {
+    return await deps.magicline.studioName(studioId);
+  } catch (error) {
+    deps.logger.warn({ err: error, conversationId, studioId }, 'studio name unavailable');
+    return 'TrainMore';
+  }
 }
 
 export async function selectAccount(

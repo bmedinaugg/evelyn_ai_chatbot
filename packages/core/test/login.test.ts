@@ -276,6 +276,35 @@ describe('verifyLoginCode', () => {
     ).toEqual({ kind: 'expired' });
   });
 
+  it('a studio without a configured key does not block the login', async () => {
+    lookups = [
+      { customerId: 9, studioId: 4040, status: 'FORMER_MEMBER', customerNumber: 'M-0009' },
+    ];
+    const code = await loginCode();
+    const failingNames: LoginDeps = {
+      ...deps(),
+      magicline: {
+        searchByEmail: async () => lookups as never,
+        studioName: async () => {
+          throw new Error('No Magicline API key configured for studio 4040');
+        },
+      },
+    };
+    expect(
+      await verifyLoginCode(failingNames, {
+        conversationId: CONV,
+        email: 'lead@example.com',
+        code,
+      }),
+    ).toEqual({
+      kind: 'verified',
+      accounts: [
+        { index: 0, studioName: 'TrainMore', status: 'FORMER_MEMBER', maskedNumber: '•••009' },
+      ],
+      selected: 0,
+    });
+  });
+
   it('never logs the email address or the code', async () => {
     const code = await loginCode();
     await verifyLoginCode(deps(), { conversationId: CONV, email: 'lead@example.com', code });

@@ -1,5 +1,5 @@
 import { type Lang, t } from '@trainmore/i18n';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
   type AccountChoice,
   type LoginResult,
@@ -35,6 +35,8 @@ export function LoginFlow(props: {
   const [problem, setProblem] = useState<Problem>(null);
   const [busy, setBusy] = useState(false);
   const [accounts, setAccounts] = useState<AccountChoice[]>([]);
+  // Turnstile tokens are single use: any failed code request needs a fresh token.
+  const [turnstileRound, setTurnstileRound] = useState(0);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -73,10 +75,16 @@ export function LoginFlow(props: {
           lang={lang}
           siteKey={props.siteKey}
           busy={busy}
+          resetSignal={turnstileRound}
           onSubmit={(value, token) =>
             run(async () => {
               const session = await props.ensureSession();
-              await api.requestLoginCode(session, value, lang, token);
+              try {
+                await api.requestLoginCode(session, value, lang, token);
+              } catch (error) {
+                setTurnstileRound((round) => round + 1);
+                throw error;
+              }
               setEmail(value);
               setStep('code');
             })
@@ -154,9 +162,14 @@ function EmailStep(props: {
   lang: Lang;
   siteKey: string;
   busy: boolean;
+  resetSignal: number;
   onSubmit: (email: string, token: string) => void;
 }) {
   const turnstile = useTurnstile(props.siteKey);
+  const { reset } = turnstile;
+  useEffect(() => {
+    if (props.resetSignal > 0) reset();
+  }, [props.resetSignal]);
   const [value, setValue] = useState('');
   return (
     <>
