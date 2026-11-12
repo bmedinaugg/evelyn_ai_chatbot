@@ -171,7 +171,10 @@ Behaviour per status:
 - **FORMER_MEMBER**: balance and history, re-join offers.
 
 ### 3.4 FAQ sync (worker, daily at night + manual "sync now")
-1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, list articles in `nl` and `en`; keep published ones.
+1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, check that it is **public** (folder visibility
+   "All Users", and the same for every parent folder). Non-public folders are skipped and their
+   stored articles removed, without the mass-change guard. Then list articles in `nl` and `en`;
+   keep published ones.
 2. Compare `updated_at` + content hash. Upsert, chunk and re-embed only what changed.
    Articles no longer in Freshdesk are soft-deleted.
 3. Store both language URLs (`/{nl|en}/support/solutions/articles/{id}`).

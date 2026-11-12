@@ -11,8 +11,23 @@ import {
 
 type Listings = Record<number, Partial<Record<Lang, FreshdeskArticle[] | Error>>>;
 
-function fakeFreshdesk(listings: Listings): Pick<FreshdeskClient, 'listFolderArticles'> {
+type Folders = Record<number, { visibility: number; parentFolderId?: number } | Error>;
+
+let folders: Folders;
+
+function fakeFreshdesk(
+  listings: Listings,
+): Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder'> {
   return {
+    async getFolder(folderId) {
+      const folder = folders[folderId] ?? { visibility: 1 };
+      if (folder instanceof Error) throw folder;
+      return {
+        id: folderId,
+        visibility: folder.visibility,
+        parentFolderId: folder.parentFolderId ?? null,
+      };
+    },
     async listFolderArticles(folderId, lang) {
       const result = listings[folderId]?.[lang] ?? [];
       if (result instanceof Error) throw result;
@@ -67,6 +82,7 @@ const many = (count: number, folderId = 101) =>
 beforeEach(() => {
   repo = createInMemoryFaqRepository();
   logOutput = '';
+  folders = {};
 });
 
 describe('runFaqSync', () => {
@@ -190,6 +206,48 @@ describe('runFaqSync', () => {
     await sync({ 101: { nl: many(20) } });
     const result = await sync({ 101: { nl: many(10) } }, [101], true);
     expect(result.deleted).toBe(10);
+  });
+
+  describe('public folders only', () => {
+    it('never adds articles from a folder that is not visible to all users', async () => {
+      folders = { 202: { visibility: 2 } };
+      await sync(
+        {
+          101: { nl: [article(7, 'Opzeggen')] },
+          202: { nl: [{ ...article(8, 'Intern'), folderId: 202 }] },
+        },
+        [101, 202],
+      );
+      expect(repo.rows.has(7)).toBe(true);
+      expect(repo.rows.has(8)).toBe(false);
+      expect(logOutput).toContain('folder is not public');
+    });
+
+    it('skips a public folder inside a non-public parent', async () => {
+      folders = { 202: { visibility: 1, parentFolderId: 200 }, 200: { visibility: 3 } };
+      await sync({ 202: { nl: [{ ...article(8, 'Intern'), folderId: 202 }] } }, [202]);
+      expect(repo.rows.has(8)).toBe(false);
+    });
+
+    it('removes stored articles once their folder stops being public, even many at once', async () => {
+      await sync({ 101: { nl: [article(7, 'Opzeggen')] }, 202: { nl: many(10, 202) } }, [101, 202]);
+      folders = { 202: { visibility: 2 } };
+      const result = await sync(
+        { 101: { nl: [article(7, 'Opzeggen')] }, 202: { nl: many(10, 202) } },
+        [101, 202],
+      );
+      expect(result.deleted).toBe(10);
+      expect(repo.rows.get(7)?.deleted).toBeFalsy();
+      expect(repo.rows.get(1000)?.deleted).toBe(true);
+    });
+
+    it('aborts without writing when a folder cannot be read', async () => {
+      folders = { 101: new Error('503') };
+      await expect(sync({ 101: { nl: [article(7, 'Opzeggen')] } })).rejects.toMatchObject({
+        reason: 'fetch_failed',
+      });
+      expect(repo.rows.size).toBe(0);
+    });
   });
 
   it('converts article HTML to text', async () => {

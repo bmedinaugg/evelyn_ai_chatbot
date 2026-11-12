@@ -12,7 +12,9 @@ import {
   type CreateTicketInput,
   createdTicketSchema,
   type FreshdeskArticle,
+  folderSchema,
   noteSchema,
+  type SolutionFolder,
   type TicketField,
   ticketFieldSchema,
 } from './schemas.ts';
@@ -25,6 +27,8 @@ export type FreshdeskClientOptions = {
 
 export interface FreshdeskClient {
   listFolderArticles(folderId: number, lang: Lang): Promise<FreshdeskArticle[]>;
+  /** Solution folder with its visibility (1 = all users) and parent folder. */
+  getFolder(folderId: number): Promise<SolutionFolder>;
   createTicket(input: CreateTicketInput): Promise<{ id: number }>;
   listTicketFields(): Promise<TicketField[]>;
   /** Private note on a ticket (agents only); the text is HTML-escaped. */
@@ -69,6 +73,13 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
   }
 
   return {
+    async getFolder(folderId) {
+      if (!Number.isSafeInteger(folderId) || folderId <= 0) throw new Error('Invalid folder id');
+      const endpoint = '/solutions/folders/{id}';
+      const response = await request(`${baseUrl}/solutions/folders/${folderId}`, endpoint);
+      return parse(response, endpoint, folderSchema);
+    },
+
     async listFolderArticles(folderId, lang) {
       const endpoint = `/solutions/folders/${folderId}/articles/${lang}`;
       const articles: FreshdeskArticle[] = [];

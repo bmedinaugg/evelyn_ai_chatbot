@@ -1,9 +1,9 @@
 # Freshdesk API v2: reference notes
 
 Official reference: https://developers.freshdesk.com/api/ (read 2026-11-11).
-Sections marked **(unverified)** came from third-party wrappers, because the Solutions
-section of the official page could not be read during research. Confirm them against
-https://developers.freshdesk.com/api/#solutions and our live instance before relying on them.
+Sections marked **(unverified)** are not confirmed by the official reference. The Solutions
+section was checked against the official page on 2026-11-12; our live instance (language codes,
+Flexible Hierarchy, multiple portals) still needs a check once credentials exist.
 
 ## General
 - Base URL: `https://{domain}.freshdesk.com/api/v2/...` (HTTPS only; custom CNAME does not work for the API).
@@ -34,7 +34,16 @@ https://developers.freshdesk.com/api/#solutions and our live instance before rel
   search `GET /api/v2/search/contacts?query="email:'x@y.com'"`. Creating a ticket with `email`
   creates the contact (standard behaviour; not explicitly stated in the docs).
 
-## Solutions / knowledge base (unverified)
+## Solutions / knowledge base (checked against the official reference 2026-11-12)
+- View folder: `GET /api/v2/solutions/folders/{id}` → `id`, `name`, `visibility`, `category_id`,
+  `parent_folder_id`, `company_ids`, `contact_segment_ids`, `company_segment_ids`, …
+  (`parent_folder_id`, `sub_folders_count`, `hierarchy` only with the "Flexible Hierarchy" feature).
+- Folder `visibility`: 1 All Users, 2 Logged In Users, 3 Agents, 4 Selected Companies, 5 Bots,
+  6 Selected Contact Segments, 7 Selected Company Segments. **The chatbot only syncs folders with
+  visibility 1 whose parent folders are also 1** (public help-portal content only).
+- Category: `visible_in_portals` (portal ids; only on accounts with multiple portals). Not checked
+  by the sync yet: **(open)** confirm whether TrainMore has more than one portal.
+- Articles have no visibility of their own; they follow their folder.
 - List articles in folder: `GET /api/v2/solutions/folders/{folder_id}/articles`
 - Translated list: `GET /api/v2/solutions/folders/{folder_id}/articles/{language_code}`
 - Get article: `GET /api/v2/solutions/articles/{id}`; translation: `GET /api/v2/solutions/articles/{id}/{language_code}`

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Field names per docs/api/freshdesk.md (Solutions section unverified until checked live).
+// Field names per docs/api/freshdesk.md (Solutions checked against the official API reference).
 export const articleSchema = z
   .object({
     id: z.number().int(),
@@ -50,3 +50,19 @@ export const ticketFieldSchema = z
 export type TicketField = z.output<typeof ticketFieldSchema>;
 
 export const noteSchema = z.object({ id: z.number().int() }).transform(({ id }) => ({ id }));
+
+/** Folder visibility 1 = "All Users" (public); see docs/api/freshdesk.md for the other values. */
+export const FOLDER_VISIBILITY_ALL_USERS = 1;
+
+export const folderSchema = z
+  .object({
+    id: z.number().int(),
+    visibility: z.number().int(),
+    parent_folder_id: z.number().int().nullable().optional(),
+  })
+  .transform((f) => ({
+    id: f.id,
+    visibility: f.visibility,
+    parentFolderId: f.parent_folder_id ?? null,
+  }));
+export type SolutionFolder = z.output<typeof folderSchema>;
