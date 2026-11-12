@@ -59,10 +59,21 @@ export const folderSchema = z
     id: z.number().int(),
     visibility: z.number().int(),
     parent_folder_id: z.number().int().nullable().optional(),
+    category_id: z.number().int().nullable().optional(),
   })
   .transform((f) => ({
     id: f.id,
     visibility: f.visibility,
     parentFolderId: f.parent_folder_id ?? null,
+    categoryId: f.category_id ?? null,
   }));
 export type SolutionFolder = z.output<typeof folderSchema>;
+
+/** visible_in_portals: portal ids the category is shown on (only on multi-portal accounts). */
+export const categorySchema = z
+  .object({
+    id: z.number().int(),
+    visible_in_portals: z.array(z.number().int()).nullable().optional(),
+  })
+  .transform((c) => ({ id: c.id, visibleInPortals: c.visible_in_portals ?? null }));
+export type SolutionCategory = z.output<typeof categorySchema>;

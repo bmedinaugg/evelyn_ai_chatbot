@@ -75,12 +75,17 @@ sh packages/db/scripts/with-local-env.sh env APP_ENV=local CHAT_FAKE_ANSWERER=1 
 Local Turnstile: use Cloudflare's test secret `1x0000000000000000000000000000000AA` (see `docs/api/turnstile.md`).
 
 ## Evals (spend money)
-`packages/evals` runs 24 bilingual questions against the synthetic FAQ fixtures with the real Claude
-API and prints pass/fail, tokens and an estimated cost (about $0.25–0.40 per run). It refuses to run
-unless `APP_ENV=local` and `EVAL_CONFIRM_SPEND=yes`, and never runs in CI.
+`packages/evals` runs 31 bilingual cases (24 anonymous, 7 logged in as synthetic profiles of the
+mock Magicline) against the synthetic FAQ fixtures with the real Claude API, and prints pass/fail,
+tokens and an estimated cost (first run 2026-11-12: 30/31, about $0.06 thanks to prompt caching).
+It refuses to run unless `APP_ENV=local`, `EVAL_CONFIRM_SPEND=yes` and Magicline is a localhost mock,
+and never runs in CI. Needs local Supabase with seeded FAQ fixtures and the mock Magicline running.
 ```sh
-sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
-  EVAL_CONFIRM_SPEND=yes ANTHROPIC_API_KEY=... pnpm --filter @trainmore/evals eval
+MOCK_MAGICLINE_KEYS=cross:dev-cross,1001:dev-1001,1002:dev-1002 pnpm --filter @trainmore/mock-magicline start &
+cd packages/evals && sh ../db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local \
+  AWS_REGION=eu-west-1 EVAL_CONFIRM_SPEND=yes MAGICLINE_USE_MOCK=true MAGICLINE_BASE_URL=http://localhost:4010 \
+  MOCK_MAGICLINE_KEYS=cross:dev-cross,1001:dev-1001,1002:dev-1002 LOG_LEVEL=error \
+  node --env-file=../../.env --import tsx src/main.ts   # ANTHROPIC_API_KEY comes from .env
 ```
 
 ## Chat widget (local)
@@ -91,6 +96,18 @@ pnpm --filter @trainmore/widget dev          # http://localhost:5173/?lang=nl (n
 pnpm --filter @trainmore/widget build        # dist/: index.html + assets, loader.js, loader.css
 pnpm --filter @trainmore/widget e2e          # Playwright (API and Turnstile mocked)
 ```
+
+**See it embedded like on the help portal:** build the widget, serve it, and open the demo portal page
+(a separate origin that loads `loader.js` with the same snippet as the Freshdesk layout):
+```sh
+cd apps/widget
+VITE_API_BASE_URL=http://localhost:8787 VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA \
+  VITE_PRIVACY_URL=https://www.trainmore.nl/privacy pnpm build
+pnpm exec vite preview --port 5173 --strictPort &       # widget host (production build, strict CSP)
+python3 -m http.server 8090 --bind 127.0.0.1 --directory demo &
+open http://127.0.0.1:8090/nl/support/home/            # or /en/support/home/
+```
+The API must run on port 8787 with `WIDGET_ALLOWED_ORIGINS=http://localhost:5173`.
 Embed on the portal (after deploying `dist/` to the widget host):
 ```html
 <script src="https://<widget host>/loader.js" data-widget-url="https://<widget host>/" async></script>

@@ -11,13 +11,18 @@ import {
 
 type Listings = Record<number, Partial<Record<Lang, FreshdeskArticle[] | Error>>>;
 
-type Folders = Record<number, { visibility: number; parentFolderId?: number } | Error>;
+type Folders = Record<
+  number,
+  { visibility: number; parentFolderId?: number; categoryId?: number | null } | Error
+>;
 
 let folders: Folders;
+/** Portals per category; categories not listed are shown on the TrainMore portal (1). */
+let categories: Record<number, number[] | null>;
 
 function fakeFreshdesk(
   listings: Listings,
-): Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder'> {
+): Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder' | 'getCategory'> {
   return {
     async getFolder(folderId) {
       const folder = folders[folderId] ?? { visibility: 1 };
@@ -26,6 +31,13 @@ function fakeFreshdesk(
         id: folderId,
         visibility: folder.visibility,
         parentFolderId: folder.parentFolderId ?? null,
+        categoryId: folder.categoryId === undefined ? 50 : folder.categoryId,
+      };
+    },
+    async getCategory(categoryId) {
+      return {
+        id: categoryId,
+        visibleInPortals: categoryId in categories ? (categories[categoryId] ?? null) : [1],
       };
     },
     async listFolderArticles(folderId, lang) {
@@ -71,6 +83,7 @@ function sync(listings: Listings, folderIds = [101], allowMassChange = false) {
     repo,
     folderIds,
     portalUrl: 'https://portal.test',
+    portalId: 1,
     logger,
     allowMassChange,
   });
@@ -83,6 +96,7 @@ beforeEach(() => {
   repo = createInMemoryFaqRepository();
   logOutput = '';
   folders = {};
+  categories = {};
 });
 
 describe('runFaqSync', () => {
@@ -239,6 +253,26 @@ describe('runFaqSync', () => {
       expect(result.deleted).toBe(10);
       expect(repo.rows.get(7)?.deleted).toBeFalsy();
       expect(repo.rows.get(1000)?.deleted).toBe(true);
+    });
+
+    it('skips a public folder whose category is shown on another brand portal', async () => {
+      folders = { 202: { visibility: 1, categoryId: 60 } };
+      categories = { 60: [2] };
+      await sync({ 202: { nl: [{ ...article(8, 'Clubsportive'), folderId: 202 }] } }, [202]);
+      expect(repo.rows.has(8)).toBe(false);
+    });
+
+    it('skips a folder whose category has no portal list', async () => {
+      folders = { 202: { visibility: 1, categoryId: 60 } };
+      categories = { 60: null };
+      await sync({ 202: { nl: [{ ...article(8, 'Intern'), folderId: 202 }] } }, [202]);
+      expect(repo.rows.has(8)).toBe(false);
+    });
+
+    it('skips a folder without a category', async () => {
+      folders = { 202: { visibility: 1, categoryId: null } };
+      await sync({ 202: { nl: [{ ...article(8, 'Los'), folderId: 202 }] } }, [202]);
+      expect(repo.rows.has(8)).toBe(false);
     });
 
     it('aborts without writing when a folder cannot be read', async () => {

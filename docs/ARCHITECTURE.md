@@ -22,6 +22,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Chat model | **Claude Sonnet 5.5** (`claude-sonnet-5-5`), configurable via `CLAUDE_CHAT_MODEL` | Product owner (2026-11-11) |
 | Answer delivery | **Check, then show**: the full answer is validated before the customer sees it (no token streaming; plain JSON, typing indicator) | Product owner (2026-11-11) |
 | Retrieval | **Full-text search first** (Postgres `dutch` + `english`); Voyage embeddings deferred behind a retrieval interface | Product owner (2026-11-11) |
+| Retrieval ranking | Any query word may match (both languages); words are weighted by rarity across the articles (IDF), so a distinctive word ("eurokorting") beats words many articles share ("how does … work") | Architect (2026-11-12, after the first test with real articles) |
 | Hand-off | **Prefilled general ticket form for everyone**; no automatic ticket, no Magicline email lookup | Product owner (2026-11-12) |
 | Ticket topics | Membership & contract, Payments & invoices, Club & facilities, App & account as built-in defaults; **synced daily from the Freshdesk ticket field** | Product owner (2026-11-12) |
 | Transcript retention | 90 days, then anonymise (M3b) | Product owner (2026-11-12) |
@@ -172,7 +173,8 @@ Behaviour per status:
 
 ### 3.4 FAQ sync (worker, daily at night + manual "sync now")
 1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, check that it is **public** (folder visibility
-   "All Users", and the same for every parent folder). Non-public folders are skipped and their
+   "All Users", the same for every parent folder, and its category shown on the TrainMore portal
+   `FRESHDESK_PORTAL_ID`; the Freshdesk account also serves other brands). Non-public folders are skipped and their
    stored articles removed, without the mass-change guard. Then list articles in `nl` and `en`;
    keep published ones.
 2. Compare `updated_at` + content hash. Upsert, chunk and re-embed only what changed.

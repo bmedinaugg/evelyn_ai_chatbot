@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Help centre (local demo)</title>
+    <style>
+      :root { --red: #fa194a; --black: #000; --white: #fff; --grey: #cacaca; --carbon: #2c2c2c; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--black); color: var(--white);
+        font: 16px/1.4 Roboto, system-ui, sans-serif; letter-spacing: 0.02em; }
+      .banner { background: var(--red); color: var(--black); text-align: center; padding: 6px 16px;
+        font-size: 13px; font-weight: 700; }
+      header { display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 32px; border-bottom: 1px solid var(--carbon); }
+      .brand { font: 900 22px/1 Montserrat, system-ui, sans-serif; text-transform: uppercase; }
+      nav a { color: var(--white); margin-left: 20px; text-decoration: none; font-size: 14px; }
+      nav a[aria-current] { border-bottom: 2px solid var(--red); }
+      .hero { padding: 64px 32px 40px; max-width: 960px; }
+      h1 { font: 900 clamp(36px, 6vw, 64px)/0.9 Montserrat, system-ui, sans-serif;
+        text-transform: uppercase; margin: 0 0 24px; }
+      .search { display: flex; max-width: 560px; border: 1px solid var(--grey); border-radius: 8px; }
+      .search input { flex: 1; padding: 14px; background: transparent; border: 0; color: var(--white); font: inherit; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
+        padding: 0 32px 120px; max-width: 1024px; }
+      .card { border: 1px solid var(--carbon); border-radius: 12px; padding: 20px; }
+      .card h2 { margin: 0 0 8px; font: 700 14px/1 Roboto, sans-serif; text-transform: uppercase;
+        letter-spacing: 0.05em; }
+      .card p { margin: 0; color: var(--grey); font-size: 14px; }
+    </style>
+    <!-- Exactly what goes into the Freshdesk portal layout (with the real widget host). -->
+    <script src="http://localhost:5173/loader.js" data-widget-url="http://localhost:5173/" async></script>
+  </head>
+  <body>
+    <div class="banner">Local demo: not a real TrainMore page. The chat is at the bottom right.</div>
+    <header>
+      <span class="brand">TrainMore Support</span>
+      <nav><a href="/nl/support/home">NL</a><a href="/en/support/home" aria-current="page">EN</a></nav>
+    </header>
+    <section class="hero">
+      <h1>How can we help you?</h1>
+      <div class="search"><input type="search" placeholder="Search the help articles" aria-label="Search the help articles" /></div>
+    </section>
+    <section class="grid">
+      <div class="card"><h2>Membership</h2><p>Cancel, change, freeze</p></div>
+      <div class="card"><h2>Payments</h2><p>Invoices and open amounts</p></div>
+      <div class="card"><h2>Booking classes</h2><p>Book and cancel</p></div>
+      <div class="card"><h2>The app</h2><p>Log in and QR code</p></div>
+    </section>
+  </body>
+</html>

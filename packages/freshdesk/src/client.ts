@@ -10,10 +10,12 @@ import { escapeHtml } from './html.ts';
 import {
   articleSchema,
   type CreateTicketInput,
+  categorySchema,
   createdTicketSchema,
   type FreshdeskArticle,
   folderSchema,
   noteSchema,
+  type SolutionCategory,
   type SolutionFolder,
   type TicketField,
   ticketFieldSchema,
@@ -29,6 +31,8 @@ export interface FreshdeskClient {
   listFolderArticles(folderId: number, lang: Lang): Promise<FreshdeskArticle[]>;
   /** Solution folder with its visibility (1 = all users) and parent folder. */
   getFolder(folderId: number): Promise<SolutionFolder>;
+  /** Solution category with the portals it is shown on. */
+  getCategory(categoryId: number): Promise<SolutionCategory>;
   createTicket(input: CreateTicketInput): Promise<{ id: number }>;
   listTicketFields(): Promise<TicketField[]>;
   /** Private note on a ticket (agents only); the text is HTML-escaped. */
@@ -78,6 +82,14 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
       const endpoint = '/solutions/folders/{id}';
       const response = await request(`${baseUrl}/solutions/folders/${folderId}`, endpoint);
       return parse(response, endpoint, folderSchema);
+    },
+
+    async getCategory(categoryId) {
+      if (!Number.isSafeInteger(categoryId) || categoryId <= 0)
+        throw new Error('Invalid category id');
+      const endpoint = '/solutions/categories/{id}';
+      const response = await request(`${baseUrl}/solutions/categories/${categoryId}`, endpoint);
+      return parse(response, endpoint, categorySchema);
     },
 
     async listFolderArticles(folderId, lang) {

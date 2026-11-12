@@ -12,7 +12,7 @@ import {
   loadSupabaseConfig,
 } from '@trainmore/shared';
 import { runFaqSync } from './faq-sync.ts';
-import { FIXTURE_FOLDER_ID, fixtureFreshdeskClient } from './fixture-source.ts';
+import { FIXTURE_FOLDER_ID, FIXTURE_PORTAL_ID, fixtureFreshdeskClient } from './fixture-source.ts';
 import { runTopicSync } from './topic-sync.ts';
 
 export const COMMANDS = ['sync-faq', 'seed-faq-fixtures', 'sync-ticket-topics'] as const;
@@ -54,6 +54,7 @@ export async function runCommand(
         repo,
         folderIds: freshdesk.faqFolderIds,
         portalUrl: freshdesk.portalUrl,
+        portalId: freshdesk.portalId,
         logger,
         allowMassChange: options.allowMassChange,
       });
@@ -65,6 +66,7 @@ export async function runCommand(
         repo,
         folderIds: [FIXTURE_FOLDER_ID],
         portalUrl: 'https://portal.example',
+        portalId: FIXTURE_PORTAL_ID,
         logger,
       });
       return;

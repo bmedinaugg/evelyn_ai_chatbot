@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(18);
 
 -- Isolate from locally seeded articles; the transaction is rolled back at the end.
 delete from public.faq_articles;
@@ -61,6 +61,34 @@ select results_eq(
 select is_empty(
   $$select 1 from public.search_faq('opzeggen', 'nl') where article_id = 4$$,
   'soft-deleted articles are excluded'
+);
+
+-- Common words ("how does ... work") are in many articles; a rare word must outweigh them.
+insert into public.faq_articles
+  (id, folder_id, title_nl, body_nl, url_nl, title_en, body_en, url_en, content_hash, freshdesk_updated_at)
+select
+  i, 10, 'Hoe werkt ' || i || '?', 'Zo werkt onderwerp ' || i || '.',
+  'https://portal.test/nl/support/solutions/articles/' || i,
+  'How does topic ' || i || ' work?', 'This is how topic ' || i || ' works and what it does.',
+  'https://portal.test/en/support/solutions/articles/' || i, 'g' || i, now()
+from generate_series(20, 27) as i;
+insert into public.faq_articles
+  (id, folder_id, title_nl, body_nl, url_nl, title_en, body_en, url_en, content_hash, freshdesk_updated_at)
+values
+  (30, 10, 'Hoe werkt de €1 korting per workout?', 'Met de eurokorting krijg je €1 korting per bezoek.',
+   'https://portal.test/nl/support/solutions/articles/30',
+   'How does the €1 discount per workout work?', 'You get €1 off your monthly fee for every visit.',
+   'https://portal.test/en/support/solutions/articles/30', 'h30', now());
+
+select results_eq(
+  $$select article_id from public.search_faq('how does eurokorting works?', 'en') limit 1$$,
+  $$values (30::bigint)$$,
+  'a rare word outranks words that many articles share'
+);
+select results_eq(
+  $$select article_id from public.search_faq('Hoe werkt de eurokorting?', 'nl') limit 1$$,
+  $$values (30::bigint)$$,
+  'same in Dutch'
 );
 
 select lives_ok($$select * from public.search_faq('', 'nl')$$, 'empty query is fine');

@@ -8,6 +8,8 @@ export type FreshdeskConfig = {
   apiKey: string;
   faqFolderIds: number[];
   portalUrl: string;
+  /** Help portal whose public articles the chatbot may use (the account serves several brands). */
+  portalId: number;
   /** Ticket field whose choices are the ticket form topics. */
   topicField: string;
 };
@@ -48,6 +50,11 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
       FRESHDESK_PORTAL_URL: z
         .url({ protocol: /^https?$/ })
         .transform((url) => url.replace(/\/+$/, '')),
+      FRESHDESK_PORTAL_ID: z
+        .string()
+        .trim()
+        .regex(/^[1-9][0-9]*$/)
+        .transform(Number),
       FRESHDESK_TOPIC_FIELD: z.string().trim().min(1).default('ticket_type'),
     }),
     env,
@@ -57,6 +64,7 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
     apiKey: e.FRESHDESK_API_KEY,
     faqFolderIds: e.FRESHDESK_FAQ_FOLDER_IDS,
     portalUrl: e.FRESHDESK_PORTAL_URL,
+    portalId: e.FRESHDESK_PORTAL_ID,
     topicField: e.FRESHDESK_TOPIC_FIELD,
   };
 }
