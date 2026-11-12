@@ -13,7 +13,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
 | Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
-| Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk) | Product owner |
+| Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk); shown word for word (server swaps the approved text in); four eyes (never publish your own version); side-by-side replay before publishing, human judge | Product owner (2026-11-11, details 2026-11-12) |
 | Daily report | Email | Product owner |
 | Account questions | Everything Magicline can answer, as a **capability catalogue** with examples and an on/off switch per capability | Product owner |
 | Magicline lookup | Cross-studio customer search; an org-wide key will be requested | Product owner |
@@ -255,6 +255,32 @@ Behaviour per status:
 6. **Approve** (approver role) publishes. Versions are immutable. Rollback re-publishes an
    earlier version. Every action is written to `audit_log` (who, what, when).
 
+As built (M4b, product owner decisions 2026-11-12):
+- **Exact approved text.** Published scenarios are retrieved next to the FAQ and offered to Claude
+  as data in `<approved_answers>`.
+  - **Claude's part:** it only decides *that* one fits, via `approvedAnswerId`.
+  - **What the customer sees:** the server shows that version's nl/en text word for word, plus its
+    linked article.
+  - **When it's used:** only if the scenario was retrieved this turn. Its status condition is
+    applied in code **before the prompt is built** (`scenariosFor`; the same in replay):
+    - no condition: offered to everyone, including people who aren't logged in;
+    - with a condition, not logged in: offered **without its text** (the bot can only ask the
+      customer to log in);
+    - logged in with another status: not offered at all, so the normal answer path applies.
+  - **Metrics:** the reply stores `scenario_version_id`.
+- **Four eyes.** Anyone with a portal role writes drafts. An approver or admin publishes, never a
+  version they wrote; rollback (re-publishing a replaced version) follows the same rule.
+  - **Where it's enforced:** in SQL (`publish_scenario_version`).
+  - **Immutable content:** a trigger plus column-level grants.
+- **Replay.**
+  - **Input:** the conversation's customer questions (at most 10), with the draft offered in place
+    of the scenario's live version.
+  - **Account questions:** they use the fixed synthetic mock profile for the original status.
+  - **Storage and output:** nothing is stored; old and new answers are masked and shown side by
+    side; each run is audited.
+  - **Where it works:** only with `MAGICLINE_USE_MOCK=true`; otherwise 409.
+- **Judging:** a person judges for now; an LLM judge comes in M5.
+
 Why Supabase scenarios rather than Freshdesk write-back:
 - They give us versioning, rollback, status conditions, preprod replay and audit in one place.
 - Freshdesk stays the source of public FAQs.
@@ -401,6 +427,28 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 ## 8. Milestones
 Each milestone ends with tests passing and a preprod deploy.
 
+**Progress (newest first)**
+- M4b ✅ 2026-11-12: approved answers (scenarios).
+  - **In the chat:** shown word for word and status-gated server-side.
+  - **Publishing:** immutable versions, four-eyes publishing and put-back, archive.
+  - **Testing:** side-by-side replay with synthetic profiles.
+  - **Portal pages:** in nl/en.
+  - **Evals:** 4 new cases (paid run pending approval).
+- M4a ✅ 2026-11-12 (code; Entra sign-in waits for the app registration): agent portal (Preact, nl/en) under `/portal/` on the same CloudFront domain.
+  - **Sign-in:** Entra ID (code + PKCE, app roles agent/approver/admin), 8 h Strict session cookie (only its hash stored).
+  - **Review:** flagged conversations with personal data masked; "show original" is audited.
+  - **Capabilities:** switches (admin only, audited), plus the "what the bot can answer" and limitations pages.
+  - **Activation:** off until `PORTAL_ENABLED`.
+- M3c ✅ 2026-11-12 (code; deploy waits for AWS access): container image, CDK stacks (foundation secrets + SES, WAF in us-east-1, CloudFront + S3 + internal ALB + Fargate API with mock sidecar, nightly worker schedules), manual GitHub deploy workflow (OIDC), `docs/DEPLOY.md`. Load test after the first deploy.
+- M3b ✅ 2026-11-12: thumbs up/down feedback, retention job (90-day anonymising, 24 h login codes and bindings), `dsar-delete`, one-command local stack (`pnpm dev:local`, local Freshdesk stand-in), `docs/TESTING.md`. WAF, load test and schedules come with the first preprod deploy.
+- M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.
+- M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
+- M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
+- M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
+- M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
+- M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
+
+
 **M0: Foundations** ✅ done 2026-11-11 (branch `m0-foundations`, plan `docs/superpowers/plans/2026-11-11-m0-foundations.md`)
 - monorepo, lint/typecheck, CI, CodeQL, Dependabot
 - Supabase baseline migrations with RLS
@@ -415,19 +463,6 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
-- M4a ✅ 2026-11-12 (code; Entra sign-in waits for the app registration): agent portal (Preact, nl/en) under `/portal/` on the same CloudFront domain.
-  - **Sign-in:** Entra ID (code + PKCE, app roles agent/approver/admin), 8 h Strict session cookie (only its hash stored).
-  - **Review:** flagged conversations with personal data masked; "show original" is audited.
-  - **Capabilities:** switches (admin only, audited), plus the "what the bot can answer" and limitations pages.
-  - **Activation:** off until `PORTAL_ENABLED`.
-- M3c ✅ 2026-11-12 (code; deploy waits for AWS access): container image, CDK stacks (foundation secrets + SES, WAF in us-east-1, CloudFront + S3 + internal ALB + Fargate API with mock sidecar, nightly worker schedules), manual GitHub deploy workflow (OIDC), `docs/DEPLOY.md`. Load test after the first deploy.
-- M3b ✅ 2026-11-12: thumbs up/down feedback, retention job (90-day anonymising, 24 h login codes and bindings), `dsar-delete`, one-command local stack (`pnpm dev:local`, local Freshdesk stand-in), `docs/TESTING.md`. WAF, load test and schedules come with the first preprod deploy.
-- M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.
-- M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
-- M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
-- M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
-- M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
-- M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE
 - widget with consent notice, language detection, citations with NL/EN URLs

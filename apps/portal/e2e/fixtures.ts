@@ -5,9 +5,28 @@ export const CONV = '00000000-0000-4000-8000-000000000001';
 export type MockPortal = { requests: { method: string; path: string; body: unknown }[] };
 
 /** Mocks /portal/api and /portal/auth/logout. `me`: the signed-in agent, or an HTTP status. */
+type Version = {
+  id: number;
+  version: number;
+  status: 'draft' | 'published' | 'superseded' | 'withdrawn';
+  triggersNl: string[];
+  triggersEn: string[];
+  answerNl: string;
+  answerEn: string;
+  statuses: string[];
+  articleId: number | null;
+  authorName: string;
+  createdAt: string;
+  publishedByName: string | null;
+  publishedAt: string | null;
+};
+
+export const SCENARIO = '00000000-0000-4000-8000-00000000000a';
+
 export async function mockPortal(
   page: Page,
   me: { name: string; roles: string[] } | 401 | 403,
+  options: { replayAvailable?: boolean } = {},
 ): Promise<MockPortal> {
   const api: MockPortal = { requests: [] };
   const capabilities = [
@@ -15,6 +34,52 @@ export async function mockPortal(
     { name: 'get_recent_visits', statuses: ['MEMBER'], enabled: true },
   ];
   let signedIn = true;
+  const myName = typeof me === 'object' ? me.name : '';
+  const isApprover =
+    typeof me === 'object' && me.roles.some((r) => r === 'approver' || r === 'admin');
+  let archived = false;
+  const versions: Version[] = [
+    {
+      id: 1,
+      version: 1,
+      status: 'published',
+      triggersNl: ['Mag mijn hond mee?'],
+      triggersEn: ['Can I bring my dog?'],
+      answerNl: 'Huisdieren zijn niet toegestaan.',
+      answerEn: 'Pets are not allowed.',
+      statuses: [],
+      articleId: null,
+      authorName: 'Someone Else',
+      createdAt: '2026-11-12T09:00:00Z',
+      publishedByName: 'Approver',
+      publishedAt: '2026-11-12T09:30:00Z',
+    },
+    {
+      id: 2,
+      version: 2,
+      status: 'draft',
+      triggersNl: ['Mag mijn hond mee?'],
+      triggersEn: ['Can I bring my dog?'],
+      answerNl: 'Alleen hulphonden zijn toegestaan.',
+      answerEn: 'Only assistance dogs are allowed.',
+      statuses: [],
+      articleId: null,
+      authorName: 'Someone Else',
+      createdAt: '2026-11-12T10:00:00Z',
+      publishedByName: null,
+      publishedAt: null,
+    },
+  ];
+  const summary = () => ({
+    id: SCENARIO,
+    createdAt: '2026-11-12T09:00:00Z',
+    archived,
+    latestVersion: versions.length,
+    latestVersionId: versions.at(-1)?.id ?? 0,
+    publishedVersion: versions.find((v) => v.status === 'published')?.version ?? null,
+    firstTriggerNl: versions.at(-1)?.triggersNl[0] ?? '',
+    firstTriggerEn: versions.at(-1)?.triggersEn[0] ?? '',
+  });
   const conversation = (text: string) => ({
     id: CONV,
     lang: 'nl',
@@ -77,6 +142,65 @@ export async function mockPortal(
     }
     if (path === `/portal/api/conversations/${CONV}/reveal`) {
       return route.fulfill({ json: conversation('Mail me op sam@example.com') });
+    }
+    if (path === '/portal/api/scenarios' && request.method() === 'GET') {
+      return route.fulfill({ json: { scenarios: [summary()] } });
+    }
+    if (path === '/portal/api/scenarios' && request.method() === 'POST') {
+      const body = request.postDataJSON() as Omit<Version, 'id' | 'version' | 'status'>;
+      versions.push({
+        ...body,
+        id: versions.length + 1,
+        version: versions.length + 1,
+        status: 'draft',
+        authorName: myName,
+        createdAt: '2026-11-12T11:00:00Z',
+        publishedByName: null,
+        publishedAt: null,
+      });
+      return route.fulfill({
+        status: 201,
+        json: { scenarioId: SCENARIO, versionId: versions.length },
+      });
+    }
+    if (path === `/portal/api/scenarios/${SCENARIO}` && request.method() === 'GET') {
+      return route.fulfill({ json: { id: SCENARIO, archived, versions } });
+    }
+    if (path === `/portal/api/scenarios/${SCENARIO}/archive`) {
+      if (!isApprover) return route.fulfill({ status: 403, json: { error: 'forbidden' } });
+      archived = true;
+      return route.fulfill({ status: 204 });
+    }
+    const publish = /^\/portal\/api\/scenario-versions\/(\d+)\/publish$/.exec(path);
+    if (publish) {
+      const target = versions.find((v) => v.id === Number(publish[1]));
+      if (!isApprover) return route.fulfill({ status: 403, json: { error: 'forbidden' } });
+      if (!target) return route.fulfill({ status: 404, json: { error: 'not_found' } });
+      if (target.authorName === myName)
+        return route.fulfill({ status: 403, json: { error: 'own_version' } });
+      for (const v of versions) if (v.status === 'published') v.status = 'superseded';
+      target.status = 'published';
+      target.publishedByName = myName;
+      return route.fulfill({ status: 204 });
+    }
+    if (path === `/portal/api/conversations/${CONV}/replay`) {
+      if (options.replayAvailable === false) {
+        return route.fulfill({ status: 409, json: { error: 'replay_unavailable' } });
+      }
+      return route.fulfill({
+        json: {
+          results: [
+            {
+              question: 'Mail me op [•••]',
+              oldAnswer: 'Ik kon hier geen betrouwbaar antwoord op vinden.',
+              newAnswer: 'Alleen hulphonden zijn toegestaan.',
+              usesDraft: true,
+              outcome: 'answered',
+              action: 'none',
+            },
+          ],
+        },
+      });
     }
     if (path === '/portal/api/capabilities') return route.fulfill({ json: { capabilities } });
     if (path.startsWith('/portal/api/capabilities/') && request.method() === 'PUT') {

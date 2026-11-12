@@ -49,4 +49,21 @@ describe('checkReply', () => {
   it('mustNotMatch also checks citation titles and urls', () => {
     expect(checkReply(reply, { mustNotMatch: [/x\/900101/] })).toHaveLength(1);
   });
+
+  it('checks that an approved answer was shown word for word', () => {
+    const approvedReply = {
+      ...reply,
+      text: 'Nee, huisdieren mogen niet mee.',
+      scenarioVersionId: 5,
+    };
+    expect(
+      checkReply(approvedReply, {
+        approvedAnswer: true,
+        textEquals: 'Nee, huisdieren mogen niet mee.',
+      }),
+    ).toEqual([]);
+    expect(checkReply(reply, { approvedAnswer: true })).toHaveLength(1);
+    expect(checkReply(approvedReply, { approvedAnswer: false })).toHaveLength(1);
+    expect(checkReply(approvedReply, { textEquals: 'iets anders' })).toHaveLength(1);
+  });
 });

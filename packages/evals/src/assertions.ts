@@ -12,6 +12,10 @@ export type Expectation = {
   mustNotMatch?: RegExp[];
   /** Each must appear in the reply text. */
   mustMatch?: RegExp[];
+  /** true: an approved answer was shown; false: none was. */
+  approvedAnswer?: boolean;
+  /** The reply text exactly (approved answers are shown word for word). */
+  textEquals?: string;
 };
 
 /** Returns one message per failed expectation (empty = pass). */
@@ -39,6 +43,17 @@ export function checkReply(reply: Reply, expect: Expectation): string[] {
   }
   for (const pattern of expect.mustMatch ?? []) {
     if (!pattern.test(reply.text)) failures.push(`reply lacks ${pattern}`);
+  }
+  if (
+    expect.approvedAnswer !== undefined &&
+    (reply.scenarioVersionId !== undefined) !== expect.approvedAnswer
+  ) {
+    failures.push(
+      expect.approvedAnswer ? 'no approved answer shown' : 'an approved answer was shown',
+    );
+  }
+  if (expect.textEquals !== undefined && reply.text !== expect.textEquals) {
+    failures.push('reply text differs from the approved text');
   }
   return failures;
 }

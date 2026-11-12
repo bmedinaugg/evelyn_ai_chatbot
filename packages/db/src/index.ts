@@ -48,3 +48,13 @@ export {
   createSupabaseRetentionRepository,
   type RetentionRepository,
 } from './retention-repository.ts';
+export {
+  createSupabaseScenarioRepository,
+  type PublishResult,
+  type ScenarioContent,
+  type ScenarioHit,
+  type ScenarioRepository,
+  type ScenarioSummary,
+  type ScenarioVersion,
+  type ScenarioVersionStatus,
+} from './scenario-repository.ts';

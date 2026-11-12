@@ -32,6 +32,7 @@ function toJson(message: StoredMessage): Json {
       api_content: message.apiContent,
       outcome: message.outcome ?? null,
       citations: message.citations ?? [],
+      scenario_version_id: message.scenarioVersionId ?? null,
     }),
   ) as Json;
 }

@@ -169,14 +169,14 @@ isOneToOne: true
                   ]
                 },"messages": {
                   Row: {
-                    "api_content": NonNullable<Json>,"citations": NonNullable<Json>,"conversation_id": string,"created_at": string,"display_text": string,"id": number,"outcome": string | null,"role": string
+                    "api_content": NonNullable<Json>,"citations": NonNullable<Json>,"conversation_id": string,"created_at": string,"display_text": string,"id": number,"outcome": string | null,"role": string,"scenario_version_id": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "api_content": NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id": string,"created_at"?: string,"display_text": string,"id"?: never,"outcome"?: string | null,"role": string
+                    "api_content": NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id": string,"created_at"?: string,"display_text": string,"id"?: never,"outcome"?: string | null,"role": string,"scenario_version_id"?: number | null
                   }
                   Update: {
-                    "api_content"?: NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id"?: string,"created_at"?: string,"display_text"?: string,"id"?: never,"outcome"?: string | null,"role"?: string
+                    "api_content"?: NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id"?: string,"created_at"?: string,"display_text"?: string,"id"?: never,"outcome"?: string | null,"role"?: string,"scenario_version_id"?: number | null
                   }
                   Relationships: [
                     {
@@ -184,6 +184,12 @@ isOneToOne: true
       columns: ["conversation_id"]
 isOneToOne: false
       referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_scenario_version_id_fkey"
+      columns: ["scenario_version_id"]
+isOneToOne: false
+      referencedRelation: "scenario_versions"
       referencedColumns: ["id"]
     }
                   ]
@@ -221,6 +227,46 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"scenario_versions": {
+                  Row: {
+                    "answer_en": string,"answer_nl": string,"article_id": number | null,"author_name": string,"author_oid": string,"created_at": string,"id": number,"published_at": string | null,"published_by": string | null,"published_by_name": string | null,"scenario_id": string,"search_en": unknown,"search_nl": unknown,"status": string,"statuses": (string)[],"triggers_en": (string)[],"triggers_nl": (string)[],"version": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answer_en": string,"answer_nl": string,"article_id"?: number | null,"author_name": string,"author_oid": string,"created_at"?: string,"id"?: never,"published_at"?: string | null,"published_by"?: string | null,"published_by_name"?: string | null,"scenario_id": string,"search_en"?: never,"search_nl"?: never,"status"?: string,"statuses"?: (string)[],"triggers_en": (string)[],"triggers_nl": (string)[],"version": number
+                  }
+                  Update: {
+                    "answer_en"?: string,"answer_nl"?: string,"article_id"?: number | null,"author_name"?: string,"author_oid"?: string,"created_at"?: string,"id"?: never,"published_at"?: string | null,"published_by"?: string | null,"published_by_name"?: string | null,"scenario_id"?: string,"search_en"?: never,"search_nl"?: never,"status"?: string,"statuses"?: (string)[],"triggers_en"?: (string)[],"triggers_nl"?: (string)[],"version"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "scenario_versions_article_id_fkey"
+      columns: ["article_id"]
+isOneToOne: false
+      referencedRelation: "faq_articles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "scenario_versions_scenario_id_fkey"
+      columns: ["scenario_id"]
+isOneToOne: false
+      referencedRelation: "scenarios"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"scenarios": {
+                  Row: {
+                    "archived_at": string | null,"archived_by": string | null,"created_at": string,"created_by": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"archived_by"?: string | null,"created_at"?: string,"created_by": string,"id"?: string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"archived_by"?: string | null,"created_at"?: string,"created_by"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"ticket_topics": {
                   Row: {
                     "active": boolean,"synced_at": string,"value": string
@@ -241,11 +287,17 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "anonymise_conversations":
+            "add_scenario_version":
+{ Args: { "p_actor_name": string,"p_actor_oid": string,"p_content": Json,"p_scenario_id": string }; Returns: number
+                           },
+"anonymise_conversations":
 { Args: { "p_before": string,"p_limit": number }; Returns: number
                            },
 "append_chat_turn":
 { Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_steps"?: Json,"p_user": Json }; Returns: number
+                           },
+"archive_scenario":
+{ Args: { "p_actor_name": string,"p_actor_oid": string,"p_scenario_id": string }; Returns: string
                            },
 "bind_account":
 { Args: { "p_conversation_id": string,"p_index": number }; Returns: boolean
@@ -259,6 +311,11 @@ isOneToOne: false
 "create_otp_challenge":
 { Args: { "p_code_hash": string,"p_conversation_id": string,"p_email_hash": string,"p_id": string,"p_max_per_window": number,"p_ttl_seconds": number,"p_window_seconds": number }; Returns: boolean
                            },
+"create_scenario":
+{ Args: { "p_actor_name": string,"p_actor_oid": string,"p_content": Json }; Returns: {
+              "scenario_id": string,"version_id": number
+            }[]
+                           },
 "dsar_delete":
 { Args: { "p_email_hash": string }; Returns: {
               "conversations": number,"otp_challenges": number
@@ -268,6 +325,9 @@ isOneToOne: false
 { Args: { "p_limit": number,"p_offset": number,"p_reason": string,"p_since": string }; Returns: {
               "conversation_id": string,"escalated": boolean,"lang": string,"last_flag_at": string,"logged_in": boolean,"reasons": (string)[],"user_message_count": number
             }[]
+                           },
+"publish_scenario_version":
+{ Args: { "p_actor_name": string,"p_actor_oid": string,"p_version_id": number }; Returns: string
                            },
 "purge_otp_challenges":
 { Args: { "p_before": string }; Returns: number
@@ -284,6 +344,11 @@ isOneToOne: false
 "search_faq":
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {
               "article_id": number,"body": string,"lang": string,"rank": number,"title": string,"url": string
+            }[]
+                           },
+"search_scenarios":
+{ Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {
+              "answer_en": string,"answer_nl": string,"article_id": number,"article_title": string,"article_url": string,"rank": number,"scenario_id": string,"statuses": (string)[],"triggers": (string)[],"version_id": number
             }[]
                            },
 "set_account_candidates":

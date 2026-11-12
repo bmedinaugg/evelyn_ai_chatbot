@@ -5,6 +5,7 @@ import {
   type FaqRepository,
   type FlagReason,
   type Outcome,
+  type ScenarioRepository,
   type StoredMessage,
 } from '@trainmore/db';
 import { type Lang, t } from '@trainmore/i18n';
@@ -20,9 +21,11 @@ import {
 import type { Answerer, AnswererResult, AnswererTools } from './claude-answerer.ts';
 import { finalizeReply, type Reply } from './finalize-reply.ts';
 import { buildUserTurn } from './prompt.ts';
+import { type OfferedScenario, scenariosFor } from './scenario-access.ts';
 
 export const MAX_CUSTOMER_MESSAGES = 20;
 const SEARCH_LIMIT = 5;
+const SCENARIO_LIMIT = 3;
 /** Replies where the bot could not help; two in a row means the conversation is stuck. */
 const FAILED: ReadonlySet<Outcome> = new Set(['no_match', 'invalid_citation']);
 
@@ -41,6 +44,8 @@ export type AnswerMessageDeps = {
   conversations: ConversationRepository;
   answerer: Answerer;
   logger: Logger;
+  /** Published approved answers (scenarios); optional so a search failure never blocks replies. */
+  scenarios?: Pick<ScenarioRepository, 'search'>;
   /** Account tools (needs a bound account to be offered). */
   capabilities?: { deps: CapabilityDeps; disabled(): Promise<ReadonlySet<string>> };
 };
@@ -91,10 +96,27 @@ export async function answerMessage(
     }
 
     const hits = await deps.faq.search(input.text, input.pageLang, SEARCH_LIMIT);
+    let scenarios: OfferedScenario[] = [];
+    if (deps.scenarios) {
+      try {
+        // Members-only answers are filtered here, before the model sees anything.
+        scenarios = scenariosFor(
+          await deps.scenarios.search(input.text, input.pageLang, SCENARIO_LIMIT),
+          input.account?.status ?? null,
+        );
+      } catch (error) {
+        // The bot still answers from the help articles.
+        logger.warn(
+          { err: error, conversationId: input.conversationId },
+          'approved answers unavailable',
+        );
+      }
+    }
     const userTurn = buildUserTurn({
       customerMessage: input.text,
       articles: hits,
       pageLang: input.pageLang,
+      scenarios,
     });
 
     const history = await conversations.listApiHistory(input.conversationId);
@@ -119,6 +141,8 @@ export async function answerMessage(
             hits,
             loggedIn: Boolean(input.account),
             accountToolsUsed: result.toolsUsed.length,
+            scenarios,
+            accountStatus: input.account?.status ?? null,
           })
         : result.kind === 'refusal'
           ? fixedReply(input.pageLang, 'bot.noMatch', {
@@ -140,6 +164,9 @@ export async function answerMessage(
             apiContent: result.assistantContent,
             outcome: reply.outcome,
             citations: reply.citations,
+            ...(reply.scenarioVersionId === undefined
+              ? {}
+              : { scenarioVersionId: reply.scenarioVersionId }),
           }
         : null;
     let messageId: number | null;

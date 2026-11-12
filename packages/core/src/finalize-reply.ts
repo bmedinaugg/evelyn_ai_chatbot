@@ -1,4 +1,11 @@
-import type { Citation, FaqSearchHit, FlagReason, Outcome } from '@trainmore/db';
+import type {
+  Citation,
+  CustomerStatus,
+  FaqSearchHit,
+  FlagReason,
+  Outcome,
+  ScenarioHit,
+} from '@trainmore/db';
 import { type Lang, t } from '@trainmore/i18n';
 import type { Answer } from './answer-schema.ts';
 
@@ -12,6 +19,8 @@ export type Reply = {
   action: ReplyAction;
   outcome: Outcome;
   flags: FlagReason[];
+  /** Set when the reply is an approved answer shown word for word. */
+  scenarioVersionId?: number;
 };
 
 const MAX_TEXT = 1200;
@@ -40,6 +49,10 @@ export function finalizeReply(input: {
   loggedIn?: boolean;
   /** Account tools that ran successfully this turn: account answers must come from their data. */
   accountToolsUsed?: number;
+  /** Approved answers retrieved this turn; only these can be shown. */
+  scenarios?: ScenarioHit[];
+  /** Status of the bound account (null: not logged in), for approved answers with conditions. */
+  accountStatus?: CustomerStatus | null;
 }): Reply {
   const { answer, hits } = input;
   const lang = answer.language;
@@ -56,6 +69,47 @@ export function finalizeReply(input: {
     outcome: Outcome,
     flags: FlagReason[],
   ): Reply => ({ text: t(lang, key), lang, citations: [], action, outcome, flags });
+
+  // An approved answer the model picked: its own text, word for word, only if it was retrieved
+  // this turn and the customer's status allows it (checked here, never by the model).
+  const approvedHit =
+    answer.approvedAnswerId === null ||
+    answer.intent === 'wants_human' ||
+    answer.intent === 'off_topic'
+      ? undefined
+      : input.scenarios?.find((s) => s.versionId === answer.approvedAnswerId);
+  const status = input.accountStatus ?? null;
+  if (approvedHit && approvedHit.statuses.length > 0 && status === null) {
+    return fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
+  }
+  // Defence in depth (scenariosFor already leaves these out): never for another status and never
+  // without its text; otherwise the normal answer path applies.
+  const allowed =
+    approvedHit &&
+    (approvedHit.statuses.length === 0 ||
+      (status !== null && approvedHit.statuses.includes(status))) &&
+    approvedHit.answerNl !== '' &&
+    approvedHit.answerEn !== '';
+  if (approvedHit && allowed) {
+    return {
+      text: lang === 'nl' ? approvedHit.answerNl : approvedHit.answerEn,
+      lang,
+      citations:
+        approvedHit.article && approvedHit.articleId !== null
+          ? [
+              {
+                articleId: approvedHit.articleId,
+                title: approvedHit.article.title,
+                url: approvedHit.article.url,
+              },
+            ]
+          : [],
+      action: 'none',
+      outcome: 'answered',
+      flags: [],
+      scenarioVersionId: approvedHit.versionId,
+    };
+  }
 
   const hitsById = new Map(hits.map((hit) => [hit.articleId, hit]));
   if (answer.citedArticleIds.some((id) => !hitsById.has(id))) {

@@ -15,6 +15,7 @@ const answer: Answer = {
   citedArticleIds: [900101],
   confidence: 'high',
   needsHuman: false,
+  approvedAnswerId: null,
 };
 
 let logOutput: string;
@@ -96,6 +97,115 @@ describe('answerMessage', () => {
       { conversationId: ID, text: 'x', pageLang: 'nl' },
     );
     expect(refused.messageId).toBeNull();
+  });
+
+  describe('approved answers', () => {
+    const freeze = {
+      versionId: 41,
+      scenarioId: '00000000-0000-4000-8000-0000000000aa',
+      triggers: ['Kan ik bevriezen bij zwangerschap?'],
+      answerNl: 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+      answerEn: 'Yes, during pregnancy you can freeze for up to 6 months.',
+      statuses: [],
+      articleId: null,
+      article: null,
+    };
+    const picksApproved: AnswererResult = {
+      kind: 'answer',
+      answer: { ...answer, approvedAnswerId: 41, answer: 'model text', citedArticleIds: [] },
+      assistantContent: [{ type: 'text', text: '{}' }],
+      steps: [],
+      toolsUsed: [],
+    };
+
+    it('offers approved answers to Claude, shows the approved text and stores its version', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      const { answerer, calls } = recordingAnswerer(picksApproved);
+      const reply = await answerMessage(
+        {
+          faq: fakeFaq([]),
+          conversations: conv.repo,
+          answerer,
+          logger,
+          scenarios: { search: async () => [freeze] },
+        },
+        { conversationId: ID, text: 'Kan ik bevriezen als ik zwanger ben?', pageLang: 'nl' },
+      );
+      expect(calls[0]?.userTurn).toContain('<approved_answer id="41">');
+      expect(reply.text).toBe('Ja, bij zwangerschap kun je tot 6 maanden bevriezen.');
+      expect(conv.turns[0]?.assistant).toMatchObject({
+        displayText: 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+        scenarioVersionId: 41,
+      });
+    });
+
+    describe('members-only answers', () => {
+      const transfer = {
+        ...freeze,
+        versionId: 42,
+        answerNl: 'GEHEIM: overzetten kan eenmalig gratis.',
+        answerEn: 'SECRET: you can transfer once for free.',
+        statuses: ['MEMBER' as const],
+      };
+      async function promptFor(account: Parameters<typeof answerMessage>[1]['account']) {
+        const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+        const { answerer, calls } = recordingAnswerer(answered);
+        await answerMessage(
+          {
+            faq: fakeFaq([]),
+            conversations: conv.repo,
+            answerer,
+            logger,
+            scenarios: { search: async () => [transfer] },
+          },
+          {
+            conversationId: ID,
+            text: 'Kan ik mijn abonnement overzetten?',
+            pageLang: 'nl',
+            ...(account ? { account } : {}),
+          },
+        );
+        return calls[0]?.userTurn ?? '';
+      }
+
+      it('a visitor who is not logged in: the bot knows it exists (to ask for a login) but never sees its text', async () => {
+        const turn = await promptFor(null);
+        expect(turn).toContain('<approved_answer id="42" requires_login="true">');
+        expect(turn).not.toContain('GEHEIM');
+        expect(turn).not.toContain('SECRET');
+      });
+
+      it('a prospect: the bot does not see the members-only answer at all', async () => {
+        const turn = await promptFor({ customerId: 2, studioId: 1001, status: 'PROSPECT' });
+        expect(turn).not.toContain('id="42"');
+        expect(turn).not.toContain('GEHEIM');
+      });
+
+      it('a member: the bot sees the answer', async () => {
+        const turn = await promptFor({ customerId: 1, studioId: 1001, status: 'MEMBER' });
+        expect(turn).toContain('GEHEIM: overzetten kan eenmalig gratis.');
+      });
+    });
+
+    it('keeps answering when approved answers cannot be searched', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      const reply = await answerMessage(
+        {
+          faq: fakeFaq([cancelNl]),
+          conversations: conv.repo,
+          answerer: recordingAnswerer(answered).answerer,
+          logger,
+          scenarios: {
+            search: async () => {
+              throw new Error('db down');
+            },
+          },
+        },
+        { conversationId: ID, text: 'Hoe zeg ik op?', pageLang: 'nl' },
+      );
+      expect(reply.outcome).toBe('answered');
+      expect(logOutput).toContain('approved answers unavailable');
+    });
   });
 
   it('refuses a second turn while one is in flight', async () => {

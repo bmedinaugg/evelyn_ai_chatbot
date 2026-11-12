@@ -8,6 +8,8 @@ export const answerSchema = z.object({
   citedArticleIds: z.array(z.number().int()),
   confidence: z.enum(['high', 'medium', 'low']),
   needsHuman: z.boolean(),
+  /** Id of an approved answer from <approved_answers> that fully answers the question, else null. */
+  approvedAnswerId: z.number().int().nullable(),
 });
 
 export type Answer = z.infer<typeof answerSchema>;

@@ -202,6 +202,7 @@ describe('account questions', () => {
           citedArticleIds: [],
           confidence: 'high',
           needsHuman: false,
+          approvedAnswerId: null,
         },
         assistantContent: [],
         steps: [],

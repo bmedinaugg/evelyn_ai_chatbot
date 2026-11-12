@@ -41,4 +41,10 @@ export {
   sanitizeAnswerText,
 } from './finalize-reply.ts';
 export { buildUserTurn, escapeForPrompt, SYSTEM_PROMPT } from './prompt.ts';
+export {
+  MAX_REPLAY_QUESTIONS,
+  REPLAY_PROFILES,
+  type ReplayDeps,
+  replayConversation,
+} from './replay.ts';
 export { buildTicketNote, MAX_NOTE_MESSAGES } from './ticket-note.ts';

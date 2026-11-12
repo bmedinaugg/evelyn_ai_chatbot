@@ -74,6 +74,7 @@ describe('widget conversations', () => {
           citedArticleIds: [],
           confidence: 'high',
           needsHuman: false,
+          approvedAnswerId: null,
         },
         assistantContent: [],
         steps: [],

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
-import { createClaudeAnswerer } from '@trainmore/core';
+import { createClaudeAnswerer, replayConversation } from '@trainmore/core';
 import {
   createServiceClient,
   createSupabaseAuthRepository,
@@ -10,6 +10,7 @@ import {
   createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
   createSupabasePortalRepository,
+  createSupabaseScenarioRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
 import { createFreshdeskClient, createLocalFreshdesk } from '@trainmore/freshdesk';
@@ -102,6 +103,9 @@ const capabilities = {
   disabled: () => flags.disabledCapabilities(),
 };
 
+const faq = createSupabaseFaqRepository(db);
+const scenarios = createSupabaseScenarioRepository(db);
+
 // Agent portal: only when Entra is configured (docs/DEPLOY.md, "Entra app registration").
 const portalConfig = loadPortalConfig(env);
 if (!portalConfig) logger.info('agent portal off (no Entra configuration)');
@@ -113,13 +117,20 @@ const app = buildApiServer({
           config: portalConfig,
           entra: createEntraClient(portalConfig),
           repo: createSupabasePortalRepository(db),
+          scenarios,
+          // Replay answers account questions as synthetic profiles: only against the mock Magicline.
+          replay: loadConfig(env).magicline.useMock
+            ? (input) =>
+                replayConversation({ faq, scenarios, answerer, capabilities, logger }, input)
+            : null,
         },
       }
     : {}),
   login,
   capabilities,
   conversations: createSupabaseConversationRepository(db),
-  faq: createSupabaseFaqRepository(db),
+  faq,
+  scenarios,
   escalations: createSupabaseEscalationRepository(db),
   answerer,
   freshdesk: freshdeskClient,

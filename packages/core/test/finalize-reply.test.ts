@@ -1,3 +1,4 @@
+import type { CustomerStatus, ScenarioHit } from '@trainmore/db';
 import { describe, expect, it } from 'vitest';
 import type { Answer } from '../src/answer-schema.ts';
 import { finalizeReply } from '../src/finalize-reply.ts';
@@ -10,10 +11,37 @@ const base: Answer = {
   citedArticleIds: [900101],
   confidence: 'high',
   needsHuman: false,
+  approvedAnswerId: null,
 };
 const hits = [cancelNl, lockersNl];
 const reply = (answer: Partial<Answer>, loggedIn = false, accountToolsUsed = 0) =>
   finalizeReply({ answer: { ...base, ...answer }, hits, loggedIn, accountToolsUsed });
+
+const freeze: ScenarioHit = {
+  versionId: 41,
+  scenarioId: '00000000-0000-4000-8000-0000000000aa',
+  triggers: ['Can I freeze during pregnancy?'],
+  answerNl: 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+  answerEn: 'Yes, during pregnancy you can freeze for up to 6 months.',
+  statuses: [],
+  articleId: 7,
+  article: {
+    title: 'How to freeze',
+    url: 'https://www.support.trainmore.com/en/support/solutions/articles/7',
+  },
+};
+const approved = (
+  answer: Partial<Answer>,
+  options: { scenarios?: ScenarioHit[]; accountStatus?: CustomerStatus | null } = {},
+) =>
+  finalizeReply({
+    answer: { ...base, approvedAnswerId: 41, ...answer },
+    hits,
+    loggedIn: options.accountStatus != null,
+    accountToolsUsed: 0,
+    scenarios: options.scenarios ?? [freeze],
+    accountStatus: options.accountStatus ?? null,
+  });
 
 describe('finalizeReply', () => {
   it('answers an FAQ with citations from the hits (fallback-language hit kept as is)', () => {
@@ -163,5 +191,67 @@ describe('finalizeReply', () => {
 
   it('hands off when the text is empty after sanitising', () => {
     expect(reply({ answer: 'https://only.a.link' })).toMatchObject({ outcome: 'no_match' });
+  });
+});
+
+describe('finalizeReply with approved answers', () => {
+  it('shows the approved text word for word, with its linked article', () => {
+    expect(
+      approved({ answer: 'Model wording that must not be shown', citedArticleIds: [900101] }),
+    ).toEqual({
+      text: 'Yes, during pregnancy you can freeze for up to 6 months.',
+      lang: 'en',
+      citations: [
+        {
+          articleId: 7,
+          title: 'How to freeze',
+          url: 'https://www.support.trainmore.com/en/support/solutions/articles/7',
+        },
+      ],
+      action: 'none',
+      outcome: 'answered',
+      flags: [],
+      scenarioVersionId: 41,
+    });
+  });
+
+  it('uses the Dutch approved text for a Dutch reply', () => {
+    expect(approved({ language: 'nl' }).text).toBe(
+      'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+    );
+  });
+
+  it('ignores an approved answer that was not retrieved this turn', () => {
+    const result = approved({ approvedAnswerId: 999 });
+    expect(result.text).toBe('You can cancel in the app.');
+    expect(result.scenarioVersionId).toBeUndefined();
+  });
+
+  it('asks to log in first for an answer limited to members', () => {
+    const membersOnly = { ...freeze, statuses: ['MEMBER' as const] };
+    expect(approved({}, { scenarios: [membersOnly] })).toMatchObject({
+      action: 'login',
+      text: 'To answer questions about your account, please log in first with your email address.',
+    });
+  });
+
+  it('never shows a members-only answer to a prospect (falls back to the normal answer path)', () => {
+    const membersOnly = { ...freeze, statuses: ['MEMBER' as const] };
+    const result = approved({}, { scenarios: [membersOnly], accountStatus: 'PROSPECT' });
+    expect(result.scenarioVersionId).toBeUndefined();
+    expect(result.text).not.toContain('freeze for up to 6 months');
+    expect(result.text).toBe('You can cancel in the app.');
+  });
+
+  it('shows a members-only answer to a logged-in member', () => {
+    const membersOnly = { ...freeze, statuses: ['MEMBER' as const] };
+    expect(
+      approved({}, { scenarios: [membersOnly], accountStatus: 'MEMBER' }).scenarioVersionId,
+    ).toBe(41);
+  });
+
+  it('a request for a person or an off-topic question wins over an approved answer', () => {
+    expect(approved({ intent: 'wants_human' }).outcome).toBe('handoff');
+    expect(approved({ intent: 'off_topic' }).outcome).toBe('declined');
   });
 });

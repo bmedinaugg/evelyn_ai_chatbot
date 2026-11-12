@@ -19,6 +19,7 @@ import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
 import { type PortalDeps, portalOrigin, registerPortalAuthRoutes } from './portal/auth.ts';
 import { registerPortalReviewRoutes } from './portal/review.ts';
+import { registerPortalScenarioRoutes } from './portal/scenarios.ts';
 import { proxyTrust } from './proxy-trust.ts';
 import { registerTicketRoutes } from './tickets.ts';
 
@@ -26,6 +27,8 @@ export type ApiDeps = {
   login: LoginDeps;
   /** Account tools for logged-in customers (bound account). */
   capabilities?: AnswerMessageDeps['capabilities'];
+  /** Published approved answers (scenarios). */
+  scenarios?: AnswerMessageDeps['scenarios'];
   conversations: ConversationRepository;
   faq: FaqRepository;
   answerer: Answerer;
@@ -116,6 +119,7 @@ export function buildApiServer(deps: ApiDeps) {
               answerer: deps.answerer,
               logger: deps.logger,
               ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
+              ...(deps.scenarios ? { scenarios: deps.scenarios } : {}),
             },
             {
               conversationId: conversation.id,
@@ -155,6 +159,7 @@ export function buildApiServer(deps: ApiDeps) {
     app.register(async (scope) => {
       registerPortalAuthRoutes(scope, portal);
       registerPortalReviewRoutes(scope, portal);
+      registerPortalScenarioRoutes(scope, portal);
     });
   }
 

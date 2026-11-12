@@ -10,6 +10,7 @@ const answer: Answer = {
   citedArticleIds: [900101],
   confidence: 'high',
   needsHuman: false,
+  approvedAnswerId: null,
 };
 
 function fakeSequence(responses: Record<string, unknown>[]): {

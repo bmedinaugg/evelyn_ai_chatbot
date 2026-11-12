@@ -8,8 +8,12 @@ import type {
   ConversationRepository,
   EscalationRepository,
   FaqRepository,
+  PortalActor,
   PortalRepository,
   PortalSession,
+  ScenarioContent,
+  ScenarioRepository,
+  ScenarioVersion,
   StoredMessage,
 } from '@trainmore/db';
 import type { CreateTicketInput } from '@trainmore/freshdesk';
@@ -39,7 +43,7 @@ export function createTestApi(
     }[];
     magiclineDown?: boolean;
     /** Portal on, with the claims the fake Entra returns on login. */
-    portal?: { claims?: Partial<EntraClaims> };
+    portal?: { claims?: Partial<EntraClaims>; replayAvailable?: boolean };
     /** Extra Freshdesk tag marking non-production tickets (e.g. chatbot-preprod). */
     envTag?: string;
     /** Synced Freshdesk topics (empty: built-in defaults apply). */
@@ -167,6 +171,7 @@ export function createTestApi(
         citedArticleIds: [],
         confidence: 'high',
         needsHuman: true,
+        approvedAnswerId: null,
       },
       assistantContent: [],
       steps: [],
@@ -334,6 +339,7 @@ export function createTestApi(
         lang: 'nl',
         createdAt: '2026-11-12T09:00:00Z',
         loggedIn: true,
+        customerStatus: 'MEMBER',
         messages: [
           {
             id: 1,
@@ -376,6 +382,98 @@ export function createTestApi(
       });
     },
   };
+  // In-memory approved answers with the same four-eyes rule as publish_scenario_version.
+  const scenarioVersions: (ScenarioVersion & { scenarioId: string })[] = [];
+  const archivedScenarios = new Set<string>();
+  let scenarioCounter = 0;
+  const addVersionTo = (scenarioId: string, content: ScenarioContent, actor: PortalActor) => {
+    const version = {
+      ...content,
+      id: scenarioVersions.length + 1,
+      scenarioId,
+      version: scenarioVersions.filter((v) => v.scenarioId === scenarioId).length + 1,
+      status: 'draft' as const,
+      authorOid: actor.oid,
+      authorName: actor.name,
+      createdAt: '2026-11-12T10:00:00Z',
+      publishedByName: null,
+      publishedAt: null,
+    };
+    scenarioVersions.push(version);
+    return version.id;
+  };
+  const scenarioRepo: ScenarioRepository = {
+    async create(content, actor) {
+      scenarioCounter += 1;
+      const scenarioId = `00000000-0000-4000-8000-${String(scenarioCounter).padStart(12, '0')}`;
+      return { scenarioId, versionId: addVersionTo(scenarioId, content, actor) };
+    },
+    async addVersion(scenarioId, content, actor) {
+      if (
+        archivedScenarios.has(scenarioId) ||
+        !scenarioVersions.some((v) => v.scenarioId === scenarioId)
+      )
+        throw Object.assign(new Error('unknown or archived scenario'), { code: 'P0002' });
+      return addVersionTo(scenarioId, content, actor);
+    },
+    async publish(versionId, actor) {
+      const v = scenarioVersions.find((x) => x.id === versionId);
+      if (!v) return 'not_found';
+      if (archivedScenarios.has(v.scenarioId)) return 'archived';
+      if (v.authorOid === actor.oid) return 'own_version';
+      for (const other of scenarioVersions)
+        if (other.scenarioId === v.scenarioId && other.status === 'published')
+          other.status = 'superseded';
+      v.status = 'published';
+      v.publishedByName = actor.name;
+      audits.push({
+        actor,
+        action: 'scenario.publish',
+        entityType: 'scenario',
+        entityId: v.scenarioId,
+      });
+      return 'ok';
+    },
+    async archive(scenarioId) {
+      if (
+        !scenarioVersions.some((v) => v.scenarioId === scenarioId) ||
+        archivedScenarios.has(scenarioId)
+      )
+        return 'not_found';
+      archivedScenarios.add(scenarioId);
+      return 'ok';
+    },
+    async list() {
+      return [...new Set(scenarioVersions.map((v) => v.scenarioId))].map((id) => {
+        const own = scenarioVersions.filter((v) => v.scenarioId === id);
+        return {
+          id,
+          createdAt: '2026-11-12T10:00:00Z',
+          archived: archivedScenarios.has(id),
+          latestVersion: own.length,
+          latestVersionId: own.at(-1)?.id ?? 0,
+          publishedVersion: own.find((v) => v.status === 'published')?.version ?? null,
+          firstTriggerNl: own.at(-1)?.triggersNl[0] ?? '',
+          firstTriggerEn: own.at(-1)?.triggersEn[0] ?? '',
+        };
+      });
+    },
+    async get(scenarioId) {
+      const versions = scenarioVersions.filter((v) => v.scenarioId === scenarioId);
+      return versions.length
+        ? { id: scenarioId, archived: archivedScenarios.has(scenarioId), versions }
+        : null;
+    },
+    async getVersion(versionId) {
+      return scenarioVersions.find((v) => v.id === versionId) ?? null;
+    },
+    async search() {
+      return [];
+    },
+  };
+  const replayCalls: unknown[] = [];
+
+  let portalClaims = options.portal?.claims;
   const entra: EntraClient = {
     async authUrl(input) {
       entraCalls.authUrl.push(input);
@@ -390,7 +488,7 @@ export function createTestApi(
         name: 'Agent One',
         roles: ['agent'],
         nonce: input.expectedNonce,
-        ...options.portal?.claims,
+        ...portalClaims,
       };
     },
   };
@@ -408,6 +506,25 @@ export function createTestApi(
             },
             entra,
             repo: portalRepo,
+            scenarios: scenarioRepo,
+            replay:
+              options.portal.replayAvailable === false
+                ? null
+                : async (input) => {
+                    replayCalls.push(input);
+                    return input.questions.map((question) => ({
+                      question,
+                      reply: {
+                        text: `Nieuw antwoord op: ${question}`,
+                        lang: input.pageLang,
+                        citations: [],
+                        action: 'none' as const,
+                        outcome: 'answered' as const,
+                        flags: [],
+                        scenarioVersionId: input.draft.versionId,
+                      },
+                    }));
+                  },
           },
         }
       : {}),
@@ -479,6 +596,12 @@ export function createTestApi(
     audits,
     capabilitySwitches,
     entraCalls,
+    scenarioVersions,
+    replayCalls,
+    /** The next portal sign-in returns these claims (a second person on the same server). */
+    setPortalClaims(claims: Partial<EntraClaims>) {
+      portalClaims = claims;
+    },
     answererCalls,
     turnstileIps,
     logs: () => logOutput,
