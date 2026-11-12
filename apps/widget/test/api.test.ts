@@ -65,6 +65,17 @@ describe('createWidgetApi', () => {
     }
   });
 
+  it('gives up on a hung request and reports a network problem', async () => {
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    const slowApi = createWidgetApi({ baseUrl: 'https://api.test', fetch: hanging, timeoutMs: 20 });
+    const error = await slowApi.sendMessage(session, 'x', 'nl').catch((e) => e);
+    expect(error).toBeInstanceOf(WidgetApiError);
+    expect(error.kind).toBe('network');
+  });
+
   it('submits a lead', async () => {
     responses.push(json(201, { ok: true }));
     await api.submitLead({

@@ -181,6 +181,8 @@ input[type="tel"] {
 .tm-button--primary {
   border-color: var(--tm-red);
   background: var(--tm-red);
+  /* Black on red is ~5.3:1 (WCAG AA); white on red is only ~4:1 at this size. */
+  color: var(--tm-black);
 }
 
 .tm-button:disabled {

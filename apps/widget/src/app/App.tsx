@@ -1,5 +1,5 @@
 import { type Lang, t } from '@trainmore/i18n';
-import { useReducer, useRef, useState } from 'preact/hooks';
+import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { type Session, type WidgetApi, WidgetApiError } from '../lib/api.ts';
 import { chatReducer, initialChatState, type Notice } from '../lib/chat-state.ts';
 import { CLOSE_MESSAGE } from '../loader-helpers.ts';
@@ -24,6 +24,11 @@ function noticeFor(error: unknown): Notice {
   return 'error';
 }
 
+function closeChat(): void {
+  // No data in the message; the loader only accepts it from the widget's origin.
+  window.parent.postMessage({ type: CLOSE_MESSAGE }, '*');
+}
+
 export function App(props: {
   lang: Lang;
   api: WidgetApi;
@@ -34,6 +39,15 @@ export function App(props: {
   const stored = useRef(loadStored());
   const [state, dispatch] = useReducer(chatReducer, initialChatState(stored.current.consentGiven));
   const [draft, setDraft] = useState('');
+
+  // Key events inside the iframe never reach the portal page, so Escape is handled here.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeChat();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const remember = (session: Session | null) => {
     stored.current = { ...stored.current, session };
@@ -93,7 +107,7 @@ export function App(props: {
           type="button"
           class="tm-icon-button"
           aria-label={t(lang, 'widget.close')}
-          onClick={() => window.parent.postMessage({ type: CLOSE_MESSAGE }, '*')}
+          onClick={closeChat}
         >
           ×
         </button>
@@ -151,7 +165,12 @@ export function App(props: {
             </button>
           </form>
           {state.messages.length > 0 && (
-            <button type="button" class="tm-link-button" onClick={newChat}>
+            <button
+              type="button"
+              class="tm-link-button"
+              onClick={newChat}
+              disabled={state.phase === 'sending'}
+            >
               {t(lang, 'widget.newChat')}
             </button>
           )}

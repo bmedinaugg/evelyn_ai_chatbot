@@ -7,6 +7,7 @@ type TurnstileApi = {
       sitekey: string;
       callback: (token: string) => void;
       'expired-callback'?: () => void;
+      'error-callback'?: () => void;
     },
   ): string;
   reset(widgetId?: string): void;
@@ -29,8 +30,15 @@ function loadTurnstile(): Promise<TurnstileApi> {
     script.async = true;
     script.onload = () =>
       window.turnstile ? resolve(window.turnstile) : reject(new Error('turnstile missing'));
-    script.onerror = () => reject(new Error('turnstile failed to load'));
+    script.onerror = () => {
+      script.remove();
+      reject(new Error('turnstile failed to load'));
+    };
     document.head.append(script);
+  });
+  // A failed load is not cached, so reopening the form tries again.
+  scriptPromise.catch(() => {
+    scriptPromise = undefined;
   });
   return scriptPromise;
 }
@@ -40,6 +48,7 @@ export function useTurnstile(siteKey: string) {
   const container = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | undefined>(undefined);
   const [token, setToken] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,9 +59,12 @@ export function useTurnstile(siteKey: string) {
           sitekey: siteKey,
           callback: (value) => setToken(value),
           'expired-callback': () => setToken(null),
+          'error-callback': () => setFailed(true),
         });
       })
-      .catch(() => setToken(null));
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
       if (widgetId.current) window.turnstile?.remove(widgetId.current);
@@ -64,5 +76,5 @@ export function useTurnstile(siteKey: string) {
     if (widgetId.current) window.turnstile?.reset(widgetId.current);
   };
 
-  return { container, token, reset };
+  return { container, token, failed, reset };
 }

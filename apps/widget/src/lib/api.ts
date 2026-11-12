@@ -56,9 +56,17 @@ async function errorKind(response: Response): Promise<WidgetApiErrorKind> {
   return 'server';
 }
 
-export function createWidgetApi(opts: { baseUrl: string; fetch?: typeof fetch }) {
+/** Longer than the API's own Claude timeout (2 x 25 s) so real answers still arrive. */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+export function createWidgetApi(opts: {
+  baseUrl: string;
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+}) {
   const base = opts.baseUrl.replace(/\/+$/, '');
   const doFetch = opts.fetch ?? fetch.bind(globalThis);
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   async function post<T>(
     path: string,
@@ -75,6 +83,7 @@ export function createWidgetApi(opts: { baseUrl: string; fetch?: typeof fetch })
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new WidgetApiError('network');

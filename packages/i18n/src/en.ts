@@ -56,6 +56,9 @@ export const en = {
       verificationFailed: "We couldn't verify that you're not a robot. Please try again.",
       error: 'Something went wrong. Please try again later.',
       cancel: 'Cancel',
+      invalid: 'Please check your email address, phone number and question.',
+      unavailable:
+        'The verification could not load. Please try again later or contact our support team.',
     },
   },
   lead: {

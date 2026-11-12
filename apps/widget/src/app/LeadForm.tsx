@@ -3,7 +3,10 @@ import { useState } from 'preact/hooks';
 import { type WidgetApi, WidgetApiError } from '../lib/api.ts';
 import { useTurnstile } from './turnstile.ts';
 
-type Status = 'idle' | 'sending' | 'verification_failed' | 'error';
+type Status = 'idle' | 'sending' | 'verification_failed' | 'invalid' | 'error';
+
+// Same rule as the API (apps/api/src/leads.ts), escaped for the `v` flag browsers use for `pattern`.
+const PHONE_PATTERN = '\\+?[0-9 \\(\\)\\-]{6,20}';
 
 export function LeadForm(props: {
   lang: Lang;
@@ -20,6 +23,10 @@ export function LeadForm(props: {
   async function submit(event: Event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget as HTMLFormElement);
+    if (String(form.get('question') ?? '').trim() === '') {
+      setStatus('invalid');
+      return;
+    }
     if (!turnstile.token) {
       setStatus('verification_failed');
       return;
@@ -39,10 +46,13 @@ export function LeadForm(props: {
       props.onSubmitted();
     } catch (error) {
       turnstile.reset();
+      const kind = error instanceof WidgetApiError ? error.kind : 'server';
       setStatus(
-        error instanceof WidgetApiError && error.kind === 'verification_failed'
+        kind === 'verification_failed'
           ? 'verification_failed'
-          : 'error',
+          : kind === 'invalid'
+            ? 'invalid'
+            : 'error',
       );
     }
   }
@@ -56,7 +66,7 @@ export function LeadForm(props: {
       </label>
       <label>
         {t(lang, 'widget.lead.phone')}
-        <input name="phone" type="tel" maxLength={20} autocomplete="tel" />
+        <input name="phone" type="tel" maxLength={20} autocomplete="tel" pattern={PHONE_PATTERN} />
       </label>
       <label>
         {t(lang, 'widget.lead.question')}
@@ -67,6 +77,16 @@ export function LeadForm(props: {
         {t(lang, 'widget.lead.consent')}
       </label>
       <div ref={turnstile.container} class="tm-turnstile" />
+      {turnstile.failed && (
+        <p class="tm-notice" role="alert">
+          {t(lang, 'widget.lead.unavailable')}
+        </p>
+      )}
+      {status === 'invalid' && (
+        <p class="tm-notice" role="alert">
+          {t(lang, 'widget.lead.invalid')}
+        </p>
+      )}
       {status === 'verification_failed' && (
         <p class="tm-notice" role="alert">
           {t(lang, 'widget.lead.verificationFailed')}

@@ -57,6 +57,9 @@ export const nl = {
       verificationFailed: 'We konden niet controleren dat je geen robot bent. Probeer het opnieuw.',
       error: 'Er ging iets mis. Probeer het later opnieuw.',
       cancel: 'Annuleren',
+      invalid: 'Controleer je e-mailadres, telefoonnummer en vraag.',
+      unavailable:
+        'De controle kon niet laden. Probeer het later opnieuw of neem contact op met ons supportteam.',
     },
   },
   lead: {

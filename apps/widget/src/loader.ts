@@ -45,12 +45,18 @@ function mountLoader(doc: Document, widgetUrl: URL, lang: Lang): void {
   doc.body.append(frame, button);
 }
 
+// currentScript is only available while the script first runs; read it before waiting.
 const script = document.currentScript as HTMLScriptElement | null;
 const widgetUrl = parseWidgetUrl(script?.dataset.widgetUrl);
 if (widgetUrl) {
-  mountLoader(
-    document,
-    widgetUrl,
-    detectPortalLang(location.pathname, document.documentElement.lang || null),
-  );
+  const mount = () =>
+    mountLoader(
+      document,
+      widgetUrl,
+      detectPortalLang(location.pathname, document.documentElement.lang || null),
+    );
+  // The script may run from <head> (or early, when async and cached) before <body> exists.
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', mount, { once: true });
+  else mount();
 }

@@ -43,6 +43,11 @@
 }
 
 @media (max-width: 480px) {
+  /* The chat covers the screen; the launcher would sit on top of the send button. */
+  .tm-chat-launcher[aria-expanded="true"] {
+    display: none;
+  }
+
   .tm-chat-frame {
     right: 0;
     bottom: 0;
