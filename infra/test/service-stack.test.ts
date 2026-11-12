@@ -43,6 +43,7 @@ beforeAll(() => {
       },
       chatModel: 'claude-sonnet-5-5',
     },
+    webAclArn: 'arn:aws:wafv2:us-east-1:111111111111:global/webacl/test/abc',
   });
   template = Template.fromStack(service);
 });
@@ -165,6 +166,14 @@ describe('ServiceStack (preprod)', () => {
           StrictTransportSecurity: Match.objectLike({ Override: true }),
           ContentTypeOptions: { Override: true },
         }),
+      }),
+    });
+  });
+
+  it('puts the WAF in front of the distribution', () => {
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        WebACLId: 'arn:aws:wafv2:us-east-1:111111111111:global/webacl/test/abc',
       }),
     });
   });
