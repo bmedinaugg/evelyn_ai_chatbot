@@ -190,6 +190,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: 1.8.0
         version: 1.8.0(zod@4.6.7)
+      '@aws-sdk/client-secrets-manager':
+        specifier: 3.1166.0
+        version: 3.1166.0
+      '@aws-sdk/client-sesv2':
+        specifier: 3.1166.0
+        version: 3.1166.0
       '@fastify/cors':
         specifier: 11.4.1
         version: 11.4.1
@@ -202,12 +208,18 @@ importers:
       '@trainmore/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@trainmore/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@trainmore/freshdesk':
         specifier: workspace:*
         version: link:../../packages/freshdesk
       '@trainmore/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@trainmore/magicline':
+        specifier: workspace:*
+        version: link:../../packages/magicline
       '@trainmore/shared':
         specifier: workspace:*
         version: link:../../packages/shared

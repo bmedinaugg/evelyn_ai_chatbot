@@ -2,7 +2,7 @@ import type { Citation, FaqSearchHit, FlagReason, Outcome } from '@trainmore/db'
 import { type Lang, t } from '@trainmore/i18n';
 import type { Answer } from './answer-schema.ts';
 
-export type ReplyAction = 'none' | 'lead_form' | 'contact';
+export type ReplyAction = 'none' | 'lead_form' | 'contact' | 'login';
 
 export type Reply = {
   text: string;
@@ -32,7 +32,12 @@ export function sanitizeAnswerText(text: string): string {
  * Turns the model's structured answer into what the customer sees. The model never decides which
  * articles exist, which links are shown, or the text for declines and hand-offs.
  */
-export function finalizeReply(input: { answer: Answer; hits: FaqSearchHit[] }): Reply {
+export function finalizeReply(input: {
+  answer: Answer;
+  hits: FaqSearchHit[];
+  /** Logged-in customer with a bound account (M2a); account tools come in M2b. */
+  loggedIn?: boolean;
+}): Reply {
   const { answer, hits } = input;
   const lang = answer.language;
   const fixed = (
@@ -41,6 +46,7 @@ export function finalizeReply(input: { answer: Answer; hits: FaqSearchHit[] }): 
       | 'bot.offTopic'
       | 'bot.accountQuestion'
       | 'bot.wantsHuman'
+      | 'bot.loginNeeded'
       | 'bot.greeting'
       | 'bot.salesLead',
     action: ReplyAction,
@@ -62,7 +68,9 @@ export function finalizeReply(input: { answer: Answer; hits: FaqSearchHit[] }): 
     case 'off_topic':
       return fixed('bot.offTopic', 'none', 'declined', []);
     case 'account_question':
-      return fixed('bot.accountQuestion', 'contact', 'unsupported', ['account_question']);
+      return input.loggedIn
+        ? fixed('bot.accountQuestion', 'contact', 'unsupported', ['account_question'])
+        : fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
     case 'wants_human':
       return fixed('bot.wantsHuman', 'contact', 'handoff', ['wants_human']);
     case 'greeting':

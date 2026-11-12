@@ -12,7 +12,8 @@ const base: Answer = {
   needsHuman: false,
 };
 const hits = [cancelNl, lockersNl];
-const reply = (answer: Partial<Answer>) => finalizeReply({ answer: { ...base, ...answer }, hits });
+const reply = (answer: Partial<Answer>, loggedIn = false) =>
+  finalizeReply({ answer: { ...base, ...answer }, hits, loggedIn });
 
 describe('finalizeReply', () => {
   it('answers an FAQ with citations from the hits (fallback-language hit kept as is)', () => {
@@ -51,8 +52,17 @@ describe('finalizeReply', () => {
     });
   });
 
-  it('hands account questions to support', () => {
+  it('asks anonymous visitors to log in for account questions', () => {
     expect(reply({ intent: 'account_question' })).toMatchObject({
+      outcome: 'unsupported',
+      action: 'login',
+      flags: ['account_question'],
+      text: 'To answer questions about your account, please log in first with your email address.',
+    });
+  });
+
+  it('hands account questions of logged-in customers to support until account tools exist', () => {
+    expect(reply({ intent: 'account_question' }, true)).toMatchObject({
       outcome: 'unsupported',
       action: 'contact',
       flags: ['account_question'],

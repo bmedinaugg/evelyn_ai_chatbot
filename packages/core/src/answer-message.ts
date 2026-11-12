@@ -50,7 +50,7 @@ function fixedReply(
  */
 export async function answerMessage(
   deps: AnswerMessageDeps,
-  input: { conversationId: string; text: string; pageLang: Lang },
+  input: { conversationId: string; text: string; pageLang: Lang; loggedIn?: boolean },
 ): Promise<Reply> {
   const { conversations, logger } = deps;
   const claimId = await conversations.claimTurn(input.conversationId);
@@ -84,7 +84,7 @@ export async function answerMessage(
 
     const reply: Reply =
       result.kind === 'answer'
-        ? finalizeReply({ answer: result.answer, hits })
+        ? finalizeReply({ answer: result.answer, hits, loggedIn: input.loggedIn ?? false })
         : result.kind === 'refusal'
           ? fixedReply(input.pageLang, 'bot.noMatch', {
               action: 'contact',

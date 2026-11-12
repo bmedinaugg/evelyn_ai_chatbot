@@ -14,6 +14,7 @@ export const nl = {
       'Ik kan alleen helpen met vragen over TrainMore. Kan ik je helpen met iets over je lidmaatschap of onze clubs?',
     accountQuestion:
       'Ik kan hier nog geen persoonlijke accountgegevens opzoeken. Ons supportteam helpt je graag met je account.',
+    loginNeeded: 'Om vragen over je account te beantwoorden, log je eerst in met je e-mailadres.',
     wantsHuman: 'Natuurlijk. Je kunt ons supportteam bereiken via de contactpagina.',
     error: 'Er ging aan onze kant iets mis. Probeer het zo nog eens.',
     conversationLimit: 'Dit gesprek heeft de limiet bereikt. Start een nieuwe chat.',

@@ -1,16 +1,24 @@
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { type Answerer, answerMessage, ConversationBusyError } from '@trainmore/core';
+import {
+  type Answerer,
+  answerMessage,
+  ConversationBusyError,
+  type LoginDeps,
+} from '@trainmore/core';
 import type { ConversationRepository, FaqRepository } from '@trainmore/db';
 import type { FreshdeskClient } from '@trainmore/freshdesk';
 import type { Logger } from '@trainmore/shared';
 import Fastify, { type FastifyError } from 'fastify';
 import { z } from 'zod';
-import { newConversationToken, tokenMatches } from './conversation-token.ts';
+import { authorizeConversation } from './authorize.ts';
+import { newConversationToken } from './conversation-token.ts';
 import { registerLeadRoutes } from './leads.ts';
+import { registerLoginRoutes } from './login-routes.ts';
 import { proxyTrust } from './proxy-trust.ts';
 
 export type ApiDeps = {
+  login: LoginDeps;
   conversations: ConversationRepository;
   faq: FaqRepository;
   answerer: Answerer;
@@ -28,7 +36,6 @@ export type ApiDeps = {
 const langSchema = z.enum(['nl', 'en']);
 const createConversationBody = z.object({ lang: langSchema });
 const messageBody = z.object({ text: z.string().trim().min(1).max(1000), pageLang: langSchema });
-const BEARER = /^Bearer (\S+)$/;
 
 export type ApiServer = ReturnType<typeof buildApiServer>;
 
@@ -80,13 +87,8 @@ export function buildApiServer(deps: ApiDeps) {
       '/widget/conversations/:id/messages',
       { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
       async (request, reply) => {
-        const bearer = BEARER.exec(request.headers.authorization ?? '')?.[1];
-        if (!bearer) return reply.code(401).send({ error: 'unauthorized' });
-        const conversation = await deps.conversations.get(request.params.id);
-        // Same answer for "no such conversation" and "wrong token".
-        if (!conversation || !tokenMatches(bearer, conversation.tokenHash)) {
-          return reply.code(404).send({ error: 'not_found' });
-        }
+        const conversation = await authorizeConversation(deps.conversations, request, reply);
+        if (!conversation) return reply;
         const body = messageBody.safeParse(request.body);
         if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
 
@@ -98,7 +100,12 @@ export function buildApiServer(deps: ApiDeps) {
               answerer: deps.answerer,
               logger: deps.logger,
             },
-            { conversationId: conversation.id, text: body.data.text, pageLang: body.data.pageLang },
+            {
+              conversationId: conversation.id,
+              text: body.data.text,
+              pageLang: body.data.pageLang,
+              loggedIn: (await deps.login.auth.getAuthState(conversation.id)).account !== null,
+            },
           );
           return {
             reply: {
@@ -118,6 +125,7 @@ export function buildApiServer(deps: ApiDeps) {
     );
 
     registerLeadRoutes(widget, deps);
+    registerLoginRoutes(widget, deps);
   });
 
   return app;

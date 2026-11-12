@@ -132,3 +132,84 @@ export function loadTurnstileConfig(env: Env = process.env): TurnstileConfig {
   const e = parseEnv(z.object({ TURNSTILE_SECRET_KEY: z.string().min(1) }), env);
   return { secretKey: e.TURNSTILE_SECRET_KEY };
 }
+
+export type OtpConfigValues = {
+  secret: string;
+  ttlSeconds: number;
+  maxAttempts: number;
+  maxPerWindow: number;
+  windowSeconds: number;
+};
+
+/** One-time login codes: hashed with OTP_HMAC_SECRET; at most 3 codes per email per 15 minutes. */
+export function loadOtpConfig(env: Env = process.env): OtpConfigValues {
+  const e = parseEnv(
+    z.object({
+      OTP_HMAC_SECRET: z.string().min(32),
+      OTP_EXPIRY_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
+      OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
+    }),
+    env,
+  );
+  return {
+    secret: e.OTP_HMAC_SECRET,
+    ttlSeconds: e.OTP_EXPIRY_SECONDS,
+    maxAttempts: e.OTP_MAX_ATTEMPTS,
+    maxPerWindow: 3,
+    windowSeconds: 900,
+  };
+}
+
+export type EmailConfig = { from: string; configurationSet?: string };
+
+export function loadEmailConfig(env: Env = process.env): EmailConfig {
+  const e = parseEnv(
+    z.object({
+      EMAIL_FROM: z.string().trim().min(3),
+      SES_CONFIGURATION_SET: z.string().trim().optional(),
+    }),
+    env,
+  );
+  return {
+    from: e.EMAIL_FROM,
+    ...(e.SES_CONFIGURATION_SET ? { configurationSet: e.SES_CONFIGURATION_SET } : {}),
+  };
+}
+
+export type MagiclineKeysConfig =
+  | { kind: 'env'; raw: string }
+  | { kind: 'secret'; secretName: string };
+
+/** With the mock (local/preprod), keys come from MOCK_MAGICLINE_KEYS; otherwise from Secrets Manager. */
+export function loadMagiclineKeysConfig(env: Env = process.env): MagiclineKeysConfig {
+  const e = parseEnv(
+    z
+      .object({
+        MAGICLINE_USE_MOCK: z.enum(['true', 'false', '1', '0']),
+        MOCK_MAGICLINE_KEYS: z.string().optional(),
+        MAGICLINE_KEYS_SECRET_NAME: z.string().optional(),
+      })
+      .superRefine((cfg, ctx) => {
+        const mock = cfg.MAGICLINE_USE_MOCK === 'true' || cfg.MAGICLINE_USE_MOCK === '1';
+        if (mock && !cfg.MOCK_MAGICLINE_KEYS) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['MOCK_MAGICLINE_KEYS'],
+            message: 'is required with the mock',
+          });
+        }
+        if (!mock && !cfg.MAGICLINE_KEYS_SECRET_NAME) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['MAGICLINE_KEYS_SECRET_NAME'],
+            message: 'is required without the mock',
+          });
+        }
+      }),
+    env,
+  );
+  const mock = e.MAGICLINE_USE_MOCK === 'true' || e.MAGICLINE_USE_MOCK === '1';
+  return mock
+    ? { kind: 'env', raw: e.MOCK_MAGICLINE_KEYS ?? '' }
+    : { kind: 'secret', secretName: e.MAGICLINE_KEYS_SECRET_NAME ?? '' };
+}

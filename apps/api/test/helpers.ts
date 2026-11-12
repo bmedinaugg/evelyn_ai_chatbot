@@ -1,6 +1,9 @@
 import { Writable } from 'node:stream';
-import type { Answerer, AnswererResult, Reply } from '@trainmore/core';
+import type { Answerer, AnswererResult, LoginDeps, Reply } from '@trainmore/core';
 import type {
+  AccountCandidate,
+  AuthRepository,
+  AuthState,
   ConversationRecord,
   ConversationRepository,
   FaqRepository,
@@ -21,6 +24,13 @@ export function createTestApi(
     claimError?: Error;
     trustProxyHops?: number;
     recordLeadError?: 'with-conversation' | 'always';
+    accounts?: {
+      customerId: number;
+      studioId: number;
+      status: 'MEMBER' | 'PROSPECT' | 'FORMER_MEMBER';
+      customerNumber: string | null;
+    }[];
+    magiclineDown?: boolean;
   } = {},
 ) {
   const conversations = new Map<
@@ -122,7 +132,116 @@ export function createTestApi(
     return result;
   };
 
+  // In-memory auth repository with the same rules as the SQL functions.
+  const sentCodes: { to: string; code: string }[] = [];
+  const challenges: {
+    id: string;
+    conversationId: string;
+    emailHash: string;
+    codeHash: string;
+    attempts: number;
+    consumed: boolean;
+  }[] = [];
+  const authByConversation = new Map<
+    string,
+    { emailHash: string | null; candidates: AccountCandidate[] | null; bound: number | null }
+  >();
+  const authOf = (id: string) => {
+    const existing = authByConversation.get(id);
+    if (existing) return existing;
+    const created = { emailHash: null, candidates: null, bound: null };
+    authByConversation.set(id, created);
+    return created;
+  };
+  const authRepo: AuthRepository = {
+    async createOtpChallenge(input) {
+      if (challenges.filter((c) => c.emailHash === input.emailHash).length >= input.maxPerWindow)
+        return false;
+      challenges.push({ ...input, attempts: 0, consumed: false });
+      return true;
+    },
+    async latestOpenChallengeId(conversationId, emailHash) {
+      return (
+        challenges
+          .filter(
+            (c) => c.conversationId === conversationId && c.emailHash === emailHash && !c.consumed,
+          )
+          .at(-1)?.id ?? null
+      );
+    },
+    async verifyOtpAttempt({ challengeId, conversationId, codeHash, maxAttempts }) {
+      const c = challenges.find((x) => x.id === challengeId && x.conversationId === conversationId);
+      if (!c || c.consumed) return 'not_found';
+      if (c.attempts >= maxAttempts) return 'locked';
+      if (c.codeHash === codeHash) {
+        c.consumed = true;
+        authOf(conversationId).emailHash = c.emailHash;
+        return 'ok';
+      }
+      c.attempts += 1;
+      return c.attempts >= maxAttempts ? 'locked' : 'invalid';
+    },
+    async setAccountCandidates(id, candidates) {
+      authOf(id).candidates = candidates;
+    },
+    async bindAccount(id, index) {
+      const a = authOf(id);
+      if (!a.emailHash || !a.candidates?.[index] || a.bound !== null) return false;
+      a.bound = index;
+      return true;
+    },
+    async getAuthState(id): Promise<AuthState> {
+      const a = authOf(id);
+      const c = a.bound === null ? null : a.candidates?.[a.bound];
+      return {
+        verified: a.emailHash !== null,
+        verifiedEmailHash: a.emailHash,
+        candidates: a.candidates,
+        account: c ? { customerId: c.customerId, studioId: c.studioId, status: c.status } : null,
+      };
+    },
+  };
+  const login: LoginDeps = {
+    auth: authRepo,
+    email: {
+      async sendLoginCode(message) {
+        sentCodes.push({ to: message.to, code: message.code });
+      },
+    },
+    magicline: {
+      async searchByEmail() {
+        if (options.magiclineDown) throw new Error('Magicline 503');
+        return (
+          options.accounts ?? [
+            { customerId: 4, studioId: 1001, status: 'MEMBER', customerNumber: 'M-0004' },
+          ]
+        );
+      },
+      async studioName(studioId) {
+        return `Club ${studioId}`;
+      },
+    },
+    config: {
+      secret: 's'.repeat(32),
+      ttlSeconds: 300,
+      maxAttempts: 5,
+      maxPerWindow: 3,
+      windowSeconds: 900,
+    },
+    logger: createLogger({
+      name: 'login-test',
+      level: 'info',
+      destination: new Writable({
+        write(chunk, _encoding, callback) {
+          logOutput += chunk.toString();
+          callback();
+        },
+      }),
+    }),
+  };
+
   const deps: ApiDeps = {
+    login,
     conversations: conversationRepo,
     faq,
     answerer,
@@ -156,6 +275,8 @@ export function createTestApi(
 
   return {
     app: buildApiServer(deps),
+    sentCodes,
+    authState: (id: string) => authRepo.getAuthState(id),
     conversations,
     leads,
     tickets,
