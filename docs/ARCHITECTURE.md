@@ -333,6 +333,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
 - M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
 - M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
 - M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
