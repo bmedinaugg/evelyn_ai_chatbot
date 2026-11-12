@@ -3,6 +3,7 @@ import { FoundationStack } from '../lib/foundation-stack.ts';
 import { PREPROD_CONFIG } from '../lib/preprod-config.ts';
 import { ServiceStack } from '../lib/service-stack.ts';
 import { WafStack } from '../lib/waf-stack.ts';
+import { WorkerStack } from '../lib/worker-stack.ts';
 
 const app = new App();
 
@@ -35,5 +36,12 @@ new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
   imageTag: context('imageTag'),
   // Built by the deploy workflow with VITE_API_BASE_URL="" (same origin as the API).
   widgetDistPath: context('widgetDistPath'),
+  config: PREPROD_CONFIG,
+});
+new WorkerStack(app, 'TrainmoreChatbot-preprod-worker', {
+  envName: 'preprod',
+  env,
+  foundation,
+  imageTag: context('imageTag'),
   config: PREPROD_CONFIG,
 });
