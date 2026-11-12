@@ -14,7 +14,9 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
 | Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
 | Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk); shown word for word (server swaps the approved text in); four eyes (never publish your own version); side-by-side replay before publishing, human judge | Product owner (2026-11-11, details 2026-11-12) |
-| Daily report | Email | Product owner |
+| Daily report | Email at 07:00 (Amsterdam) about the previous day; flagged questions grouped into named topics by **Claude Haiku** (`CLAUDE_FAST_MODEL`, masked input); **up to 2 masked example questions per topic** in the email | Product owner (2026-11-13) |
+| Replay judge | **LLM judge (Haiku)** gives an advisory better/same/worse plus a reason per replayed question; a person still decides and four eyes still apply | Product owner (2026-11-13) |
+| Metric definitions | Per Amsterdam calendar day; computed live in SQL (no snapshot table); see §3.6 "As built (M5)" | Architect (2026-11-13) |
 | Account questions | Everything Magicline can answer, as a **capability catalogue** with examples and an on/off switch per capability | Product owner |
 | Magicline lookup | Cross-studio customer search; an org-wide key will be requested | Product owner |
 | Magicline writes | **Read-only**; changes go through tickets | Product owner |
@@ -279,7 +281,49 @@ As built (M4b, product owner decisions 2026-11-12):
   - **Storage and output:** nothing is stored; old and new answers are masked and shown side by
     side; each run is audited.
   - **Where it works:** only with `MAGICLINE_USE_MOCK=true`; otherwise 409.
-- **Judging:** a person judges for now; an LLM judge comes in M5.
+- **Judging:** a person judges; since M5 an LLM judge adds advisory verdicts (below).
+
+As built (M5, product owner decisions 2026-11-13):
+- **Metrics** (`daily_metrics(from, to)`, at most 92 days), per Amsterdam calendar day (23 or 25
+  hours on DST days):
+  - **conversations:** at least one customer message, counted on the creation day;
+  - **resolved:** of those, the last bot reply was `answered`, with no escalation and no thumbs
+    down;
+  - **escalations, 👍/👎, flags per reason:** counted on their own day;
+  - **approved answers used:** replies with a `scenario_version_id`;
+  - **logins:** conversations where the customer picked an account;
+  - **rates** are shown as "—" when the base is 0, never 0 %.
+
+  Anonymising keeps all of these, so older numbers stay correct.
+- **Daily report** (worker `daily-report`, 07:00 Europe/Amsterdam, about yesterday):
+  - **Idempotent:** a `daily_reports` row is claimed per day, so a retried or parallel run never
+    sends twice. A failed send releases the day, and an unsent claim older than 15 minutes can be
+    taken over. `--resend` re-sends; `--day` is for local use only.
+  - **Questions:** `flagged_questions` returns the customer question before each flagged reply,
+    one row per question.
+  - **Grouping:** the first 200 questions are masked, cut to 300 characters, escaped and grouped
+    by Haiku into at most 12 nl/en topics. Output is rejected unless every question is used
+    exactly once and labels are 3–60 characters without links, markup or recognisable personal
+    data.
+  - **Fallback:** the topics become the flag reasons, and the email says so. Questions beyond 200
+    are always grouped by reason.
+  - **Email:** plain text to `DAILY_REPORT_RECIPIENTS`, in `DAILY_REPORT_LANG`. Up to 2 examples
+    per topic, masked (`maskText`), with links defanged and cut to 160 characters. It links to
+    `#/flagged?day=…` and `#/metrics`, and carries a "do not forward" note.
+  - **What is stored:** `daily_reports.topics` keeps labels, counts and conversation ids only.
+  - **Infrastructure:** only this task gets the Claude key and SES permission.
+- **Replay judge** (`judgeReplay`):
+  - **Input:** the same masked texts the reviewer sees, plus the draft text, escaped and marked as
+    data.
+  - **Output:** one verdict per question, with a reason of at most 200 characters in the
+    reviewer's language, without links or markup.
+  - **Failure:** any failure gives `judgement: null`, and the replay is still shown.
+  - **Audit:** the replay audit row records `judged` and the counts.
+  - **Locally:** off with the fake answerer.
+- **Portal:**
+  - a Metrics page (7/30/90 days; tiles, bar chart, daily table, yesterday's report topics);
+  - `?day=` on the flagged list;
+  - judge badges in the replay panel.
 
 Why Supabase scenarios rather than Freshdesk write-back:
 - They give us versioning, rollback, status conditions, preprod replay and audit in one place.
@@ -294,6 +338,8 @@ Tables:
   id, topic, reason; no email, name or description), `ticket_topics` (synced Freshdesk choices)
 - `otp_challenges`, `sessions`
 - `portal_users`, `audit_log`, `sync_runs`
+- `daily_reports` (M5: one row per report day; topic labels, counts and conversation ids, no
+  customer text)
 
 Access:
 - **RLS enabled on every table.** Policies deny `anon` and `authenticated`. Only the server
@@ -428,6 +474,13 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 Each milestone ends with tests passing and a preprod deploy.
 
 **Progress (newest first)**
+- M5 ✅ 2026-11-13: daily report and metrics.
+  - **Report:** a 07:00 email about yesterday with Haiku topic grouping (masked; falls back to
+    flag reasons), masked examples, and one send per day.
+  - **Metrics:** live per-Amsterdam-day metrics, with a portal Metrics page and the flagged list
+    by day.
+  - **Replay:** an advisory LLM judge.
+  - **Housekeeping:** the PUBLIC execute grant on the private trigger functions is removed.
 - M4b ✅ 2026-11-12: approved answers (scenarios).
   - **In the chat:** shown word for word and status-gated server-side.
   - **Publishing:** immutable versions, four-eyes publishing and put-back, archive.

@@ -6,7 +6,8 @@
   "scripts": {
     "eval": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:fast": "tsx src/fast-model.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.8.0",
