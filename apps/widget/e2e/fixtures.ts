@@ -9,7 +9,7 @@ type Reply = {
   text: string;
   lang: 'nl' | 'en';
   citations: { articleId: number; title: string; url: string }[];
-  action: 'none' | 'lead_form' | 'contact' | 'login';
+  action: 'none' | 'lead_form' | 'ticket_form' | 'login';
   contactUrl?: string;
 };
 
@@ -30,6 +30,7 @@ export async function mockApi(
   accounts: MockAccount[] = [
     { index: 0, studioName: 'TrainMore Amsterdam', status: 'MEMBER', maskedNumber: '•••004' },
   ],
+  ticketStatus = 201,
 ): Promise<MockApi> {
   const api: MockApi = { requests: [] };
   let conversations = 0;
@@ -41,7 +42,7 @@ export async function mockApi(
       'access-control-allow-headers': 'content-type, authorization',
     };
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    api.requests.push({ path, body: request.postDataJSON() });
+    api.requests.push({ path, body: request.method() === 'GET' ? null : request.postDataJSON() });
     if (path === '/widget/conversations') {
       conversations += 1;
       return route.fulfill({
@@ -74,6 +75,32 @@ export async function mockApi(
     if (path.endsWith('/login/select')) {
       const { index } = request.postDataJSON() as { index: number };
       return route.fulfill({ status: 200, headers: cors, json: { account: accounts[index] } });
+    }
+    if (path === '/widget/ticket-topics') {
+      const lang = new URL(request.url()).searchParams.get('lang');
+      return route.fulfill({
+        status: 200,
+        headers: cors,
+        json: {
+          topics: [
+            {
+              value: 'Membership & contract',
+              label: lang === 'nl' ? 'Lidmaatschap & contract' : 'Membership & contract',
+            },
+            {
+              value: 'Payments & invoices',
+              label: lang === 'nl' ? 'Betalingen & facturen' : 'Payments & invoices',
+            },
+          ],
+        },
+      });
+    }
+    if (path.endsWith('/tickets')) {
+      return route.fulfill({
+        status: ticketStatus,
+        headers: cors,
+        json: ticketStatus === 201 ? { ok: true } : { error: 'verification_failed' },
+      });
     }
     if (path === '/widget/leads') {
       return route.fulfill({

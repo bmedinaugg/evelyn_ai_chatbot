@@ -89,4 +89,40 @@ describe('createWidgetApi', () => {
     expect(requests[0]?.url).toBe('https://api.test/widget/leads');
     expect(await requests[0]?.json()).toMatchObject({ email: 'a@example.com', consent: true });
   });
+
+  it('loads ticket topics for a language', async () => {
+    const topics = [{ value: 'Payments & invoices', label: 'Betalingen & facturen' }];
+    responses.push(json(200, { topics }));
+    expect(await api.getTicketTopics('nl')).toEqual(topics);
+    expect(requests[0]?.url).toBe('https://api.test/widget/ticket-topics?lang=nl');
+    expect(requests[0]?.method).toBe('GET');
+  });
+
+  it('submits a ticket with the bearer token', async () => {
+    responses.push(json(201, { ok: true }));
+    await api.submitTicket(session, {
+      email: 'a@example.com',
+      topic: 'Payments & invoices',
+      subject: 's',
+      description: 'd',
+      lang: 'nl',
+      turnstileToken: 'tok',
+      consent: true,
+    });
+    expect(requests[0]?.url).toBe(
+      `https://api.test/widget/conversations/${session.conversationId}/tickets`,
+    );
+    expect(requests[0]?.headers.get('authorization')).toBe(`Bearer ${session.token}`);
+    expect(await requests[0]?.json()).toMatchObject({
+      topic: 'Payments & invoices',
+      consent: true,
+    });
+  });
+
+  it('accepts the ticket_form action', async () => {
+    responses.push(
+      json(200, { reply: { text: 'x', lang: 'nl', citations: [], action: 'ticket_form' } }),
+    );
+    expect((await api.sendMessage(session, 'q', 'nl')).action).toBe('ticket_form');
+  });
 });

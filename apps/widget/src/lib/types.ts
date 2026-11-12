@@ -1,1 +1,1 @@
-export type ReplyAction = 'none' | 'lead_form' | 'contact' | 'login';
+export type ReplyAction = 'none' | 'lead_form' | 'ticket_form' | 'login';

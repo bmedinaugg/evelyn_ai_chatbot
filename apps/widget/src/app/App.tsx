@@ -1,13 +1,14 @@
 import { type Lang, t } from '@trainmore/i18n';
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { type Session, type WidgetApi, WidgetApiError } from '../lib/api.ts';
-import { chatReducer, initialChatState, type Notice } from '../lib/chat-state.ts';
+import { chatReducer, initialChatState, type Notice, ticketPrefill } from '../lib/chat-state.ts';
 import { CLOSE_MESSAGE } from '../loader-helpers.ts';
 import { ConsentNotice } from './ConsentNotice.tsx';
 import { LeadForm } from './LeadForm.tsx';
 import { LoginFlow } from './LoginFlow.tsx';
 import { MessageList } from './MessageList.tsx';
 import { loadStored, saveStored } from './session.ts';
+import { TicketForm } from './TicketForm.tsx';
 
 const MAX_LENGTH = 1000;
 
@@ -40,6 +41,8 @@ export function App(props: {
   const stored = useRef(loadStored());
   const [state, dispatch] = useReducer(chatReducer, initialChatState(stored.current.consentGiven));
   const [draft, setDraft] = useState('');
+  // Email verified with a login code in this chat: memory only, used to prefill the ticket form.
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
 
   // Key events inside the iframe never reach the portal page, so Escape is handled here.
   useEffect(() => {
@@ -94,6 +97,7 @@ export function App(props: {
 
   function newChat() {
     remember(null);
+    setVerifiedEmail(null);
     dispatch({ type: 'new_chat' });
   }
 
@@ -123,6 +127,7 @@ export function App(props: {
             messages={state.messages}
             sending={state.phase === 'sending'}
             onOpenLeadForm={() => dispatch({ type: 'lead_form_opened' })}
+            onOpenTicketForm={() => dispatch({ type: 'ticket_form_opened' })}
             onOpenLogin={() => dispatch({ type: 'login_opened' })}
           />
           {state.notice && (
@@ -146,16 +151,34 @@ export function App(props: {
               api={api}
               siteKey={props.turnstileSiteKey}
               ensureSession={ensureSession}
-              onLoggedIn={(account) =>
+              onLoggedIn={(account, email) => {
+                setVerifiedEmail(email);
                 dispatch({
                   type: 'logged_in',
                   note: account
                     ? t(lang, 'widget.login.loggedIn', { club: account.studioName })
                     : t(lang, 'widget.login.noAccount'),
-                })
-              }
+                });
+              }}
               onCancel={() => dispatch({ type: 'login_closed' })}
             />
+          )}
+          {state.ticketForm === 'open' && (
+            <TicketForm
+              lang={lang}
+              api={api}
+              siteKey={props.turnstileSiteKey}
+              ensureSession={ensureSession}
+              prefill={ticketPrefill(state.messages)}
+              verifiedEmail={verifiedEmail}
+              onSubmitted={() => dispatch({ type: 'ticket_submitted' })}
+              onCancel={() => dispatch({ type: 'ticket_form_closed' })}
+            />
+          )}
+          {state.ticketForm === 'submitted' && (
+            <p class="tm-success" role="status">
+              {t(lang, 'widget.ticket.success')}
+            </p>
           )}
           {state.leadForm === 'submitted' && (
             <p class="tm-success" role="status">

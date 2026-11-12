@@ -26,7 +26,8 @@ export function LoginFlow(props: {
   api: WidgetApi;
   siteKey: string;
   ensureSession: () => Promise<Session>;
-  onLoggedIn: (account: AccountChoice | null) => void;
+  /** The verified email is passed up (memory only) to prefill the ticket form. */
+  onLoggedIn: (account: AccountChoice | null, email: string) => void;
   onCancel: () => void;
 }) {
   const { lang, api } = props;
@@ -55,8 +56,9 @@ export function LoginFlow(props: {
   }
 
   function handleResult(result: LoginResult) {
-    if (result.selected !== null) return props.onLoggedIn(result.accounts[result.selected] ?? null);
-    if (result.accounts.length === 0) return props.onLoggedIn(null);
+    if (result.selected !== null)
+      return props.onLoggedIn(result.accounts[result.selected] ?? null, email);
+    if (result.accounts.length === 0) return props.onLoggedIn(null, email);
     setAccounts(result.accounts);
     setStep('choose');
   }
@@ -116,6 +118,7 @@ export function LoginFlow(props: {
                 run(async () =>
                   props.onLoggedIn(
                     await api.selectAccount(await props.ensureSession(), account.index),
+                    email,
                   ),
                 )
               }

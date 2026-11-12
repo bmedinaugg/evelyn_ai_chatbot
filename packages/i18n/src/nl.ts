@@ -89,6 +89,25 @@ export const nl = {
       unavailable:
         'De controle kon niet laden. Probeer het later opnieuw of neem contact op met ons supportteam.',
     },
+    ticket: {
+      title: 'Contact met support',
+      topic: 'Categorie',
+      chooseTopic: 'Kies een categorie',
+      email: 'E-mailadres',
+      name: 'Naam (optioneel)',
+      subject: 'Onderwerp',
+      description: 'Je bericht',
+      consent:
+        'TrainMore mag dit chatgesprek delen met het supportteam om mijn vraag te behandelen.',
+      submit: 'Versturen',
+      sending: 'Bezig met versturen…',
+      success: 'Bedankt! Ons supportteam heeft je bericht ontvangen en reageert per e-mail.',
+      verificationFailed: 'We konden niet controleren dat je geen robot bent. Probeer het opnieuw.',
+      error: 'Er ging iets mis. Probeer het later opnieuw.',
+      cancel: 'Annuleren',
+      invalid: 'Controleer je e-mailadres, categorie, onderwerp en bericht.',
+      unavailable: 'Het formulier kon niet laden. Gebruik in plaats daarvan de contactpagina.',
+    },
   },
   email: {
     loginCode: {

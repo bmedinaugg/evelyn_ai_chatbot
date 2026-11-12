@@ -89,6 +89,24 @@ export const en = {
       unavailable:
         'The verification could not load. Please try again later or contact our support team.',
     },
+    ticket: {
+      title: 'Contact support',
+      topic: 'Topic',
+      chooseTopic: 'Choose a topic',
+      email: 'Email address',
+      name: 'Name (optional)',
+      subject: 'Subject',
+      description: 'Your message',
+      consent: 'TrainMore may share this chat with the support team to handle my question.',
+      submit: 'Send',
+      sending: 'Sending…',
+      success: 'Thanks! Our support team has received your message and will reply by email.',
+      verificationFailed: "We couldn't verify that you're not a robot. Please try again.",
+      error: 'Something went wrong. Please try again later.',
+      cancel: 'Cancel',
+      invalid: 'Please check your email address, topic, subject and message.',
+      unavailable: "The form couldn't load. Please use the contact page instead.",
+    },
   },
   email: {
     loginCode: {

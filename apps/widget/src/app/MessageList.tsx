@@ -9,6 +9,7 @@ export function MessageList(props: {
   messages: ChatMessage[];
   sending: boolean;
   onOpenLeadForm: () => void;
+  onOpenTicketForm: () => void;
   onOpenLogin: () => void;
 }) {
   const log = useRef<HTMLDivElement>(null);
@@ -52,9 +53,18 @@ export function MessageList(props: {
                 </ul>
               </div>
             )}
+            {message.action === 'ticket_form' && (
+              <button
+                type="button"
+                class="tm-button tm-button--primary"
+                onClick={props.onOpenTicketForm}
+              >
+                {t(props.lang, 'widget.ticket.title')}
+              </button>
+            )}
             <ContactLink
               lang={props.lang}
-              show={message.action === 'contact'}
+              show={message.action === 'ticket_form'}
               url={message.contactUrl}
             />
             {message.action === 'lead_form' && (

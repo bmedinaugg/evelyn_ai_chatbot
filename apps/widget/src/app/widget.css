@@ -151,6 +151,8 @@ a {
 }
 
 textarea,
+select,
+input[type="text"],
 input[type="email"],
 input[type="tel"] {
   width: 100%;
@@ -161,6 +163,11 @@ input[type="tel"] {
   color: var(--tm-white);
   font: inherit;
   resize: none;
+}
+
+input[readonly] {
+  border-style: dashed;
+  color: var(--tm-grey-light);
 }
 
 .tm-button {
