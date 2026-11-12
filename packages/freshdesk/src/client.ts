@@ -99,6 +99,7 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
       const endpoint = '/tickets';
       const body = {
         email: input.email,
+        ...(input.name === undefined ? {} : { name: input.name }),
         subject: input.subject,
         description: escapeHtml(input.descriptionText).replace(/\n/g, '<br>'),
         tags: input.tags,

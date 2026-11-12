@@ -106,5 +106,12 @@ export const en = {
     notLoggedIn: 'Account: not logged in',
     customer: 'Customer',
     bot: 'Chatbot',
+    // Labels of the built-in ticket form topics (Freshdesk ticket types).
+    topics: {
+      membership: 'Membership & contract',
+      payments: 'Payments & invoices',
+      club: 'Club & facilities',
+      app: 'App & account',
+    },
   },
 };

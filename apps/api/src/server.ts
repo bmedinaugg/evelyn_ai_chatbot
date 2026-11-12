@@ -7,7 +7,7 @@ import {
   ConversationBusyError,
   type LoginDeps,
 } from '@trainmore/core';
-import type { ConversationRepository, FaqRepository } from '@trainmore/db';
+import type { ConversationRepository, EscalationRepository, FaqRepository } from '@trainmore/db';
 import type { FreshdeskClient } from '@trainmore/freshdesk';
 import type { Logger } from '@trainmore/shared';
 import Fastify, { type FastifyError } from 'fastify';
@@ -17,6 +17,7 @@ import { newConversationToken } from './conversation-token.ts';
 import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
 import { proxyTrust } from './proxy-trust.ts';
+import { registerTicketRoutes } from './tickets.ts';
 
 export type ApiDeps = {
   login: LoginDeps;
@@ -25,7 +26,8 @@ export type ApiDeps = {
   conversations: ConversationRepository;
   faq: FaqRepository;
   answerer: Answerer;
-  freshdesk: Pick<FreshdeskClient, 'createTicket'>;
+  freshdesk: Pick<FreshdeskClient, 'createTicket' | 'addPrivateNote'>;
+  escalations: Pick<EscalationRepository, 'activeTopics' | 'record'>;
   verifyTurnstile: (token: string, remoteIp: string) => Promise<boolean>;
   config: {
     allowedOrigins: string[];
@@ -132,6 +134,7 @@ export function buildApiServer(deps: ApiDeps) {
 
     registerLeadRoutes(widget, deps);
     registerLoginRoutes(widget, deps);
+    registerTicketRoutes(widget, deps);
   });
 
   return app;

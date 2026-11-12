@@ -105,5 +105,11 @@ export const nl = {
     notLoggedIn: 'Account: niet ingelogd',
     customer: 'Klant',
     bot: 'Chatbot',
+    topics: {
+      membership: 'Lidmaatschap & contract',
+      payments: 'Betalingen & facturen',
+      club: 'Club & faciliteiten',
+      app: 'App & account',
+    },
   },
 } satisfies Messages;

@@ -7,6 +7,7 @@ import {
   createSupabaseAuthRepository,
   createSupabaseCapabilityFlagRepository,
   createSupabaseConversationRepository,
+  createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
@@ -95,6 +96,7 @@ const app = buildApiServer({
   capabilities,
   conversations: createSupabaseConversationRepository(db),
   faq: createSupabaseFaqRepository(db),
+  escalations: createSupabaseEscalationRepository(db),
   answerer,
   freshdesk: createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey }),
   verifyTurnstile: createTurnstileVerifier({ secretKey: loadTurnstileConfig(env).secretKey }),

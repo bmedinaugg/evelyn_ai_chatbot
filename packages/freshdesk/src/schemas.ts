@@ -27,6 +27,8 @@ export const createdTicketSchema = z
 
 export type CreateTicketInput = {
   email: string;
+  /** Requester name (optional, shown to agents). */
+  name?: string;
   subject: string;
   descriptionText: string;
   tags: string[];

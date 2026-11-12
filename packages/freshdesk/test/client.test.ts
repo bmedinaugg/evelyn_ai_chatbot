@@ -229,4 +229,16 @@ describe('ticket fields, notes and types', () => {
     });
     expect(await requests[0]?.json()).toMatchObject({ type: 'Payments' });
   });
+
+  it('sends the requester name when given', async () => {
+    queue(201, { id: 57 });
+    await client.createTicket({
+      email: 'a@example.com',
+      name: 'Sam',
+      subject: 'Q',
+      descriptionText: 'hi',
+      tags: [],
+    });
+    expect(await requests[0]?.json()).toMatchObject({ email: 'a@example.com', name: 'Sam' });
+  });
 });
