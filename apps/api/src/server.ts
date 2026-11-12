@@ -17,6 +17,7 @@ import { newConversationToken } from './conversation-token.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
 import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
+import { type PortalDeps, portalOrigin, registerPortalAuthRoutes } from './portal/auth.ts';
 import { proxyTrust } from './proxy-trust.ts';
 import { registerTicketRoutes } from './tickets.ts';
 
@@ -39,6 +40,8 @@ export type ApiDeps = {
     envTag?: string;
   };
   logger: Logger;
+  /** Agent portal (Entra ID); absent until it is configured. */
+  portal?: PortalDeps;
 };
 
 const langSchema = z.enum(['nl', 'en']);
@@ -60,7 +63,11 @@ export function buildApiServer(deps: ApiDeps) {
   // Browsers always send Origin on cross-site POSTs: anything not on the allowlist is refused.
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
-    if (origin !== undefined && !deps.config.allowedOrigins.includes(origin)) {
+    if (
+      origin !== undefined &&
+      !deps.config.allowedOrigins.includes(origin) &&
+      !(deps.portal && origin === portalOrigin(deps.portal.config))
+    ) {
       return reply.code(403).send({ error: 'forbidden' });
     }
   });
@@ -141,6 +148,9 @@ export function buildApiServer(deps: ApiDeps) {
     registerTicketRoutes(widget, deps);
     registerFeedbackRoutes(widget, deps);
   });
+
+  const { portal } = deps;
+  if (portal) app.register(async (scope) => registerPortalAuthRoutes(scope, portal));
 
   return app;
 }

@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "1.8.0",
     "@aws-sdk/client-secrets-manager": "3.1166.0",
     "@aws-sdk/client-sesv2": "3.1166.0",
+    "@azure/msal-node": "7.2.1",
     "@fastify/cors": "11.4.1",
     "@fastify/rate-limit": "11.2.2",
     "@trainmore/core": "workspace:*",

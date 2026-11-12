@@ -9,6 +9,7 @@ import {
   createSupabaseConversationRepository,
   createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
+  createSupabasePortalRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
 import { createFreshdeskClient, createLocalFreshdesk } from '@trainmore/freshdesk';
@@ -27,12 +28,14 @@ import {
   loadFreshdeskConfig,
   loadMagiclineKeysConfig,
   loadOtpConfig,
+  loadPortalConfig,
   loadRuntimeConfig,
   loadSupabaseConfig,
   loadTurnstileConfig,
 } from '@trainmore/shared';
 import { createFakeAnswerer } from './fake-answerer.ts';
 import { createMagiclineAccess } from './magicline-access.ts';
+import { createEntraClient } from './portal/entra.ts';
 import { buildApiServer } from './server.ts';
 import { createTurnstileVerifier } from './turnstile.ts';
 
@@ -99,7 +102,20 @@ const capabilities = {
   disabled: () => flags.disabledCapabilities(),
 };
 
+// Agent portal: only when Entra is configured (docs/DEPLOY.md, "Entra app registration").
+const portalConfig = loadPortalConfig(env);
+if (!portalConfig) logger.info('agent portal off (no Entra configuration)');
+
 const app = buildApiServer({
+  ...(portalConfig
+    ? {
+        portal: {
+          config: portalConfig,
+          entra: createEntraClient(portalConfig),
+          repo: createSupabasePortalRepository(db),
+        },
+      }
+    : {}),
   login,
   capabilities,
   conversations: createSupabaseConversationRepository(db),
