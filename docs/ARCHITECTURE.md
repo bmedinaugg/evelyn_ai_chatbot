@@ -102,7 +102,9 @@ Prod preferably goes in a separate AWS account.
    Policies, prices and account facts may only come from retrieved content or tool results.
 7. Return the validated reply as JSON (the widget shows a typing indicator meanwhile). Store the turn,
    set flags, and log without personal data.
-8. Assistant turns are stored verbatim (API content blocks, including thinking blocks) and the
+8. Only one turn per conversation is in flight (claimed in the database, expires after 60 s); a second
+   concurrent message gets "busy". A conversation allows at most 20 customer messages.
+9. Assistant turns are stored verbatim (API content blocks, including thinking blocks) and the
    history sent to Claude is append-only, as Sonnet 5.5's preserved thinking requires.
 
 ### 3.2 Authentication (OTP)
@@ -175,6 +177,8 @@ Behaviour per status:
     subject, description, consent checkbox
   - topic maps to Freshdesk `type`/tags; the mapping is configured in code and agreed with support
   - subject and description are pre-filled from the conversation and editable
+- **Until M3** adds the general ticket form, a hand-off shows a contact link (`SUPPORT_CONTACT_URL`);
+  the bot never writes links itself.
 - **Auto-escalation** on a stuck conversation: two low-confidence turns in a row, an explicit
   request for a human, or the same question repeated. It creates a ticket with:
   - the transcript as a private note
