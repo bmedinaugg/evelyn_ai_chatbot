@@ -97,3 +97,19 @@ Embed on the portal (after deploying `dist/` to the widget host):
 ```
 The API's `WIDGET_ALLOWED_ORIGINS` must contain the widget host's origin.
 First time only: `pnpm --filter @trainmore/widget exec playwright install chromium`.
+
+## Customer login (local)
+Visitors log in with a one-time code sent to their email; the server then looks up their Magicline
+account(s) with the cross-studio key and binds the chosen account to the conversation.
+- Locally (`APP_ENV=local`) codes are printed by the API (`[local outbox] login code …`) instead of emailed.
+- Run the mock Magicline server (`pnpm --filter @trainmore/mock-magicline dev`, port 4010) and set
+  `MAGICLINE_BASE_URL=http://localhost:4010`, `MAGICLINE_USE_MOCK=true`, `MOCK_MAGICLINE_KEYS=…`,
+  `OTP_HMAC_SECRET` (≥ 32 characters).
+- Synthetic logins: `member.single@example.com`, `prospect@example.com`, `former@example.com`,
+  `multi@example.com` (two clubs).
+
+In AWS, codes go out through Amazon SES (`EMAIL_FROM`, optional `SES_CONFIGURATION_SET`) and the
+Magicline keys come from one Secrets Manager secret per environment (`MAGICLINE_KEYS_SECRET_NAME`):
+```json
+{ "crossStudio": "<cross-studio key>", "studios": { "1001": "<key>", "1002": "<key>" } }
+```
