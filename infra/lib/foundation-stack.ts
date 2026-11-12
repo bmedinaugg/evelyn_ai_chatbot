@@ -29,6 +29,9 @@ export class FoundationStack extends Stack {
   readonly appSecret: secretsmanager.Secret;
   readonly otpHmacSecret: secretsmanager.Secret;
   readonly emailIdentity: ses.EmailIdentity;
+  /** JSON: ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET (agent portal, set by hand). */
+  readonly portalSecret: secretsmanager.Secret;
+  readonly portalSessionSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
@@ -113,6 +116,19 @@ export class FoundationStack extends Stack {
     this.otpHmacSecret = new secretsmanager.Secret(this, 'OtpHmacSecret', {
       secretName: `${prefix}/otp-hmac-secret`,
       description: 'Pepper for login-code and email hashes',
+      generateSecretString: { passwordLength: 64, excludePunctuation: true },
+      removalPolicy: retain,
+    });
+
+    // Agent portal (only used once the portal is switched on, docs/DEPLOY.md).
+    this.portalSecret = new secretsmanager.Secret(this, 'PortalSecret', {
+      secretName: `${prefix}/portal`,
+      description: 'JSON: ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET',
+      removalPolicy: retain,
+    });
+    this.portalSessionSecret = new secretsmanager.Secret(this, 'PortalSessionSecret', {
+      secretName: `${prefix}/portal-session-secret`,
+      description: 'Signs the short-lived portal login cookie',
       generateSecretString: { passwordLength: 64, excludePunctuation: true },
       removalPolicy: retain,
     });
