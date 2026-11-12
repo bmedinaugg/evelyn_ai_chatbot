@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigError } from '../src/config.ts';
 import {
   loadFreshdeskConfig,
+  loadPortalConfig,
   loadRuntimeConfig,
   loadSupabaseConfig,
 } from '../src/config-sections.ts';
@@ -116,5 +117,40 @@ describe('loadRuntimeConfig', () => {
       awsRegion: 'eu-west-1',
       logLevel: 'info',
     });
+  });
+});
+
+describe('loadPortalConfig', () => {
+  const portal = {
+    ENTRA_TENANT_ID: '11111111-1111-4111-8111-111111111111',
+    ENTRA_CLIENT_ID: '22222222-2222-4222-8222-222222222222',
+    ENTRA_CLIENT_SECRET: 'client-secret',
+    PORTAL_BASE_URL: 'https://dxxxx.cloudfront.net/',
+    PORTAL_SESSION_SECRET: 's'.repeat(32),
+  };
+
+  it('is off (null) while Entra is not configured', () => {
+    expect(loadPortalConfig({})).toBeNull();
+  });
+
+  it('parses a complete configuration', () => {
+    expect(loadPortalConfig(portal)).toEqual({
+      tenantId: '11111111-1111-4111-8111-111111111111',
+      clientId: '22222222-2222-4222-8222-222222222222',
+      clientSecret: 'client-secret',
+      baseUrl: 'https://dxxxx.cloudfront.net',
+      sessionSecret: 's'.repeat(32),
+    });
+  });
+
+  it('refuses a partial configuration or a short session secret', () => {
+    const { ENTRA_CLIENT_SECRET: _omit, ...partial } = portal;
+    expect(() => loadPortalConfig(partial)).toThrow(/ENTRA_CLIENT_SECRET/);
+    expect(() => loadPortalConfig({ ...portal, PORTAL_SESSION_SECRET: 'short' })).toThrow(
+      /PORTAL_SESSION_SECRET/,
+    );
+    expect(() => loadPortalConfig({ ...portal, ENTRA_TENANT_ID: 'common' })).toThrow(
+      /ENTRA_TENANT_ID/,
+    );
   });
 });
