@@ -7,4 +7,18 @@ export const nl = {
     },
     greeting: 'Hoi {name}!',
   },
+  bot: {
+    noMatch:
+      'Ik kon hier geen betrouwbaar antwoord op vinden in onze helpartikelen. Ons supportteam helpt je graag verder.',
+    offTopic:
+      'Ik kan alleen helpen met vragen over TrainMore. Kan ik je helpen met iets over je lidmaatschap of onze clubs?',
+    accountQuestion:
+      'Ik kan hier nog geen persoonlijke accountgegevens opzoeken. Ons supportteam helpt je graag met je account.',
+    wantsHuman: 'Natuurlijk. Je kunt ons supportteam bereiken via de contactpagina.',
+    error: 'Er ging aan onze kant iets mis. Probeer het zo nog eens.',
+    conversationLimit: 'Dit gesprek heeft de limiet bereikt. Start een nieuwe chat.',
+  },
+  lead: {
+    subject: 'Nieuwe lidmaatschapsvraag via websitechat',
+  },
 } satisfies Messages;

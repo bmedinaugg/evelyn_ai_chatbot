@@ -36,3 +36,15 @@ describe('isLang', () => {
     expect(isLang(undefined)).toBe(false);
   });
 });
+
+describe('bot texts', () => {
+  it('has the fixed nl/en bot texts', () => {
+    expect(t('nl', 'bot.noMatch')).toBe(
+      'Ik kon hier geen betrouwbaar antwoord op vinden in onze helpartikelen. Ons supportteam helpt je graag verder.',
+    );
+    expect(t('en', 'bot.offTopic')).toBe(
+      'I can only help with questions about TrainMore. Is there something about your membership or our clubs I can help with?',
+    );
+    expect(t('en', 'lead.subject')).toBe('New membership question via website chat');
+  });
+});
