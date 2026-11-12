@@ -205,6 +205,11 @@ Tables:
 Access:
 - **RLS enabled on every table.** Policies deny `anon` and `authenticated`. Only the server
   (service role) reads and writes. The widget never talks to Supabase.
+- Enforced in the baseline migration: an event trigger enables RLS on every new `public` table, and
+  `postgres` grants nothing to `anon`/`authenticated` by default. Supabase's `supabase_admin` role
+  still has default grants that `postgres` cannot change, so pgTAP tests fail if any object in
+  `public` is granted to `anon`/`authenticated`. Rule: only create objects through migrations; never
+  install extensions into `public` from the dashboard.
 - Emails are stored as an HMAC hash where lookup is enough (OTP, sessions, DSAR). Plain email is
   stored only on escalation records, and only as long as needed.
 
@@ -246,8 +251,9 @@ Each dependency is confirmed with the product owner when introduced.
 
 | Area | Choice | Why | Alternatives / tradeoff |
 |---|---|---|---|
-| Runtime | Node 24 LTS (re-check Active LTS vs Node 26 at M0) | LTS, Fargate | Node 26: newer, younger LTS |
-| Language | TypeScript 7.0.x, strict | required | fall back to 5.x if lint tooling isn't ready |
+| Runtime | Node 26 (Active LTS since 2026-10-28) | current LTS, Fargate | Node 24 (maintenance since 2026-10-20) |
+| Language | TypeScript 6.0.3, strict | required; typescript-eslint supports `<6.1` and openapi-typescript declares `^5.x`, so 7.x waits for the ecosystem | TypeScript 7 (native, faster) once tooling supports it |
+| Lint/format | Biome 2.6 | one fast tool, no TypeScript peer dependency | ESLint 10 + typescript-eslint (type-aware rules, needs TS ≤ 6.0) |
 | Monorepo | pnpm 12 workspaces + Turborepo 2.11 | strict deps, cached tasks | Nx (heavier) |
 | API | Fastify 5.12 + @fastify/rate-limit 11 | mature, fast, schema-first, SSE-friendly | Hono 4 (lighter, smaller ecosystem) |
 | Validation | zod 4.6 | one schema language for API, LLM output, config | valibot (smaller) |
@@ -262,6 +268,7 @@ Each dependency is confirmed with the product owner when introduced.
 | Bot protection | Cloudflare Turnstile | free, usually invisible, privacy-friendly | hCaptcha |
 | Logging | pino 10 (redact) | fast, structured | — |
 | Testing | vitest 5, msw 3, Playwright 1.65, custom eval runner | fast unit tests, HTTP mocking, widget end-to-end | Jest |
+| DB tests | pgTAP via Supabase CLI (`supabase test db`, local Docker) | tests RLS against the real Supabase roles | PGlite (approximation) |
 
 ## 7. Folder structure
 
@@ -292,12 +299,18 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 ## 8. Milestones
 Each milestone ends with tests passing and a preprod deploy.
 
-**M0: Foundations**
+**M0: Foundations** ✅ done 2026-11-11 (branch `m0-foundations`, plan `docs/superpowers/plans/2026-11-11-m0-foundations.md`)
 - monorepo, lint/typecheck, CI, CodeQL, Dependabot
 - Supabase baseline migrations with RLS
 - config loader, redacting logger, i18n package
 - CDK skeleton for preprod
 - generated Magicline types, mock server skeleton
+- Deviations:
+  - TypeScript 6.0.3 and Biome instead of TypeScript 7 (tooling compatibility)
+  - Node 26 instead of 24
+  - Types generated with `--default-non-nullable false`
+  - Database denies `anon`/`authenticated` by both grants and RLS
+  - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**
 - daily FAQ sync, hybrid retrieval

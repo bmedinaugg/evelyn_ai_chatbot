@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.*
+!.env.example
+cdk.out
+.turbo
+coverage
+supabase/.temp
+.DS_Store
