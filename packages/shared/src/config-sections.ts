@@ -56,3 +56,67 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
     portalUrl: e.FRESHDESK_PORTAL_URL,
   };
 }
+
+export type ClaudeConfig = { chatModel: string };
+export type ApiConfig = { port: number; allowedOrigins: string[]; supportContactUrl: string };
+export type TurnstileConfig = { secretKey: string };
+
+export function loadClaudeConfig(env: Env = process.env): ClaudeConfig {
+  const e = parseEnv(
+    z.object({
+      CLAUDE_CHAT_MODEL: z
+        .string()
+        .default('claude-sonnet-5-5')
+        .refine((model) => /^claude-[a-z0-9-]+$/.test(model), {
+          message: 'must be a Claude model id such as claude-sonnet-5-5',
+        }),
+    }),
+    env,
+  );
+  return { chatModel: e.CLAUDE_CHAT_MODEL };
+}
+
+const HTTPS_ORIGIN = /^https:\/\/[a-z0-9.-]+(:\d+)?$/;
+const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+export function loadApiConfig(env: Env = process.env): ApiConfig {
+  const e = parseEnv(
+    z
+      .object({
+        APP_ENV: runtimeEnvShape.APP_ENV,
+        API_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+        WIDGET_ALLOWED_ORIGINS: z.string().transform((raw) =>
+          raw
+            .split(',')
+            .map((origin) => origin.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+        SUPPORT_CONTACT_URL: z.url({ protocol: /^https$/ }),
+      })
+      .superRefine((cfg, ctx) => {
+        const valid = cfg.WIDGET_ALLOWED_ORIGINS.every(
+          (origin) =>
+            HTTPS_ORIGIN.test(origin) || (cfg.APP_ENV === 'local' && LOCAL_ORIGIN.test(origin)),
+        );
+        if (cfg.WIDGET_ALLOWED_ORIGINS.length === 0 || !valid) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['WIDGET_ALLOWED_ORIGINS'],
+            message:
+              'must be a comma-separated list of https origins (no path); http://localhost only with APP_ENV=local',
+          });
+        }
+      }),
+    env,
+  );
+  return {
+    port: e.API_PORT,
+    allowedOrigins: e.WIDGET_ALLOWED_ORIGINS,
+    supportContactUrl: e.SUPPORT_CONTACT_URL,
+  };
+}
+
+export function loadTurnstileConfig(env: Env = process.env): TurnstileConfig {
+  const e = parseEnv(z.object({ TURNSTILE_SECRET_KEY: z.string().min(1) }), env);
+  return { secretKey: e.TURNSTILE_SECRET_KEY };
+}
