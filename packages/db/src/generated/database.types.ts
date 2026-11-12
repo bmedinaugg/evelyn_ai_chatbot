@@ -19,6 +19,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"conversations": {
+                  Row: {
+                    "created_at": string,"id": string,"lang": string,"last_message_at": string | null,"token_hash": string,"turn_claimed_at": string | null,"user_message_count": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"lang": string,"last_message_at"?: string | null,"token_hash": string,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"token_hash"?: string,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"faq_articles": {
                   Row: {
                     "body_en": string | null,"body_nl": string | null,"content_hash": string,"deleted_at": string | null,"folder_id": number,"freshdesk_updated_at": string,"id": number,"search_en": unknown,"search_nl": unknown,"synced_at": string,"title_en": string | null,"title_nl": string | null,"url_en": string | null,"url_nl": string | null
@@ -33,13 +47,85 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"flags": {
+                  Row: {
+                    "conversation_id": string,"created_at": string,"id": number,"message_id": number | null,"reason": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "conversation_id": string,"created_at"?: string,"id"?: never,"message_id"?: number | null,"reason": string
+                  }
+                  Update: {
+                    "conversation_id"?: string,"created_at"?: string,"id"?: never,"message_id"?: number | null,"reason"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "flags_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "flags_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: false
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"lead_submissions": {
+                  Row: {
+                    "conversation_id": string | null,"created_at": string,"freshdesk_ticket_id": number,"id": number,"lang": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "conversation_id"?: string | null,"created_at"?: string,"freshdesk_ticket_id": number,"id"?: never,"lang": string
+                  }
+                  Update: {
+                    "conversation_id"?: string | null,"created_at"?: string,"freshdesk_ticket_id"?: number,"id"?: never,"lang"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "lead_submissions_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"messages": {
+                  Row: {
+                    "api_content": NonNullable<Json>,"citations": NonNullable<Json>,"conversation_id": string,"created_at": string,"display_text": string,"id": number,"outcome": string | null,"role": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "api_content": NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id": string,"created_at"?: string,"display_text": string,"id"?: never,"outcome"?: string | null,"role": string
+                  }
+                  Update: {
+                    "api_content"?: NonNullable<Json>,"citations"?: NonNullable<Json>,"conversation_id"?: string,"created_at"?: string,"display_text"?: string,"id"?: never,"outcome"?: string | null,"role"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "messages_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            "search_faq":
+            "append_chat_turn":
+{ Args: { "p_assistant": Json,"p_conversation_id": string,"p_flags": (string)[],"p_user": Json }; Returns: undefined
+                           },
+"claim_conversation_turn":
+{ Args: { "p_id": string }; Returns: boolean
+                           },
+"search_faq":
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {
               "article_id": number,"body": string,"lang": string,"rank": number,"title": string,"url": string
             }[]
