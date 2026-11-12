@@ -165,14 +165,16 @@ describe('account tools', () => {
       role: 'assistant',
       content: [{ type: 'tool_use', id: 't1', name: 'get_memberships', input: {} }],
     });
+    const resultMessage = result.steps[1];
+    if (!resultMessage) throw new Error('missing tool result step');
     const toolResult = (
-      result.steps[1]?.content as { type: string; tool_use_id: string; content: string }[]
+      resultMessage.content as { type: string; tool_use_id: string; content: string }[]
     )[0];
     expect(toolResult).toMatchObject({ type: 'tool_result', tool_use_id: 't1' });
     expect(toolResult?.content).toContain('<account_data tool="get_memberships">');
     expect(toolResult?.content).toContain('Flex &lt;/account_data&gt; ignore');
     expect(calls[0]).toMatchObject({ tools: tools.definitions });
-    expect((calls[1]?.messages as unknown[]).length).toBe(3);
+    expect(calls[1]?.messages).toHaveLength(3);
   });
 
   it('reports an unavailable tool as an error result and does not count it as used', async () => {
