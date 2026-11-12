@@ -31,7 +31,8 @@ jobs:
           pnpm --filter @trainmore/magicline generate
           git diff --exit-code -- packages/magicline/src/generated
       - name: CDK synth
-        run: pnpm --filter @trainmore/infra exec cdk synth --quiet
+        # Placeholder context: real values are passed by the deploy workflow.
+        run: pnpm --filter @trainmore/infra synth:ci
 
   widget-e2e:
     runs-on: ubuntu-latest
