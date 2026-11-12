@@ -13,10 +13,10 @@
     "test": "turbo run test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.6",
     "@types/node": "26.6.6",
     "tsx": "4.23.15",
-    "turbo": "2.11.11",
+    "turbo": "2.11.10",
     "typescript": "6.0.3",
     "vitest": "5.1.0"
   }
