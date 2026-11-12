@@ -1,0 +1,20 @@
+{
+  "name": "@trainmore/magicline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../docs/api/magicline-openapi.json --default-non-nullable false -o src/generated/schema.d.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}
