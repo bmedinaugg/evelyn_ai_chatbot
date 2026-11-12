@@ -96,6 +96,18 @@ pnpm --filter @trainmore/widget dev          # http://localhost:5173/?lang=nl (n
 pnpm --filter @trainmore/widget build        # dist/: index.html + assets, loader.js, loader.css
 pnpm --filter @trainmore/widget e2e          # Playwright (API and Turnstile mocked)
 ```
+
+**See it embedded like on the help portal:** build the widget, serve it, and open the demo portal page
+(a separate origin that loads `loader.js` with the same snippet as the Freshdesk layout):
+```sh
+cd apps/widget
+VITE_API_BASE_URL=http://localhost:8787 VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA \
+  VITE_PRIVACY_URL=https://www.trainmore.nl/privacy pnpm build
+pnpm exec vite preview --port 5173 --strictPort &       # widget host (production build, strict CSP)
+python3 -m http.server 8090 --bind 127.0.0.1 --directory demo &
+open http://127.0.0.1:8090/nl/support/home/            # or /en/support/home/
+```
+The API must run on port 8787 with `WIDGET_ALLOWED_ORIGINS=http://localhost:5173`.
 Embed on the portal (after deploying `dist/` to the widget host):
 ```html
 <script src="https://<widget host>/loader.js" data-widget-url="https://<widget host>/" async></script>
