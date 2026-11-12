@@ -50,15 +50,19 @@ const logger = createLogger({
   }),
 });
 
-function sync(listings: Listings, folderIds = [101]) {
+function sync(listings: Listings, folderIds = [101], allowMassChange = false) {
   return runFaqSync({
     freshdesk: fakeFreshdesk(listings),
     repo,
     folderIds,
     portalUrl: 'https://portal.test',
     logger,
+    allowMassChange,
   });
 }
+
+const many = (count: number, folderId = 101) =>
+  Array.from({ length: count }, (_, i) => ({ ...article(1000 + i, `A${i}`), folderId }));
 
 beforeEach(() => {
   repo = createInMemoryFaqRepository();
@@ -139,6 +143,53 @@ describe('runFaqSync', () => {
     expect(error).toBeInstanceOf(FaqSyncAbortedError);
     expect(error.reason).toBe('empty_listing');
     expect(repo.rows.get(7)?.deleted).toBe(false);
+  });
+
+  it('aborts when one language listing is empty while stored articles have that language', async () => {
+    await sync({ 101: { nl: [article(7, 'Opzeggen')], en: [article(7, 'Cancel')] } });
+    const error = await sync({ 101: { nl: [article(7, 'Opzeggen')], en: [] } }).catch((e) => e);
+    expect(error).toBeInstanceOf(FaqSyncAbortedError);
+    expect(error.reason).toBe('empty_listing');
+    expect(repo.rows.get(7)?.en?.title).toBe('Cancel');
+  });
+
+  it('aborts when one folder is empty while it has stored articles', async () => {
+    await sync(
+      {
+        101: { nl: [article(7, 'Opzeggen')] },
+        102: { nl: [{ ...article(8, 'Kluisjes'), folderId: 102 }] },
+      },
+      [101, 102],
+    );
+    const error = await sync(
+      { 101: { nl: [article(7, 'Opzeggen')] }, 102: { nl: [] } },
+      [101, 102],
+    ).catch((e) => e);
+    expect(error.reason).toBe('empty_listing');
+    expect(repo.rows.get(8)?.deleted).toBe(false);
+  });
+
+  it('aborts before writing when too many articles would be deleted', async () => {
+    await sync({ 101: { nl: many(20) } });
+    const calls = { ...repo.calls };
+    const error = await sync({ 101: { nl: many(10) } }).catch((e) => e);
+    expect(error).toBeInstanceOf(FaqSyncAbortedError);
+    expect(error.reason).toBe('mass_change');
+    expect(repo.calls).toEqual(calls);
+  });
+
+  it('aborts when many articles would lose a translation', async () => {
+    const bilingual = { nl: many(20), en: many(20) };
+    await sync({ 101: bilingual });
+    const error = await sync({ 101: { nl: many(20), en: many(2) } }).catch((e) => e);
+    expect(error.reason).toBe('mass_change');
+    expect(repo.rows.get(1010)?.en).not.toBeNull();
+  });
+
+  it('applies a large change when explicitly allowed', async () => {
+    await sync({ 101: { nl: many(20) } });
+    const result = await sync({ 101: { nl: many(10) } }, [101], true);
+    expect(result.deleted).toBe(10);
   });
 
   it('converts article HTML to text', async () => {

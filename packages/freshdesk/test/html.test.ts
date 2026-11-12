@@ -22,6 +22,18 @@ describe('htmlToText', () => {
     expect(htmlToText('&lt;script&gt;alert(1)&lt;/script&gt;')).toBe('<script>alert(1)</script>');
   });
 
+  it('drops HTML comments and CDATA sections', () => {
+    expect(htmlToText('<p>x</p><!-- <p>hidden</p> --><p>y</p><![CDATA[ secret ]]>')).toBe('x\n\ny');
+  });
+
+  it('decodes accented letters and typographic entities', () => {
+    expect(
+      htmlToText(
+        'be&euml;indigen caf&eacute; &Eacute;&eacute;n na&iuml;ef &rsquo;s &ldquo;q&rdquo; a&ndash;b c&mdash;d e&hellip;',
+      ),
+    ).toBe('beëindigen café Één naïef ’s “q” a–b c—d e…');
+  });
+
   it('collapses whitespace and trims', () => {
     expect(htmlToText('  <p> a \n\n\n b </p>  ')).toBe('a\n\nb');
   });

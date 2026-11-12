@@ -50,7 +50,7 @@ jobs:
         with:
           version: 3.1.0
       - name: Start Supabase (database, auth, REST)
-        run: supabase start -x studio,imgproxy,inbucket,mailpit,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor
+        run: supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor
       - run: supabase test db
       - name: Generated database types are up to date
         run: supabase gen types typescript --schema public | diff - src/generated/database.types.ts

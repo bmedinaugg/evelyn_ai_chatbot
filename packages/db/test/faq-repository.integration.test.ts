@@ -39,9 +39,19 @@ function record(id: number, overrides: Partial<FaqArticleRecord> = {}): FaqArtic
   };
 }
 
+// Real Freshdesk ids are 12 digits; used to check request-size limits.
+const BULK_FROM = 103000990000;
+const BULK_COUNT = 1000;
+
 async function cleanup(): Promise<void> {
   const { error } = await client.from('faq_articles').delete().in('id', IDS);
   if (error) throw error;
+  const bulk = await client
+    .from('faq_articles')
+    .delete()
+    .gte('id', BULK_FROM)
+    .lt('id', BULK_FROM + BULK_COUNT);
+  if (bulk.error) throw bulk.error;
 }
 
 beforeEach(cleanup);
@@ -87,6 +97,31 @@ describe('SupabaseFaqRepository', () => {
     const hashes = await repo.getActiveContentHashes();
     expect(hashes.has(990001)).toBe(false);
     expect(hashes.get(990002)).toBe('hash-990002');
+  });
+
+  it('getActiveSummaries reports folder and languages', async () => {
+    await repo.upsert([record(990001), record(990002, { en: null })]);
+    const summaries = await repo.getActiveSummaries();
+    expect(summaries.find((a) => a.id === 990001)).toEqual({
+      id: 990001,
+      folderId: 900001,
+      contentHash: 'hash-990001',
+      languages: ['nl', 'en'],
+    });
+    expect(summaries.find((a) => a.id === 990002)?.languages).toEqual(['nl']);
+  });
+
+  it('soft-deletes with a thousand 12-digit ids without hitting URL limits', async () => {
+    const bulk = Array.from({ length: BULK_COUNT }, (_, i) => record(BULK_FROM + i));
+    await repo.upsert(bulk);
+    const others = [...(await repo.getActiveContentHashes()).keys()].filter(
+      (id) => id < BULK_FROM || id >= BULK_FROM + BULK_COUNT,
+    );
+    const keep = [...others, ...bulk.slice(0, 900).map((a) => a.id)];
+    expect(await repo.softDeleteAllExcept(keep)).toBe(100);
+    const active = await repo.getActiveContentHashes();
+    expect(active.has(BULK_FROM)).toBe(true);
+    expect(active.has(BULK_FROM + 950)).toBe(false);
   });
 
   it('the anon key cannot read faq_articles or call search_faq', async () => {

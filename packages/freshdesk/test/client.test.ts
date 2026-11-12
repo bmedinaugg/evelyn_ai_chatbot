@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createFreshdeskClient,
   FreshdeskError,
+  FreshdeskPaginationError,
   FreshdeskRateLimitError,
   FreshdeskResponseError,
 } from '../src/index.ts';
@@ -67,11 +68,33 @@ describe('listFolderArticles', () => {
     expect(requests[1]?.url).toContain('page=2');
   });
 
-  it('never follows a next link to another host (the auth header would leak)', async () => {
+  it('throws instead of following a next link to another host (the auth header would leak)', async () => {
     queue(200, [article(1)], { link: '<https://evil.example/steal?page=2>; rel="next"' });
-    const articles = await client.listFolderArticles(101, 'nl');
-    expect(articles.map((a) => a.id)).toEqual([1]);
+    const error = await client.listFolderArticles(101, 'nl').catch((e) => e);
+    expect(error).toBeInstanceOf(FreshdeskPaginationError);
     expect(requests).toHaveLength(1);
+  });
+
+  it('keeps paging when a full page has no link header', async () => {
+    queue(
+      200,
+      Array.from({ length: 100 }, (_, i) => article(i + 1)),
+    );
+    queue(200, [article(101), article(102)]);
+    const articles = await client.listFolderArticles(101, 'nl');
+    expect(articles).toHaveLength(102);
+    expect(requests[1]?.url).toContain('page=2');
+  });
+
+  it('throws when the page limit is reached with more pages left', async () => {
+    for (let page = 0; page < 50; page += 1) {
+      queue(
+        200,
+        Array.from({ length: 100 }, (_, i) => article(page * 100 + i + 1)),
+      );
+    }
+    const error = await client.listFolderArticles(101, 'nl').catch((e) => e);
+    expect(error).toBeInstanceOf(FreshdeskPaginationError);
   });
 
   it('strips unknown fields and maps names', async () => {

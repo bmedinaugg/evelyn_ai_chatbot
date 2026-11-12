@@ -32,3 +32,11 @@ export class FreshdeskResponseError extends FreshdeskError {
     this.name = 'FreshdeskResponseError';
   }
 }
+
+/** A listing could not be read completely; partial results must never be used. */
+export class FreshdeskPaginationError extends FreshdeskError {
+  constructor(endpoint: string, reason: string) {
+    super(0, endpoint, `Freshdesk ${endpoint} pagination stopped: ${reason}`);
+    this.name = 'FreshdeskPaginationError';
+  }
+}

@@ -20,7 +20,16 @@ export type FaqSearchHit = {
   rank: number;
 };
 
+export type ActiveFaqSummary = {
+  id: number;
+  folderId: number;
+  contentHash: string;
+  languages: Lang[];
+};
+
 export interface FaqRepository {
+  /** Active (not soft-deleted) articles with the languages they have. */
+  getActiveSummaries(): Promise<ActiveFaqSummary[]>;
   /** Content hashes of active (not soft-deleted) articles. */
   getActiveContentHashes(): Promise<Map<number, string>>;
   countActive(): Promise<number>;

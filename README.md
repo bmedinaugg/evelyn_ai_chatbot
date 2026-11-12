@@ -54,6 +54,8 @@ sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local 
 # Real sync (needs FRESHDESK_DOMAIN, FRESHDESK_API_KEY, FRESHDESK_FAQ_FOLDER_IDS, FRESHDESK_PORTAL_URL):
 pnpm --filter @trainmore/worker sync-faq
 ```
-The sync deletes nothing if any Freshdesk request fails or Freshdesk suddenly returns no articles.
+The sync writes nothing if any Freshdesk request or page fails, if a folder or language comes back empty
+while we have content for it, or if it would delete articles or drop translations beyond max(5, 30%).
+After checking Freshdesk, an intended large change runs with `sync-faq --allow-mass-change`.
 `pnpm --filter @trainmore/db test:integration` runs the repository tests against the local stack.
 `pnpm --filter @trainmore/db db:types` regenerates `packages/db/src/generated/database.types.ts`.

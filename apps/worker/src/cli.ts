@@ -17,8 +17,22 @@ export function isCommand(value: unknown): value is Command {
   return COMMANDS.includes(value as Command);
 }
 
+export type CommandOptions = { allowMassChange: boolean };
+
+/** Parses `<command> [--allow-mass-change]`; undefined for anything else. */
+export function parseArgs(argv: string[]): ({ command: Command } & CommandOptions) | undefined {
+  const [command, ...flags] = argv;
+  if (!isCommand(command)) return undefined;
+  if (flags.some((flag) => flag !== '--allow-mass-change')) return undefined;
+  return { command, allowMassChange: flags.includes('--allow-mass-change') };
+}
+
 /** Runs one worker command; throws on failure so the caller can exit non-zero. */
-export async function runCommand(command: Command, env: Env): Promise<void> {
+export async function runCommand(
+  command: Command,
+  env: Env,
+  options: CommandOptions = { allowMassChange: false },
+): Promise<void> {
   const runtime = loadRuntimeConfig(env);
   if (command === 'seed-faq-fixtures' && runtime.appEnv !== 'local') {
     throw new Error('seed-faq-fixtures only runs with APP_ENV=local');
@@ -35,6 +49,7 @@ export async function runCommand(command: Command, env: Env): Promise<void> {
         folderIds: freshdesk.faqFolderIds,
         portalUrl: freshdesk.portalUrl,
         logger,
+        allowMassChange: options.allowMassChange,
       });
       return;
     }

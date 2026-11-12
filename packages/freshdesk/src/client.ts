@@ -1,6 +1,11 @@
 import type { Lang } from '@trainmore/i18n';
 import { z } from 'zod';
-import { FreshdeskError, FreshdeskRateLimitError, FreshdeskResponseError } from './errors.ts';
+import {
+  FreshdeskError,
+  FreshdeskPaginationError,
+  FreshdeskRateLimitError,
+  FreshdeskResponseError,
+} from './errors.ts';
 import { escapeHtml } from './html.ts';
 import {
   articleSchema,
@@ -20,6 +25,7 @@ export interface FreshdeskClient {
   createTicket(input: CreateTicketInput): Promise<{ id: number }>;
 }
 
+const PER_PAGE = 100;
 const MAX_PAGES = 50;
 const TICKET_STATUS_OPEN = 2;
 const TICKET_PRIORITY_LOW = 1;
@@ -60,15 +66,27 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
     async listFolderArticles(folderId, lang) {
       const endpoint = `/solutions/folders/${folderId}/articles/${lang}`;
       const articles: FreshdeskArticle[] = [];
-      let url: string | undefined = `${baseUrl}${endpoint}?per_page=100&page=1`;
-      for (let page = 0; url && page < MAX_PAGES; page += 1) {
+      let url = `${baseUrl}${endpoint}?per_page=${PER_PAGE}&page=1`;
+      for (let page = 1; ; page += 1) {
         const response = await request(url, endpoint);
-        const next = nextLink(response.headers.get('link'));
-        articles.push(...(await parse(response, endpoint, z.array(articleSchema))));
-        // Only follow links on our own API host: the Authorization header goes with them.
-        url = next?.startsWith(`${baseUrl}/`) ? next : undefined;
+        const link = response.headers.get('link');
+        const batch = await parse(response, endpoint, z.array(articleSchema));
+        articles.push(...batch);
+
+        const next = nextLink(link, url);
+        // A full page without a next link may still have more: ask for the next page anyway.
+        if (next === undefined && batch.length < PER_PAGE) return articles;
+        if (page >= MAX_PAGES) {
+          throw new FreshdeskPaginationError(endpoint, `more than ${MAX_PAGES} pages`);
+        }
+        if (next === null) throw new FreshdeskPaginationError(endpoint, 'unreadable next link');
+        const nextUrl = next ?? `${baseUrl}${endpoint}?per_page=${PER_PAGE}&page=${page + 1}`;
+        // The Authorization header goes with every request: never leave our API host.
+        if (!nextUrl.startsWith(`${baseUrl}/`)) {
+          throw new FreshdeskPaginationError(endpoint, 'next link points to another host');
+        }
+        url = nextUrl;
       }
-      return articles;
     },
 
     async createTicket(input) {
@@ -92,11 +110,18 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
   };
 }
 
-function nextLink(header: string | null): string | undefined {
+/** Absolute next-page URL, undefined when there is none, null when the header is unreadable. */
+function nextLink(header: string | null, currentUrl: string): string | null | undefined {
   if (!header) return undefined;
   for (const part of header.split(',')) {
-    const match = /<([^>]+)>\s*;\s*rel="?next"?/i.exec(part);
-    if (match?.[1]) return match[1];
+    const match = /<([^>]*)>\s*;\s*rel="?next"?/i.exec(part);
+    if (match) {
+      try {
+        return new URL(match[1] ?? '', currentUrl).toString();
+      } catch {
+        return null;
+      }
+    }
   }
   return undefined;
 }

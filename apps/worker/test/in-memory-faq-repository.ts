@@ -16,6 +16,16 @@ export function createInMemoryFaqRepository(): InMemoryFaqRepository {
         [...rows.values()].filter((r) => !r.deleted).map((r) => [r.id, r.contentHash]),
       );
     },
+    async getActiveSummaries() {
+      return [...rows.values()]
+        .filter((r) => !r.deleted)
+        .map((r) => ({
+          id: r.id,
+          folderId: r.folderId,
+          contentHash: r.contentHash,
+          languages: (['nl', 'en'] as const).filter((lang) => r[lang] !== null),
+        }));
+    },
     async countActive() {
       return [...rows.values()].filter((r) => !r.deleted).length;
     },

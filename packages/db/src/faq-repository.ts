@@ -1,9 +1,16 @@
 import type { Lang } from '@trainmore/i18n';
 import { z } from 'zod';
 import { DbError, type ServiceClient } from './client.ts';
-import type { FaqArticleRecord, FaqRepository, FaqSearchHit } from './faq-types.ts';
+import type {
+  ActiveFaqSummary,
+  FaqArticleRecord,
+  FaqRepository,
+  FaqSearchHit,
+} from './faq-types.ts';
 
 const PAGE_SIZE = 1000;
+/** Ids per update request; keeps the PostgREST URL far below proxy limits (~8 KB). */
+const ID_CHUNK = 200;
 
 const searchRowSchema = z
   .object({
@@ -26,20 +33,36 @@ const searchRowSchema = z
   );
 
 export function createSupabaseFaqRepository(client: ServiceClient): FaqRepository {
-  return {
-    async getActiveContentHashes() {
-      const hashes = new Map<number, string>();
-      for (let from = 0; ; from += PAGE_SIZE) {
-        const { data, error } = await client
-          .from('faq_articles')
-          .select('id, content_hash')
-          .is('deleted_at', null)
-          .order('id')
-          .range(from, from + PAGE_SIZE - 1);
-        if (error) throw new DbError('faq_articles select', error.code);
-        for (const row of data) hashes.set(row.id, row.content_hash);
-        if (data.length < PAGE_SIZE) return hashes;
+  async function getActiveSummaries(): Promise<ActiveFaqSummary[]> {
+    const summaries: ActiveFaqSummary[] = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await client
+        .from('faq_articles')
+        .select('id, folder_id, content_hash, title_nl, title_en')
+        .is('deleted_at', null)
+        .order('id')
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw new DbError('faq_articles select', error.code);
+      for (const row of data) {
+        summaries.push({
+          id: row.id,
+          folderId: row.folder_id,
+          contentHash: row.content_hash,
+          languages: [
+            ...(row.title_nl === null ? [] : (['nl'] as const)),
+            ...(row.title_en === null ? [] : (['en'] as const)),
+          ],
+        });
       }
+      if (data.length < PAGE_SIZE) return summaries;
+    }
+  }
+
+  return {
+    getActiveSummaries,
+
+    async getActiveContentHashes() {
+      return new Map((await getActiveSummaries()).map((a) => [a.id, a.contentHash]));
     },
 
     async countActive() {
@@ -75,14 +98,23 @@ export function createSupabaseFaqRepository(client: ServiceClient): FaqRepositor
     },
 
     async softDeleteAllExcept(keepIds) {
-      let query = client
-        .from('faq_articles')
-        .update({ deleted_at: new Date().toISOString() })
-        .is('deleted_at', null);
-      if (keepIds.length > 0) query = query.not('id', 'in', `(${keepIds.map(Number).join(',')})`);
-      const { data, error } = await query.select('id');
-      if (error) throw new DbError('faq_articles soft delete', error.code);
-      return data.length;
+      // Compute the ids to delete here and send them in small chunks: a "not in (all kept ids)"
+      // filter grows with the FAQ and eventually exceeds URL limits (414).
+      const keep = new Set(keepIds);
+      const toDelete = (await getActiveSummaries()).map((a) => a.id).filter((id) => !keep.has(id));
+      const deletedAt = new Date().toISOString();
+      let deleted = 0;
+      for (let i = 0; i < toDelete.length; i += ID_CHUNK) {
+        const { data, error } = await client
+          .from('faq_articles')
+          .update({ deleted_at: deletedAt })
+          .in('id', toDelete.slice(i, i + ID_CHUNK))
+          .is('deleted_at', null)
+          .select('id');
+        if (error) throw new DbError('faq_articles soft delete', error.code);
+        deleted += data.length;
+      }
+      return deleted;
     },
 
     async search(query: string, preferredLang: Lang, limit = 5) {
