@@ -1,4 +1,8 @@
-import { createServiceClient, createSupabaseFaqRepository } from '@trainmore/db';
+import {
+  createServiceClient,
+  createSupabaseEscalationRepository,
+  createSupabaseFaqRepository,
+} from '@trainmore/db';
 import { createFreshdeskClient } from '@trainmore/freshdesk';
 import {
   createLogger,
@@ -9,8 +13,9 @@ import {
 } from '@trainmore/shared';
 import { runFaqSync } from './faq-sync.ts';
 import { FIXTURE_FOLDER_ID, fixtureFreshdeskClient } from './fixture-source.ts';
+import { runTopicSync } from './topic-sync.ts';
 
-export const COMMANDS = ['sync-faq', 'seed-faq-fixtures'] as const;
+export const COMMANDS = ['sync-faq', 'seed-faq-fixtures', 'sync-ticket-topics'] as const;
 export type Command = (typeof COMMANDS)[number];
 
 export function isCommand(value: unknown): value is Command {
@@ -38,7 +43,8 @@ export async function runCommand(
     throw new Error('seed-faq-fixtures only runs with APP_ENV=local');
   }
   const logger = createLogger({ name: `worker:${command}`, level: runtime.logLevel });
-  const repo = createSupabaseFaqRepository(createServiceClient(loadSupabaseConfig(env)));
+  const db = createServiceClient(loadSupabaseConfig(env));
+  const repo = createSupabaseFaqRepository(db);
 
   switch (command) {
     case 'sync-faq': {
@@ -59,6 +65,16 @@ export async function runCommand(
         repo,
         folderIds: [FIXTURE_FOLDER_ID],
         portalUrl: 'https://portal.example',
+        logger,
+      });
+      return;
+    }
+    case 'sync-ticket-topics': {
+      const freshdesk = loadFreshdeskConfig(env);
+      await runTopicSync({
+        freshdesk: createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey }),
+        repo: createSupabaseEscalationRepository(db),
+        field: freshdesk.topicField,
         logger,
       });
       return;
