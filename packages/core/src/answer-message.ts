@@ -4,6 +4,7 @@ import {
   type ConversationRepository,
   type FaqRepository,
   type FlagReason,
+  type Outcome,
   type StoredMessage,
 } from '@trainmore/db';
 import { type Lang, t } from '@trainmore/i18n';
@@ -22,6 +23,8 @@ import { buildUserTurn } from './prompt.ts';
 
 export const MAX_CUSTOMER_MESSAGES = 20;
 const SEARCH_LIMIT = 5;
+/** Replies where the bot could not help; two in a row means the conversation is stuck. */
+const FAILED: ReadonlySet<Outcome> = new Set(['no_match', 'invalid_citation']);
 
 export class ConversationBusyError extends Error {
   constructor() {
@@ -41,7 +44,7 @@ export type AnswerMessageDeps = {
 
 function fixedReply(
   lang: Lang,
-  key: 'bot.noMatch' | 'bot.error' | 'bot.conversationLimit',
+  key: 'bot.noMatch' | 'bot.error' | 'bot.conversationLimit' | 'bot.stuck',
   overrides: Partial<Reply>,
 ): Reply {
   return {
@@ -103,7 +106,7 @@ export async function answerMessage(
       result = { kind: 'error' };
     }
 
-    const reply: Reply =
+    const finalized: Reply =
       result.kind === 'answer'
         ? finalizeReply({
             answer: result.answer,
@@ -113,7 +116,7 @@ export async function answerMessage(
           })
         : result.kind === 'refusal'
           ? fixedReply(input.pageLang, 'bot.noMatch', {
-              action: 'contact',
+              action: 'ticket_form',
               outcome: 'refusal',
               flags: ['refusal'],
             })
@@ -121,6 +124,7 @@ export async function answerMessage(
               outcome: 'error',
               flags: ['error'] satisfies FlagReason[],
             });
+    const reply = await unstick(conversations, input.conversationId, finalized);
 
     const user: StoredMessage = { displayText: input.text, apiContent: userTurn };
     const assistant: StoredMessage | null =
@@ -162,6 +166,25 @@ export async function answerMessage(
   } finally {
     if (!appended) await conversations.releaseTurn(input.conversationId, claimId);
   }
+}
+
+/**
+ * A second failed reply in a row within this conversation proactively offers the ticket form
+ * with a fixed text, and flags the conversation for review.
+ */
+async function unstick(
+  conversations: ConversationRepository,
+  conversationId: string,
+  reply: Reply,
+): Promise<Reply> {
+  if (!FAILED.has(reply.outcome)) return reply;
+  const previous = await conversations.lastAssistantOutcome(conversationId);
+  if (previous === null || !FAILED.has(previous)) return reply;
+  return fixedReply(reply.lang, 'bot.stuck', {
+    action: 'ticket_form',
+    outcome: reply.outcome,
+    flags: reply.flags.includes('needs_human') ? reply.flags : [...reply.flags, 'needs_human'],
+  });
 }
 
 /** Names of tools called anywhere in the stored history. */

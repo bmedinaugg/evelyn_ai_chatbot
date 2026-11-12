@@ -65,7 +65,7 @@ test('shows a hand-off contact link', async ({ page }) => {
       text: 'Ons supportteam helpt je graag verder.',
       lang: 'nl',
       citations: [],
-      action: 'contact',
+      action: 'ticket_form',
       contactUrl: 'https://www.support.trainmore.com/nl/support/tickets/new',
     },
   ]);

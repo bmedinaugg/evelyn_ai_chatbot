@@ -2,7 +2,8 @@ import type { Citation, FaqSearchHit, FlagReason, Outcome } from '@trainmore/db'
 import { type Lang, t } from '@trainmore/i18n';
 import type { Answer } from './answer-schema.ts';
 
-export type ReplyAction = 'none' | 'lead_form' | 'contact' | 'login';
+/** ticket_form: the widget offers the general ticket form (hand-off to support). */
+export type ReplyAction = 'none' | 'lead_form' | 'ticket_form' | 'login';
 
 export type Reply = {
   text: string;
@@ -58,7 +59,7 @@ export function finalizeReply(input: {
 
   const hitsById = new Map(hits.map((hit) => [hit.articleId, hit]));
   if (answer.citedArticleIds.some((id) => !hitsById.has(id))) {
-    return fixed('bot.noMatch', 'contact', 'invalid_citation', ['invalid_citation']);
+    return fixed('bot.noMatch', 'ticket_form', 'invalid_citation', ['invalid_citation']);
   }
   const citations: Citation[] = [...new Set(answer.citedArticleIds)].flatMap((id) => {
     const hit = hitsById.get(id);
@@ -75,9 +76,9 @@ export function finalizeReply(input: {
       // Only show the model's text when it is based on account data loaded this turn.
       return (input.accountToolsUsed ?? 0) > 0 && text
         ? { text, lang, citations: [], action: 'none', outcome: 'answered', flags: [] }
-        : fixed('bot.accountQuestion', 'contact', 'unsupported', ['account_question']);
+        : fixed('bot.accountQuestion', 'ticket_form', 'unsupported', ['account_question']);
     case 'wants_human':
-      return fixed('bot.wantsHuman', 'contact', 'handoff', ['wants_human']);
+      return fixed('bot.wantsHuman', 'ticket_form', 'handoff', ['wants_human']);
     case 'greeting':
       // Fixed text: model-written small talk could still invent offers or prices.
       return fixed('bot.greeting', 'none', 'answered', []);
@@ -92,7 +93,12 @@ export function finalizeReply(input: {
       if (answer.confidence === 'low') flags.push('low_confidence');
       if (answer.needsHuman) flags.push('needs_human');
       if (flags.length > 0 || !text) {
-        return fixed('bot.noMatch', 'contact', 'no_match', flags.length > 0 ? flags : ['no_match']);
+        return fixed(
+          'bot.noMatch',
+          'ticket_form',
+          'no_match',
+          flags.length > 0 ? flags : ['no_match'],
+        );
       }
       return { text, lang, citations, action: 'none', outcome: 'answered', flags: [] };
     }

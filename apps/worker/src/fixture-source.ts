@@ -29,9 +29,15 @@ export function fixtureArticles(): FixtureArticle[] {
 }
 
 /** Serves the fixtures as if they were the Freshdesk Solutions folder FIXTURE_FOLDER_ID. */
-export function fixtureFreshdeskClient(): Pick<FreshdeskClient, 'listFolderArticles'> {
+export function fixtureFreshdeskClient(): Pick<
+  FreshdeskClient,
+  'listFolderArticles' | 'getFolder'
+> {
   const articles = fixtureArticles();
   return {
+    async getFolder(folderId) {
+      return { id: folderId, visibility: 1, parentFolderId: null };
+    },
     async listFolderArticles(folderId, lang) {
       if (folderId !== FIXTURE_FOLDER_ID) return [];
       return articles.flatMap((article): FreshdeskArticle[] => {

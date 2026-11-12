@@ -15,7 +15,10 @@ export const nl = {
     accountQuestion:
       'Ik kan hier nog geen persoonlijke accountgegevens opzoeken. Ons supportteam helpt je graag met je account.',
     loginNeeded: 'Om vragen over je account te beantwoorden, log je eerst in met je e-mailadres.',
-    wantsHuman: 'Natuurlijk. Je kunt ons supportteam bereiken via de contactpagina.',
+    wantsHuman:
+      'Natuurlijk. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
+    stuck:
+      'Sorry, ik kom er niet uit. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
     error: 'Er ging aan onze kant iets mis. Probeer het zo nog eens.',
     conversationLimit: 'Dit gesprek heeft de limiet bereikt. Start een nieuwe chat.',
     greeting: 'Hoi! Waarmee kan ik je helpen?',
@@ -86,6 +89,25 @@ export const nl = {
       unavailable:
         'De controle kon niet laden. Probeer het later opnieuw of neem contact op met ons supportteam.',
     },
+    ticket: {
+      title: 'Contact met support',
+      topic: 'Categorie',
+      chooseTopic: 'Kies een categorie',
+      email: 'E-mailadres',
+      name: 'Naam (optioneel)',
+      subject: 'Onderwerp',
+      description: 'Je bericht',
+      consent:
+        'TrainMore mag dit chatgesprek delen met het supportteam om mijn vraag te behandelen.',
+      submit: 'Versturen',
+      sending: 'Bezig met versturen…',
+      success: 'Bedankt! Ons supportteam heeft je bericht ontvangen en reageert per e-mail.',
+      verificationFailed: 'We konden niet controleren dat je geen robot bent. Probeer het opnieuw.',
+      error: 'Er ging iets mis. Probeer het later opnieuw.',
+      cancel: 'Annuleren',
+      invalid: 'Controleer je e-mailadres, categorie, onderwerp en bericht.',
+      unavailable: 'Het formulier kon niet laden. Gebruik in plaats daarvan de contactpagina.',
+    },
   },
   email: {
     loginCode: {
@@ -95,5 +117,21 @@ export const nl = {
   },
   lead: {
     subject: 'Nieuwe lidmaatschapsvraag via websitechat',
+  },
+  ticket: {
+    noteTitle: 'Chatbot-gesprek (laatste berichten)',
+    topic: 'Onderwerp: {topic}',
+    account: 'Account: {status}, {club} (geverifieerd via e-mailcode)',
+    notLoggedIn: 'Account: niet ingelogd',
+    otherEmail:
+      'Account: ingelogd met een ander, geverifieerd e-mailadres. Deel geen accountgegevens met deze aanvrager.',
+    customer: 'Klant',
+    bot: 'Chatbot',
+    topics: {
+      membership: 'Lidmaatschap & contract',
+      payments: 'Betalingen & facturen',
+      club: 'Club & faciliteiten',
+      app: 'App & account',
+    },
   },
 } satisfies Messages;

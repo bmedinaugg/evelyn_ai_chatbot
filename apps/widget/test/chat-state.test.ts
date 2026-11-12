@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiReply } from '../src/lib/api.ts';
-import { type ChatState, chatReducer, initialChatState } from '../src/lib/chat-state.ts';
+import {
+  type ChatState,
+  chatReducer,
+  initialChatState,
+  ticketPrefill,
+} from '../src/lib/chat-state.ts';
 
 const reply: ApiReply = { text: 'Via de app.', lang: 'nl', citations: [], action: 'none' };
 const ready = (): ChatState => chatReducer(initialChatState(false), { type: 'consent_given' });
@@ -50,6 +55,14 @@ describe('chatReducer', () => {
     expect(chatReducer(withForm, { type: 'lead_form_closed' }).leadForm).toBe('closed');
   });
 
+  it('opens and completes the ticket form', () => {
+    const withForm = chatReducer(ready(), { type: 'ticket_form_opened' });
+    expect(withForm.ticketForm).toBe('open');
+    expect(chatReducer(withForm, { type: 'ticket_submitted' }).ticketForm).toBe('submitted');
+    expect(chatReducer(withForm, { type: 'ticket_form_closed' }).ticketForm).toBe('closed');
+    expect(chatReducer(withForm, { type: 'new_chat' }).ticketForm).toBe('closed');
+  });
+
   it('new chat clears messages but keeps consent', () => {
     const state = chatReducer(chatReducer(ready(), { type: 'send_started', text: 'q' }), {
       type: 'send_succeeded',
@@ -58,5 +71,30 @@ describe('chatReducer', () => {
     const fresh = chatReducer(state, { type: 'new_chat' });
     expect(fresh.messages).toEqual([]);
     expect(fresh.phase).toBe('ready');
+  });
+});
+
+describe('ticketPrefill', () => {
+  it('uses the first question as subject and all questions as description', () => {
+    let state = ready();
+    for (const text of ['Dubbel afgeschreven', 'Wat nu?']) {
+      state = chatReducer(state, { type: 'send_started', text });
+      state = chatReducer(state, { type: 'send_succeeded', reply });
+    }
+    expect(ticketPrefill(state.messages)).toEqual({
+      subject: 'Dubbel afgeschreven',
+      description: 'Dubbel afgeschreven\n\nWat nu?',
+    });
+  });
+
+  it('keeps the subject on one short line', () => {
+    const state = chatReducer(ready(), { type: 'send_started', text: `a\nb ${'x'.repeat(200)}` });
+    const { subject } = ticketPrefill(state.messages);
+    expect(subject.startsWith('a b x')).toBe(true);
+    expect(subject.length).toBeLessThanOrEqual(100);
+  });
+
+  it('is empty without messages', () => {
+    expect(ticketPrefill([])).toEqual({ subject: '', description: '' });
   });
 });

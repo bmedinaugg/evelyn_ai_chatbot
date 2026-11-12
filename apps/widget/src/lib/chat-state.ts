@@ -20,6 +20,7 @@ export type ChatState = {
   messages: ChatMessage[];
   notice: Notice | null;
   leadForm: 'closed' | 'open' | 'submitted';
+  ticketForm: 'closed' | 'open' | 'submitted';
   loginForm: 'closed' | 'open';
   nextId: number;
 };
@@ -32,6 +33,9 @@ export type ChatEvent =
   | { type: 'lead_form_opened' }
   | { type: 'lead_form_closed' }
   | { type: 'lead_submitted' }
+  | { type: 'ticket_form_opened' }
+  | { type: 'ticket_form_closed' }
+  | { type: 'ticket_submitted' }
   | { type: 'login_opened' }
   | { type: 'login_closed' }
   | { type: 'logged_in'; note: string }
@@ -43,6 +47,7 @@ export function initialChatState(consentGiven: boolean): ChatState {
     messages: [],
     notice: null,
     leadForm: 'closed',
+    ticketForm: 'closed',
     loginForm: 'closed',
     nextId: 1,
   };
@@ -88,6 +93,12 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, leadForm: 'closed' };
     case 'lead_submitted':
       return { ...state, leadForm: 'submitted' };
+    case 'ticket_form_opened':
+      return { ...state, ticketForm: 'open' };
+    case 'ticket_form_closed':
+      return { ...state, ticketForm: 'closed' };
+    case 'ticket_submitted':
+      return { ...state, ticketForm: 'submitted' };
     case 'login_opened':
       return { ...state, loginForm: 'open' };
     case 'login_closed':
@@ -102,4 +113,16 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
     case 'new_chat':
       return { ...initialChatState(true), nextId: state.nextId };
   }
+}
+
+const SUBJECT_MAX = 100;
+const DESCRIPTION_MAX = 5000;
+
+/** Ticket form prefill from what the customer typed: first question as subject, all as description. */
+export function ticketPrefill(messages: ChatMessage[]): { subject: string; description: string } {
+  const questions = messages.flatMap((m) => (m.role === 'user' ? [m.text.trim()] : []));
+  return {
+    subject: (questions[0] ?? '').replace(/\s+/g, ' ').slice(0, SUBJECT_MAX),
+    description: questions.join('\n\n').slice(0, DESCRIPTION_MAX),
+  };
 }

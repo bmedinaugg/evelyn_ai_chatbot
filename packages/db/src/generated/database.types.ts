@@ -47,6 +47,26 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"escalations": {
+                  Row: {
+                    "conversation_id": string | null,"created_at": string,"freshdesk_ticket_id": number,"id": number,"reason": string,"topic": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "conversation_id"?: string | null,"created_at"?: string,"freshdesk_ticket_id": number,"id"?: never,"reason": string,"topic": string
+                  }
+                  Update: {
+                    "conversation_id"?: string | null,"created_at"?: string,"freshdesk_ticket_id"?: number,"id"?: never,"reason"?: string,"topic"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "escalations_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"faq_articles": {
                   Row: {
                     "body_en": string | null,"body_nl": string | null,"content_hash": string,"deleted_at": string | null,"folder_id": number,"freshdesk_updated_at": string,"id": number,"search_en": unknown,"search_nl": unknown,"synced_at": string,"title_en": string | null,"title_nl": string | null,"url_en": string | null,"url_nl": string | null
@@ -147,6 +167,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ticket_topics": {
+                  Row: {
+                    "active": boolean,"synced_at": string,"value": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"synced_at"?: string,"value": string
+                  }
+                  Update: {
+                    "active"?: boolean,"synced_at"?: string,"value"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 }
           }
           Views: {
@@ -167,6 +201,9 @@ isOneToOne: false
                            },
 "release_conversation_turn":
 { Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
+                           },
+"replace_ticket_topics":
+{ Args: { "p_values": (string)[] }; Returns: undefined
                            },
 "search_faq":
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {

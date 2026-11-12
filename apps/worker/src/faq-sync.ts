@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { FaqArticleRecord, FaqRepository, FaqTranslation } from '@trainmore/db';
-import { type FreshdeskArticle, type FreshdeskClient, htmlToText } from '@trainmore/freshdesk';
+import {
+  FOLDER_VISIBILITY_ALL_USERS,
+  type FreshdeskArticle,
+  type FreshdeskClient,
+  htmlToText,
+} from '@trainmore/freshdesk';
 import type { Lang } from '@trainmore/i18n';
 import type { Logger } from '@trainmore/shared';
 
@@ -8,7 +13,7 @@ const LANGS: readonly Lang[] = ['nl', 'en'];
 const PUBLISHED = 2;
 
 export type FaqSyncDeps = {
-  freshdesk: Pick<FreshdeskClient, 'listFolderArticles'>;
+  freshdesk: Pick<FreshdeskClient, 'listFolderArticles' | 'getFolder'>;
   repo: FaqRepository;
   folderIds: number[];
   portalUrl: string;
@@ -29,6 +34,8 @@ export type FaqSyncAbortReason = 'fetch_failed' | 'empty_listing' | 'mass_change
 /** Deleting articles or dropping translations beyond this needs allowMassChange. */
 const MASS_CHANGE_MIN = 5;
 const MASS_CHANGE_RATIO = 0.3;
+/** Nested folders deeper than this are treated as not public. */
+const MAX_FOLDER_DEPTH = 10;
 
 export class FaqSyncAbortedError extends Error {
   readonly reason: FaqSyncAbortReason;
@@ -47,14 +54,32 @@ type Merged = {
   seenUnpublished: boolean;
 };
 
+/** A folder is public only if it and every parent folder are visible to all users. */
+async function isPublicFolder(deps: FaqSyncDeps, folderId: number): Promise<boolean> {
+  let id: number | null = folderId;
+  for (let depth = 0; id !== null && depth < MAX_FOLDER_DEPTH; depth += 1) {
+    const folder = await deps.freshdesk.getFolder(id);
+    if (folder.visibility !== FOLDER_VISIBILITY_ALL_USERS) return false;
+    id = folder.parentFolderId;
+  }
+  return id === null;
+}
+
 /**
- * Mirrors the published Freshdesk FAQ articles into the repository.
+ * Mirrors the published Freshdesk FAQ articles of public folders into the repository.
  * Fetches everything before writing anything, so a partial failure never deletes content.
  */
 export async function runFaqSync(deps: FaqSyncDeps): Promise<FaqSyncResult> {
   const listings: Array<{ folderId: number; lang: Lang; articles: FreshdeskArticle[] }> = [];
+  // Only content customers can already see on the help portal may reach the chatbot.
+  const hiddenFolders = new Set<number>();
   try {
     for (const folderId of deps.folderIds) {
+      if (!(await isPublicFolder(deps, folderId))) {
+        deps.logger.warn({ folderId }, 'faq sync: folder is not public; its articles are excluded');
+        hiddenFolders.add(folderId);
+        continue;
+      }
       for (const lang of LANGS) {
         listings.push({
           folderId,
@@ -125,7 +150,10 @@ export async function runFaqSync(deps: FaqSyncDeps): Promise<FaqSyncResult> {
   }
 
   const byId = new Map(records.map((record) => [record.id, record]));
-  const toDelete = active.filter((a) => !byId.has(a.id)).map((a) => a.id);
+  // Removing articles of folders that are no longer public is never held back by the guard.
+  const toDelete = active
+    .filter((a) => !byId.has(a.id) && !hiddenFolders.has(a.folderId))
+    .map((a) => a.id);
   const translationsLost = active.reduce((lost, a) => {
     const next = byId.get(a.id);
     return next ? lost + a.languages.filter((lang) => next[lang] === null).length : lost;

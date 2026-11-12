@@ -6,6 +6,7 @@ import type {
   AuthState,
   ConversationRecord,
   ConversationRepository,
+  EscalationRepository,
   FaqRepository,
   StoredMessage,
 } from '@trainmore/db';
@@ -31,6 +32,10 @@ export function createTestApi(
       customerNumber: string | null;
     }[];
     magiclineDown?: boolean;
+    /** Synced Freshdesk topics (empty: built-in defaults apply). */
+    topics?: string[];
+    topicsError?: boolean;
+    noteError?: Error;
   } = {},
 ) {
   const conversations = new Map<
@@ -39,6 +44,8 @@ export function createTestApi(
   >();
   const leads: { conversationId: string | null; freshdeskTicketId: number; lang: string }[] = [];
   const tickets: CreateTicketInput[] = [];
+  const notes: { ticketId: number; text: string }[] = [];
+  const escalations: Parameters<EscalationRepository['record']>[0][] = [];
   const answererCalls: Parameters<Answerer>[0][] = [];
   const turnstileIps: string[] = [];
   let logOutput = '';
@@ -92,6 +99,16 @@ export function createTestApi(
         throw new Error('foreign key violation');
       }
       leads.push(input);
+    },
+    async lastAssistantOutcome(id) {
+      const turns = conversations.get(id)?.turns ?? [];
+      return turns.findLast((m) => m.outcome !== undefined)?.outcome ?? null;
+    },
+    async listTranscript(id) {
+      return (conversations.get(id)?.turns ?? []).map((m) => ({
+        role: m.outcome === undefined ? ('user' as const) : ('assistant' as const),
+        text: m.displayText,
+      }));
     },
   };
 
@@ -266,6 +283,19 @@ export function createTestApi(
         tickets.push(input);
         return { id: 777 };
       },
+      async addPrivateNote(ticketId, text) {
+        if (options.noteError) throw options.noteError;
+        notes.push({ ticketId, text });
+      },
+    },
+    escalations: {
+      async activeTopics() {
+        if (options.topicsError) throw new Error('db down');
+        return options.topics ?? [];
+      },
+      async record(input) {
+        escalations.push(input);
+      },
     },
     verifyTurnstile: async (_token, remoteIp) => {
       turnstileIps.push(remoteIp);
@@ -295,6 +325,8 @@ export function createTestApi(
     conversations,
     leads,
     tickets,
+    notes,
+    escalations,
     answererCalls,
     turnstileIps,
     logs: () => logOutput,

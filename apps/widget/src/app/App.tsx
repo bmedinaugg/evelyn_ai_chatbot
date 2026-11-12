@@ -1,13 +1,14 @@
 import { type Lang, t } from '@trainmore/i18n';
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { type Session, type WidgetApi, WidgetApiError } from '../lib/api.ts';
-import { chatReducer, initialChatState, type Notice } from '../lib/chat-state.ts';
+import { chatReducer, initialChatState, type Notice, ticketPrefill } from '../lib/chat-state.ts';
 import { CLOSE_MESSAGE } from '../loader-helpers.ts';
 import { ConsentNotice } from './ConsentNotice.tsx';
 import { LeadForm } from './LeadForm.tsx';
 import { LoginFlow } from './LoginFlow.tsx';
 import { MessageList } from './MessageList.tsx';
 import { loadStored, saveStored } from './session.ts';
+import { TicketForm } from './TicketForm.tsx';
 
 const MAX_LENGTH = 1000;
 
@@ -40,6 +41,8 @@ export function App(props: {
   const stored = useRef(loadStored());
   const [state, dispatch] = useReducer(chatReducer, initialChatState(stored.current.consentGiven));
   const [draft, setDraft] = useState('');
+  // Email verified with a login code for this session: prefills the forms (see session.ts).
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(stored.current.verifiedEmail);
 
   // Key events inside the iframe never reach the portal page, so Escape is handled here.
   useEffect(() => {
@@ -50,9 +53,11 @@ export function App(props: {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const remember = (session: Session | null) => {
-    stored.current = { ...stored.current, session };
+  // A different (or no) session is never logged in: the verified email goes with it.
+  const remember = (session: Session | null, email: string | null = null) => {
+    stored.current = { ...stored.current, session, verifiedEmail: session ? email : null };
     saveStored(stored.current);
+    setVerifiedEmail(stored.current.verifiedEmail);
   };
 
   async function ensureSession(): Promise<Session> {
@@ -123,6 +128,7 @@ export function App(props: {
             messages={state.messages}
             sending={state.phase === 'sending'}
             onOpenLeadForm={() => dispatch({ type: 'lead_form_opened' })}
+            onOpenTicketForm={() => dispatch({ type: 'ticket_form_opened' })}
             onOpenLogin={() => dispatch({ type: 'login_opened' })}
           />
           {state.notice && (
@@ -136,6 +142,7 @@ export function App(props: {
               api={api}
               siteKey={props.turnstileSiteKey}
               conversationId={stored.current.session?.conversationId}
+              defaultEmail={verifiedEmail}
               onSubmitted={() => dispatch({ type: 'lead_submitted' })}
               onCancel={() => dispatch({ type: 'lead_form_closed' })}
             />
@@ -146,16 +153,34 @@ export function App(props: {
               api={api}
               siteKey={props.turnstileSiteKey}
               ensureSession={ensureSession}
-              onLoggedIn={(account) =>
+              onLoggedIn={(account, email) => {
+                remember(stored.current.session, email);
                 dispatch({
                   type: 'logged_in',
                   note: account
                     ? t(lang, 'widget.login.loggedIn', { club: account.studioName })
                     : t(lang, 'widget.login.noAccount'),
-                })
-              }
+                });
+              }}
               onCancel={() => dispatch({ type: 'login_closed' })}
             />
+          )}
+          {state.ticketForm === 'open' && (
+            <TicketForm
+              lang={lang}
+              api={api}
+              siteKey={props.turnstileSiteKey}
+              ensureSession={ensureSession}
+              prefill={ticketPrefill(state.messages)}
+              verifiedEmail={verifiedEmail}
+              onSubmitted={() => dispatch({ type: 'ticket_submitted' })}
+              onCancel={() => dispatch({ type: 'ticket_form_closed' })}
+            />
+          )}
+          {state.ticketForm === 'submitted' && (
+            <p class="tm-success" role="status">
+              {t(lang, 'widget.ticket.success')}
+            </p>
           )}
           {state.leadForm === 'submitted' && (
             <p class="tm-success" role="status">

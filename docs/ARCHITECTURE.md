@@ -22,6 +22,9 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Chat model | **Claude Sonnet 5.5** (`claude-sonnet-5-5`), configurable via `CLAUDE_CHAT_MODEL` | Product owner (2026-11-11) |
 | Answer delivery | **Check, then show**: the full answer is validated before the customer sees it (no token streaming; plain JSON, typing indicator) | Product owner (2026-11-11) |
 | Retrieval | **Full-text search first** (Postgres `dutch` + `english`); Voyage embeddings deferred behind a retrieval interface | Product owner (2026-11-11) |
+| Hand-off | **Prefilled general ticket form for everyone**; no automatic ticket, no Magicline email lookup | Product owner (2026-11-12) |
+| Ticket topics | Membership & contract, Payments & invoices, Club & facilities, App & account as built-in defaults; **synced daily from the Freshdesk ticket field** | Product owner (2026-11-12) |
+| Transcript retention | 90 days, then anonymise (M3b) | Product owner (2026-11-12) |
 | M1 delivery | Split into M1a (FAQ knowledge base), M1b (answering), M1c (widget); preprod deploy is a separate step once AWS access exists | Architect (2026-11-11) |
 | Everything else below | Architect's proposal; open to change | Architect |
 
@@ -168,27 +171,59 @@ Behaviour per status:
 - **FORMER_MEMBER**: balance and history, re-join offers.
 
 ### 3.4 FAQ sync (worker, daily at night + manual "sync now")
-1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, list articles in `nl` and `en`; keep published ones.
+1. For each folder in `FRESHDESK_FAQ_FOLDER_IDS`, check that it is **public** (folder visibility
+   "All Users", and the same for every parent folder). Non-public folders are skipped and their
+   stored articles removed, without the mass-change guard. Then list articles in `nl` and `en`;
+   keep published ones.
 2. Compare `updated_at` + content hash. Upsert, chunk and re-embed only what changed.
    Articles no longer in Freshdesk are soft-deleted.
 3. Store both language URLs (`/{nl|en}/support/solutions/articles/{id}`).
 4. Respect rate-limit headers; back off on 429. The run is logged for the portal.
 
-### 3.5 Forms and escalation
+### 3.5 Forms and escalation (M3a)
 - **Lead form** (anonymous, sales questions): email, phone, question, Turnstile → Freshdesk ticket.
-- **General ticket form** (hand-off), NL/EN labels:
-  - fields: email (pre-filled and locked when verified), name (optional), topic (dropdown),
-    subject, description, consent checkbox
-  - topic maps to Freshdesk `type`/tags; the mapping is configured in code and agreed with support
-  - subject and description are pre-filled from the conversation and editable
-- **Until M3** adds the general ticket form, a hand-off shows a contact link (`SUPPORT_CONTACT_URL`);
-  the bot never writes links itself.
-- **Auto-escalation** on a stuck conversation: two low-confidence turns in a row, an explicit
-  request for a human, or the same question repeated. It creates a ticket with:
-  - the transcript as a private note
-  - minimal account context: status, club, contract type
-  - tags `chatbot`, language and reason
+- **General ticket form** (the hand-off), nl/en labels. Every hand-off reply carries the action
+  `ticket_form`; the widget shows a button that opens the form, plus the contact link
+  (`SUPPORT_CONTACT_URL`) as a fallback. The bot never writes links itself.
+  - fields: topic (dropdown), email, name (optional), subject, description, consent, Turnstile
+  - the email of a code-verified login is prefilled and read-only; the lead form prefills it but
+    keeps it editable. The widget keeps it in `sessionStorage` next to the session token (this tab,
+    widget origin) so it survives a reload; a new or expired conversation clears it
+  - subject (first question) and description (all questions) are prefilled and editable
+  - after sending: a thank-you message without a ticket number (privacy)
+- **API:**
+  - `GET /widget/ticket-topics?lang=` returns the active topics with labels (built-in nl/en labels
+    for the four defaults, the Freshdesk value otherwise)
+  - `POST /widget/conversations/:id/tickets` needs the conversation bearer token, Turnstile and a
+    topic from the offered list. It creates the ticket (tags `chatbot`, `escalation`, language),
+    then adds a **private note**, then records an `escalations` row. Once the ticket exists the
+    request answers 201 even if the note or the record fails (logged), so retries never duplicate it.
+  - `type` = the topic, **only for topics synced from Freshdesk**: `type` must be one of the
+    ticket type choices (expected validation, **unverified** on our instance), so built-in defaults
+    are never sent as `type`. The topic is always in the note.
+- **Private note:** the transcript of display texts only (what the customer saw and typed; never
+  tool data or API content), last 50 messages, one line each, HTML-escaped. Account context is
+  only status and club name, and only when the form email matches the email verified with a code
+  in this conversation (compared by HMAC); no customer id or number. When the customer verified a different
+  email than the form's, the note says so and tells agents not to share account details with the
+  requester (the transcript may contain that account's answers).
+- **Stuck detection:** a second failed reply in a row (`no_match` or `invalid_citation`) in the
+  same conversation gets the fixed text `bot.stuck`, the `ticket_form` action and the flag
+  `needs_human`. The escalation reason is `stuck` when the last reply failed, otherwise
+  `customer_request`.
 - Later (optional): forms mirroring individual Freshdesk ticket forms.
+
+### 3.5b Ticket topic sync (worker `sync-ticket-topics`, daily)
+- Reads `GET /api/v2/ticket_fields`, takes the choices of `FRESHDESK_TOPIC_FIELD` (default
+  `ticket_type`), trims and de-duplicates them, and replaces `ticket_topics` in one transaction.
+- Same safety as the FAQ sync: Freshdesk down, the field missing or no choices → nothing changes and
+  the job fails (non-zero exit) so the scheduler alerts.
+- Until the first successful sync, the API offers the four built-in topics.
+- Labels: the four built-in topics have nl/en labels. Any other synced choice is shown as Freshdesk
+  names it, in both languages (known limitation; ask support to keep type names bilingual or add
+  nl/en labels for new types in `packages/i18n`).
+- Schedule (EventBridge Scheduler → ECS RunTask, daily at night, next to `sync-faq`): to be added
+  with the worker task definition in the CDK app; neither job is scheduled in `infra/` yet.
 
 ### 3.6 Improvement loop
 1. **Flag** conversations on no retrieval match, low confidence, thumbs-down, or escalation.
@@ -213,7 +248,8 @@ Why Supabase scenarios rather than Freshdesk write-back:
 Tables:
 - `faq_articles` (whole articles with nl/en tsvectors; FAQs are short, so chunking only if they grow)
 - `scenarios`, `scenario_versions`, `capability_flags`
-- `conversations`, `messages`, `feedback`, `flags`, `escalations`
+- `conversations`, `messages`, `feedback`, `flags`, `escalations` (conversation id, Freshdesk ticket
+  id, topic, reason; no email, name or description), `ticket_topics` (synced Freshdesk choices)
 - `otp_challenges`, `sessions`
 - `portal_users`, `audit_log`, `sync_runs`
 
@@ -225,8 +261,8 @@ Access:
   still has default grants that `postgres` cannot change, so pgTAP tests fail if any object in
   `public` is granted to `anon`/`authenticated`. Rule: only create objects through migrations; never
   install extensions into `public` from the dashboard.
-- Emails are stored as an HMAC hash where lookup is enough (OTP, sessions, DSAR). Plain email is
-  stored only on escalation records, and only as long as needed.
+- Emails are stored as an HMAC hash where lookup is enough (OTP, sessions, DSAR). Plain emails are
+  not stored: ticket forms send them straight to Freshdesk.
 
 Retention (proposal, to confirm with the DPO):
 - transcripts 90 days, then anonymised
@@ -333,6 +369,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.
 - M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
 - M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
 - M1c ✅ 2026-11-11: Preact widget in an iframe (consent, answers with sources, hand-off link, lead form with Turnstile), `loader.js` for the help portal, TrainMore branding without external fonts, Playwright e2e.
@@ -397,6 +434,9 @@ Each milestone ends with tests passing and a preprod deploy.
   `nl`/`en` language codes on our instance (see `docs/api/freshdesk.md`).
 - ★ (M1) Permission to add a script tag and CSP changes in the Freshdesk portal layout.
 - (M1) Approve Voyage AI as a sub-processor, or start with full-text-only retrieval.
-- (M3) Retention periods and consent text with the DPO. Topic list for the general form, with support.
+- (M3) Retention periods and consent text with the DPO.
+- (M3) Confirm with support which Freshdesk field holds the topics (`FRESHDESK_TOPIC_FIELD`,
+  default `ticket_type`) and its values; until the first sync, tickets carry no `type`.
+- (M3) Add the EventBridge schedules for `sync-faq` and `sync-ticket-topics` to the CDK app.
 - (M4) Entra app registration and group names.
 - Exact club count and expected volume (brief still says [X]).

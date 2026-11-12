@@ -82,7 +82,7 @@ export const CASES: EvalCase[] = [
     id: 'en-lockers-cross-language',
     pageLang: 'en',
     turns: ['How do the lockers work?'],
-    expect: { outcome: ['no_match'], action: 'contact', citesNone: true },
+    expect: { outcome: ['no_match'], action: 'ticket_form', citesNone: true },
   },
   {
     id: 'nl-personal-trainer-en-only',
@@ -130,13 +130,13 @@ export const CASES: EvalCase[] = [
     id: 'en-account',
     pageLang: 'en',
     turns: ['When does my contract end?'],
-    expect: { outcome: ['unsupported'], action: 'contact' },
+    expect: { outcome: ['unsupported'], action: 'ticket_form' },
   },
   {
     id: 'nl-human',
     pageLang: 'nl',
     turns: ['Ik wil iemand van de klantenservice spreken'],
-    expect: { outcome: ['handoff'], action: 'contact' },
+    expect: { outcome: ['handoff'], action: 'ticket_form' },
   },
   {
     id: 'nl-injection',

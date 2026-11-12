@@ -5,7 +5,7 @@ const replySchema = z.object({
   text: z.string(),
   lang: z.enum(['nl', 'en']),
   citations: z.array(z.object({ articleId: z.number(), title: z.string(), url: z.string() })),
-  action: z.enum(['none', 'lead_form', 'contact', 'login']),
+  action: z.enum(['none', 'lead_form', 'ticket_form', 'login']),
   contactUrl: z.string().optional(),
 });
 export type ApiReply = z.infer<typeof replySchema>;
@@ -22,6 +22,20 @@ export type LeadInput = {
   consent: true;
   conversationId?: string;
 };
+
+export type TicketInput = {
+  email: string;
+  name?: string;
+  topic: string;
+  subject: string;
+  description: string;
+  lang: Lang;
+  turnstileToken: string;
+  consent: true;
+};
+
+const topicSchema = z.object({ value: z.string(), label: z.string() });
+export type TicketTopic = z.infer<typeof topicSchema>;
 
 const accountSchema = z.object({
   index: z.number().int(),
@@ -90,21 +104,11 @@ export function createWidgetApi(opts: {
   const doFetch = opts.fetch ?? fetch.bind(globalThis);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  async function post<T>(
-    path: string,
-    body: unknown,
-    schema: z.ZodType<T>,
-    token?: string,
-  ): Promise<T> {
+  async function call<T>(path: string, init: RequestInit, schema: z.ZodType<T>): Promise<T> {
     let response: Response;
     try {
       response = await doFetch(`${base}${path}`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
+        ...init,
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
@@ -114,6 +118,21 @@ export function createWidgetApi(opts: {
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) throw new WidgetApiError('server');
     return parsed.data;
+  }
+
+  function post<T>(path: string, body: unknown, schema: z.ZodType<T>, token?: string): Promise<T> {
+    return call(
+      path,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      },
+      schema,
+    );
   }
 
   return {
@@ -159,6 +178,22 @@ export function createWidgetApi(opts: {
     },
     async submitLead(input: LeadInput): Promise<void> {
       await post('/widget/leads', input, z.object({ ok: z.literal(true) }));
+    },
+    async getTicketTopics(lang: Lang): Promise<TicketTopic[]> {
+      const { topics } = await call(
+        `/widget/ticket-topics?lang=${lang}`,
+        { method: 'GET' },
+        z.object({ topics: z.array(topicSchema) }),
+      );
+      return topics;
+    },
+    async submitTicket(session: Session, input: TicketInput): Promise<void> {
+      await post(
+        `/widget/conversations/${encodeURIComponent(session.conversationId)}/tickets`,
+        input,
+        z.object({ ok: z.literal(true) }),
+        session.token,
+      );
     },
   };
 }

@@ -12,6 +12,11 @@ import {
   type CreateTicketInput,
   createdTicketSchema,
   type FreshdeskArticle,
+  folderSchema,
+  noteSchema,
+  type SolutionFolder,
+  type TicketField,
+  ticketFieldSchema,
 } from './schemas.ts';
 
 export type FreshdeskClientOptions = {
@@ -22,7 +27,12 @@ export type FreshdeskClientOptions = {
 
 export interface FreshdeskClient {
   listFolderArticles(folderId: number, lang: Lang): Promise<FreshdeskArticle[]>;
+  /** Solution folder with its visibility (1 = all users) and parent folder. */
+  getFolder(folderId: number): Promise<SolutionFolder>;
   createTicket(input: CreateTicketInput): Promise<{ id: number }>;
+  listTicketFields(): Promise<TicketField[]>;
+  /** Private note on a ticket (agents only); the text is HTML-escaped. */
+  addPrivateNote(ticketId: number, text: string): Promise<void>;
 }
 
 const PER_PAGE = 100;
@@ -63,6 +73,13 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
   }
 
   return {
+    async getFolder(folderId) {
+      if (!Number.isSafeInteger(folderId) || folderId <= 0) throw new Error('Invalid folder id');
+      const endpoint = '/solutions/folders/{id}';
+      const response = await request(`${baseUrl}/solutions/folders/${folderId}`, endpoint);
+      return parse(response, endpoint, folderSchema);
+    },
+
     async listFolderArticles(folderId, lang) {
       const endpoint = `/solutions/folders/${folderId}/articles/${lang}`;
       const articles: FreshdeskArticle[] = [];
@@ -93,10 +110,12 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
       const endpoint = '/tickets';
       const body = {
         email: input.email,
+        ...(input.name === undefined ? {} : { name: input.name }),
         subject: input.subject,
         description: escapeHtml(input.descriptionText).replace(/\n/g, '<br>'),
         tags: input.tags,
         ...(input.phone === undefined ? {} : { phone: input.phone }),
+        ...(input.type === undefined ? {} : { type: input.type }),
         status: TICKET_STATUS_OPEN,
         priority: TICKET_PRIORITY_LOW,
         source: TICKET_SOURCE_CHAT,
@@ -106,6 +125,22 @@ export function createFreshdeskClient(opts: FreshdeskClientOptions): FreshdeskCl
         body: JSON.stringify(body),
       });
       return parse(response, endpoint, createdTicketSchema);
+    },
+
+    async listTicketFields() {
+      const endpoint = '/ticket_fields';
+      const response = await request(`${baseUrl}${endpoint}`, endpoint);
+      return parse(response, endpoint, z.array(ticketFieldSchema));
+    },
+
+    async addPrivateNote(ticketId, text) {
+      if (!Number.isSafeInteger(ticketId) || ticketId <= 0) throw new Error('Invalid ticket id');
+      const endpoint = '/tickets/{id}/notes';
+      const response = await request(`${baseUrl}/tickets/${ticketId}/notes`, endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ body: escapeHtml(text).replace(/\n/g, '<br>'), private: true }),
+      });
+      await parse(response, endpoint, noteSchema);
     },
   };
 }

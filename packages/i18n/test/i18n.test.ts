@@ -47,6 +47,21 @@ describe('bot texts', () => {
     );
     expect(t('en', 'lead.subject')).toBe('New membership question via website chat');
   });
+
+  it('points hand-offs to the ticket form in both languages', () => {
+    expect(t('en', 'bot.stuck')).toBe(
+      "Sorry, I can't seem to help you with this. Fill in the form below and our support team will get back to you by email.",
+    );
+    expect(t('nl', 'bot.stuck')).toBe(
+      'Sorry, ik kom er niet uit. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
+    );
+    expect(t('en', 'bot.wantsHuman')).toBe(
+      'Of course. Fill in the form below and our support team will get back to you by email.',
+    );
+    expect(t('nl', 'bot.wantsHuman')).toBe(
+      'Natuurlijk. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
+    );
+  });
 });
 
 describe('widget texts', () => {

@@ -13,6 +13,13 @@ describe('parseArgs', () => {
     });
   });
 
+  it('parses sync-ticket-topics', () => {
+    expect(parseArgs(['sync-ticket-topics'])).toEqual({
+      command: 'sync-ticket-topics',
+      allowMassChange: false,
+    });
+  });
+
   it('rejects unknown commands and flags', () => {
     expect(parseArgs(['drop-everything'])).toBeUndefined();
     expect(parseArgs(['sync-faq', '--force'])).toBeUndefined();

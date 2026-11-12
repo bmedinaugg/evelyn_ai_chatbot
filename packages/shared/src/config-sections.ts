@@ -8,6 +8,8 @@ export type FreshdeskConfig = {
   apiKey: string;
   faqFolderIds: number[];
   portalUrl: string;
+  /** Ticket field whose choices are the ticket form topics. */
+  topicField: string;
 };
 
 export function loadRuntimeConfig(env: Env = process.env): RuntimeConfig {
@@ -46,6 +48,7 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
       FRESHDESK_PORTAL_URL: z
         .url({ protocol: /^https?$/ })
         .transform((url) => url.replace(/\/+$/, '')),
+      FRESHDESK_TOPIC_FIELD: z.string().trim().min(1).default('ticket_type'),
     }),
     env,
   );
@@ -54,6 +57,7 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
     apiKey: e.FRESHDESK_API_KEY,
     faqFolderIds: e.FRESHDESK_FAQ_FOLDER_IDS,
     portalUrl: e.FRESHDESK_PORTAL_URL,
+    topicField: e.FRESHDESK_TOPIC_FIELD,
   };
 }
 

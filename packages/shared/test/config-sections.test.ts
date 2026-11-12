@@ -20,7 +20,14 @@ describe('loadFreshdeskConfig', () => {
       apiKey: 'fd-key',
       faqFolderIds: [101],
       portalUrl: 'https://portal.test',
+      topicField: 'ticket_type',
     });
+  });
+
+  it('reads the ticket topic field name', () => {
+    expect(loadFreshdeskConfig({ ...fd, FRESHDESK_TOPIC_FIELD: 'cf_topic' }).topicField).toBe(
+      'cf_topic',
+    );
   });
 
   it('parses folder ids with spaces', () => {

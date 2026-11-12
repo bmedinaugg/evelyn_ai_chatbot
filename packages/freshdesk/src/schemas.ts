@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Field names per docs/api/freshdesk.md (Solutions section unverified until checked live).
+// Field names per docs/api/freshdesk.md (Solutions checked against the official API reference).
 export const articleSchema = z
   .object({
     id: z.number().int(),
@@ -27,8 +27,42 @@ export const createdTicketSchema = z
 
 export type CreateTicketInput = {
   email: string;
+  /** Requester name (optional, shown to agents). */
+  name?: string;
   subject: string;
   descriptionText: string;
   tags: string[];
   phone?: string;
+  /** Ticket type (one of the ticket_type field's choices). */
+  type?: string;
 };
+
+/** Ticket field with its choices when they are a plain list (dropdowns such as ticket_type). */
+export const ticketFieldSchema = z
+  .object({ name: z.string(), choices: z.unknown().optional() })
+  .transform(({ name, choices }) => ({
+    name,
+    choices:
+      Array.isArray(choices) && choices.every((c) => typeof c === 'string')
+        ? (choices as string[])
+        : [],
+  }));
+export type TicketField = z.output<typeof ticketFieldSchema>;
+
+export const noteSchema = z.object({ id: z.number().int() }).transform(({ id }) => ({ id }));
+
+/** Folder visibility 1 = "All Users" (public); see docs/api/freshdesk.md for the other values. */
+export const FOLDER_VISIBILITY_ALL_USERS = 1;
+
+export const folderSchema = z
+  .object({
+    id: z.number().int(),
+    visibility: z.number().int(),
+    parent_folder_id: z.number().int().nullable().optional(),
+  })
+  .transform((f) => ({
+    id: f.id,
+    visibility: f.visibility,
+    parentFolderId: f.parent_folder_id ?? null,
+  }));
+export type SolutionFolder = z.output<typeof folderSchema>;

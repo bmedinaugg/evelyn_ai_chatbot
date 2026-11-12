@@ -103,6 +103,51 @@ describe('answerMessage', () => {
     expect(conv.isClaimed()).toBe(false);
   });
 
+  describe('stuck detection', () => {
+    const noMatch: AnswererResult = {
+      kind: 'answer',
+      answer: { ...answer, citedArticleIds: [], confidence: 'low' },
+      assistantContent: [{ type: 'text', text: '{}' }],
+      steps: [],
+      toolsUsed: [],
+    };
+    const ask = (conv: ReturnType<typeof fakeConversations>, result: AnswererResult) =>
+      answerMessage(
+        {
+          faq: fakeFaq([cancelNl]),
+          conversations: conv.repo,
+          answerer: recordingAnswerer(result).answerer,
+          logger,
+        },
+        { conversationId: ID, text: 'Vraag', pageLang: 'nl' },
+      );
+
+    it('offers the ticket form with the stuck text on a second failure in a row', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      const first = await ask(conv, noMatch);
+      expect(first).toMatchObject({ outcome: 'no_match', action: 'ticket_form' });
+      expect(first.text).not.toContain('Sorry, ik kom er niet uit');
+
+      const second = await ask(conv, noMatch);
+      expect(second).toMatchObject({
+        outcome: 'no_match',
+        action: 'ticket_form',
+        text: 'Sorry, ik kom er niet uit. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
+      });
+      expect(second.flags).toContain('needs_human');
+      expect(conv.turns[1]?.assistant?.displayText).toBe(second.text);
+      expect(conv.turns[1]?.flags).toContain('needs_human');
+    });
+
+    it('does not trigger when the previous reply was answered', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      await ask(conv, answered);
+      const reply = await ask(conv, noMatch);
+      expect(reply.text).not.toContain('Sorry, ik kom er niet uit');
+      expect(reply.flags).not.toContain('needs_human');
+    });
+  });
+
   it('stores only the user message on a refusal', async () => {
     const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'en', userMessageCount: 0 });
     const { answerer } = recordingAnswerer({ kind: 'refusal' });
@@ -110,7 +155,7 @@ describe('answerMessage', () => {
       { faq: fakeFaq([]), conversations: conv.repo, answerer, logger },
       { conversationId: ID, text: 'x', pageLang: 'en' },
     );
-    expect(reply).toMatchObject({ outcome: 'refusal', action: 'contact', flags: ['refusal'] });
+    expect(reply).toMatchObject({ outcome: 'refusal', action: 'ticket_form', flags: ['refusal'] });
     expect(conv.turns[0]?.assistant).toBeNull();
     expect(conv.turns[0]?.flags).toEqual(['refusal']);
   });

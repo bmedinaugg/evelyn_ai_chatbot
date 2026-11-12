@@ -53,10 +53,10 @@ describe('widget conversations', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       reply: {
-        text: 'Of course. You can reach our support team via the contact page.',
+        text: 'Of course. Fill in the form below and our support team will get back to you by email.',
         lang: 'en',
         citations: [],
-        action: 'contact',
+        action: 'ticket_form',
         contactUrl: CONTACT_URL,
       },
     });
