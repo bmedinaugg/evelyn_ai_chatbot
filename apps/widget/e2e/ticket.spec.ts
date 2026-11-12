@@ -109,17 +109,14 @@ test('ticket form: shows a verification failure and gets a new token', async ({ 
   expect(new Set(tokens).size).toBe(2);
 });
 
-test('ticket form: the verified email is prefilled and locked', async ({ page }) => {
-  await mockApi(page, [
-    {
-      text: 'Om vragen over je account te beantwoorden, log je eerst in met je e-mailadres.',
-      lang: 'nl',
-      citations: [],
-      action: 'login',
-    },
-    handoff,
-  ]);
-  await startChat(page);
+const needsLogin = {
+  text: 'Om vragen over je account te beantwoorden, log je eerst in met je e-mailadres.',
+  lang: 'nl' as const,
+  citations: [],
+  action: 'login' as const,
+};
+
+async function logIn(page: Page) {
   await ask(page, 'Wanneer eindigt mijn contract?');
   await page.getByRole('button', { name: 'Inloggen' }).click();
   const login = page.getByRole('form', { name: 'Inloggen' });
@@ -128,6 +125,53 @@ test('ticket form: the verified email is prefilled and locked', async ({ page })
   await login.getByLabel('Code', { exact: true }).fill('123456');
   await login.getByRole('button', { name: 'Inloggen' }).click();
   await expect(page.getByText('Je bent ingelogd (TrainMore Amsterdam).')).toBeVisible();
+}
+
+test('ticket form: the verified email stays prefilled after a page reload', async ({ page }) => {
+  await mockApi(page, [needsLogin, handoff]);
+  await startChat(page);
+  await logIn(page);
+  await page.reload();
+  await ask(page, 'Ik wil een mens spreken');
+  await page.getByRole('button', { name: 'Contact met support' }).click();
+  const email = ticketForm(page).getByLabel('E-mailadres', { exact: true });
+  await expect(email).toHaveValue('member@example.com');
+  await expect(email).toHaveAttribute('readonly', '');
+});
+
+test('lead form: the verified email is prefilled but editable', async ({ page }) => {
+  await mockApi(page, [
+    needsLogin,
+    { text: 'Leuk!', lang: 'nl', citations: [], action: 'lead_form' },
+  ]);
+  await startChat(page);
+  await logIn(page);
+  await ask(page, 'Ik wil een extra lidmaatschap');
+  await page.getByRole('button', { name: 'Lid worden' }).click();
+  const email = page
+    .getByRole('form', { name: 'Lid worden' })
+    .getByLabel('E-mailadres', { exact: true });
+  await expect(email).toHaveValue('member@example.com');
+  await expect(email).not.toHaveAttribute('readonly', '');
+});
+
+test('ticket form: a new chat forgets the verified email', async ({ page }) => {
+  await mockApi(page, [needsLogin, handoff]);
+  await startChat(page);
+  await logIn(page);
+  await page.getByRole('button', { name: 'Nieuwe chat' }).click();
+  await page.reload();
+  await ask(page, 'Ik wil een mens spreken');
+  await page.getByRole('button', { name: 'Contact met support' }).click();
+  const email = ticketForm(page).getByLabel('E-mailadres', { exact: true });
+  await expect(email).toHaveValue('');
+  await expect(email).not.toHaveAttribute('readonly', '');
+});
+
+test('ticket form: the verified email is prefilled and locked', async ({ page }) => {
+  await mockApi(page, [needsLogin, handoff]);
+  await startChat(page);
+  await logIn(page);
   await ask(page, 'Ik wil een mens spreken');
   await page.getByRole('button', { name: 'Contact met support' }).click();
   const email = ticketForm(page).getByLabel('E-mailadres', { exact: true });

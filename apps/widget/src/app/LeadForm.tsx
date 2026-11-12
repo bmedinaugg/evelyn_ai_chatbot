@@ -13,6 +13,8 @@ export function LeadForm(props: {
   api: WidgetApi;
   siteKey: string;
   conversationId: string | undefined;
+  /** Verified login email, prefilled but editable (a lead may be for someone else). */
+  defaultEmail: string | null;
   onSubmitted: () => void;
   onCancel: () => void;
 }) {
@@ -62,7 +64,14 @@ export function LeadForm(props: {
       <h2 id="tm-lead-title">{t(lang, 'widget.lead.title')}</h2>
       <label>
         {t(lang, 'widget.lead.email')}
-        <input name="email" type="email" required maxLength={254} autocomplete="email" />
+        <input
+          name="email"
+          type="email"
+          required
+          maxLength={254}
+          autocomplete="email"
+          defaultValue={props.defaultEmail ?? ''}
+        />
       </label>
       <label>
         {t(lang, 'widget.lead.phone')}

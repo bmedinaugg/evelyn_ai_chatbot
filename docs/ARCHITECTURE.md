@@ -186,7 +186,9 @@ Behaviour per status:
   `ticket_form`; the widget shows a button that opens the form, plus the contact link
   (`SUPPORT_CONTACT_URL`) as a fallback. The bot never writes links itself.
   - fields: topic (dropdown), email, name (optional), subject, description, consent, Turnstile
-  - the email of a code-verified login is prefilled and read-only (widget memory only)
+  - the email of a code-verified login is prefilled and read-only; the lead form prefills it but
+    keeps it editable. The widget keeps it in `sessionStorage` next to the session token (this tab,
+    widget origin) so it survives a reload; a new or expired conversation clears it
   - subject (first question) and description (all questions) are prefilled and editable
   - after sending: a thank-you message without a ticket number (privacy)
 - **API:**

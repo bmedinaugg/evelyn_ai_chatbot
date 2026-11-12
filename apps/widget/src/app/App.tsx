@@ -41,8 +41,8 @@ export function App(props: {
   const stored = useRef(loadStored());
   const [state, dispatch] = useReducer(chatReducer, initialChatState(stored.current.consentGiven));
   const [draft, setDraft] = useState('');
-  // Email verified with a login code in this chat: memory only, used to prefill the ticket form.
-  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  // Email verified with a login code for this session: prefills the forms (see session.ts).
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(stored.current.verifiedEmail);
 
   // Key events inside the iframe never reach the portal page, so Escape is handled here.
   useEffect(() => {
@@ -53,9 +53,11 @@ export function App(props: {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const remember = (session: Session | null) => {
-    stored.current = { ...stored.current, session };
+  // A different (or no) session is never logged in: the verified email goes with it.
+  const remember = (session: Session | null, email: string | null = null) => {
+    stored.current = { ...stored.current, session, verifiedEmail: session ? email : null };
     saveStored(stored.current);
+    setVerifiedEmail(stored.current.verifiedEmail);
   };
 
   async function ensureSession(): Promise<Session> {
@@ -97,7 +99,6 @@ export function App(props: {
 
   function newChat() {
     remember(null);
-    setVerifiedEmail(null);
     dispatch({ type: 'new_chat' });
   }
 
@@ -141,6 +142,7 @@ export function App(props: {
               api={api}
               siteKey={props.turnstileSiteKey}
               conversationId={stored.current.session?.conversationId}
+              defaultEmail={verifiedEmail}
               onSubmitted={() => dispatch({ type: 'lead_submitted' })}
               onCancel={() => dispatch({ type: 'lead_form_closed' })}
             />
@@ -152,7 +154,7 @@ export function App(props: {
               siteKey={props.turnstileSiteKey}
               ensureSession={ensureSession}
               onLoggedIn={(account, email) => {
-                setVerifiedEmail(email);
+                remember(stored.current.session, email);
                 dispatch({
                   type: 'logged_in',
                   note: account
