@@ -246,8 +246,9 @@ Each dependency is confirmed with the product owner when introduced.
 
 | Area | Choice | Why | Alternatives / tradeoff |
 |---|---|---|---|
-| Runtime | Node 24 LTS (re-check Active LTS vs Node 26 at M0) | LTS, Fargate | Node 26: newer, younger LTS |
-| Language | TypeScript 7.0.x, strict | required | fall back to 5.x if lint tooling isn't ready |
+| Runtime | Node 26 (Active LTS since 2026-10-28) | current LTS, Fargate | Node 24 (maintenance since 2026-10-20) |
+| Language | TypeScript 6.0.3, strict | required; typescript-eslint supports `<6.1` and openapi-typescript declares `^5.x`, so 7.x waits for the ecosystem | TypeScript 7 (native, faster) once tooling supports it |
+| Lint/format | Biome 2.6 | one fast tool, no TypeScript peer dependency | ESLint 10 + typescript-eslint (type-aware rules, needs TS ≤ 6.0) |
 | Monorepo | pnpm 12 workspaces + Turborepo 2.11 | strict deps, cached tasks | Nx (heavier) |
 | API | Fastify 5.12 + @fastify/rate-limit 11 | mature, fast, schema-first, SSE-friendly | Hono 4 (lighter, smaller ecosystem) |
 | Validation | zod 4.6 | one schema language for API, LLM output, config | valibot (smaller) |
@@ -262,6 +263,7 @@ Each dependency is confirmed with the product owner when introduced.
 | Bot protection | Cloudflare Turnstile | free, usually invisible, privacy-friendly | hCaptcha |
 | Logging | pino 10 (redact) | fast, structured | — |
 | Testing | vitest 5, msw 3, Playwright 1.65, custom eval runner | fast unit tests, HTTP mocking, widget end-to-end | Jest |
+| DB tests | pgTAP via Supabase CLI (`supabase test db`, local Docker) | tests RLS against the real Supabase roles | PGlite (approximation) |
 
 ## 7. Folder structure
 
