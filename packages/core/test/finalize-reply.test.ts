@@ -30,7 +30,7 @@ describe('finalizeReply', () => {
   it('rejects a citation that was not retrieved', () => {
     expect(reply({ citedArticleIds: [900101, 123] })).toMatchObject({
       outcome: 'invalid_citation',
-      action: 'contact',
+      action: 'ticket_form',
       flags: ['invalid_citation'],
       citations: [],
       text: "I couldn't find a reliable answer to that in our help articles. Our support team can help you further.",
@@ -85,7 +85,7 @@ describe('finalizeReply', () => {
   it('hands account questions of logged-in customers to support when no tool ran', () => {
     expect(reply({ intent: 'account_question' }, true)).toMatchObject({
       outcome: 'unsupported',
-      action: 'contact',
+      action: 'ticket_form',
       flags: ['account_question'],
     });
   });
@@ -93,7 +93,7 @@ describe('finalizeReply', () => {
   it('hands off when the customer wants a human', () => {
     expect(reply({ intent: 'wants_human' })).toMatchObject({
       outcome: 'handoff',
-      action: 'contact',
+      action: 'ticket_form',
       flags: ['wants_human'],
     });
   });

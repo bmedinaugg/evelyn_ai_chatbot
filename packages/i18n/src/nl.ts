@@ -15,7 +15,10 @@ export const nl = {
     accountQuestion:
       'Ik kan hier nog geen persoonlijke accountgegevens opzoeken. Ons supportteam helpt je graag met je account.',
     loginNeeded: 'Om vragen over je account te beantwoorden, log je eerst in met je e-mailadres.',
-    wantsHuman: 'Natuurlijk. Je kunt ons supportteam bereiken via de contactpagina.',
+    wantsHuman:
+      'Natuurlijk. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
+    stuck:
+      'Sorry, ik kom er niet uit. Vul het formulier hieronder in, dan neemt ons supportteam per e-mail contact met je op.',
     error: 'Er ging aan onze kant iets mis. Probeer het zo nog eens.',
     conversationLimit: 'Dit gesprek heeft de limiet bereikt. Start een nieuwe chat.',
     greeting: 'Hoi! Waarmee kan ik je helpen?',
@@ -95,5 +98,12 @@ export const nl = {
   },
   lead: {
     subject: 'Nieuwe lidmaatschapsvraag via websitechat',
+  },
+  ticket: {
+    noteTitle: 'Chatbot-gesprek (laatste berichten)',
+    account: 'Account: {status}, {club} (geverifieerd via e-mailcode)',
+    notLoggedIn: 'Account: niet ingelogd',
+    customer: 'Klant',
+    bot: 'Chatbot',
   },
 } satisfies Messages;

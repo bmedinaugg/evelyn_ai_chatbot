@@ -15,7 +15,10 @@ export const en = {
       "I can't look up personal account details here yet. Our support team can help you with your account.",
     loginNeeded:
       'To answer questions about your account, please log in first with your email address.',
-    wantsHuman: 'Of course. You can reach our support team via the contact page.',
+    wantsHuman:
+      'Of course. Fill in the form below and our support team will get back to you by email.',
+    stuck:
+      "Sorry, I can't seem to help you with this. Fill in the form below and our support team will get back to you by email.",
     error: 'Something went wrong on our side. Please try again in a moment.',
     conversationLimit: 'This conversation has reached its limit. Please start a new chat.',
     greeting: 'Hi! How can I help you today?',
@@ -95,5 +98,13 @@ export const en = {
   },
   lead: {
     subject: 'New membership question via website chat',
+  },
+  // Private note on chat tickets (read by support agents).
+  ticket: {
+    noteTitle: 'Chatbot conversation (latest messages)',
+    account: 'Account: {status}, {club} (verified by email code)',
+    notLoggedIn: 'Account: not logged in',
+    customer: 'Customer',
+    bot: 'Chatbot',
   },
 };

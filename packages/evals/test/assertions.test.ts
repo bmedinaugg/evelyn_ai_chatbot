@@ -27,7 +27,7 @@ describe('checkReply', () => {
   it('reports each failed expectation', () => {
     const failures = checkReply(reply, {
       outcome: ['no_match'],
-      action: 'contact',
+      action: 'ticket_form',
       citesAnyOf: [900103],
       replyLang: 'en',
       mustNotMatch: [/opzeggen/],

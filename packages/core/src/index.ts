@@ -40,3 +40,4 @@ export {
   sanitizeAnswerText,
 } from './finalize-reply.ts';
 export { buildUserTurn, escapeForPrompt, SYSTEM_PROMPT } from './prompt.ts';
+export { buildTicketNote, MAX_NOTE_MESSAGES } from './ticket-note.ts';

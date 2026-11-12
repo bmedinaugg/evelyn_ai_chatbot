@@ -117,7 +117,9 @@ export function buildApiServer(deps: ApiDeps) {
               lang: result.lang,
               citations: result.citations,
               action: result.action,
-              ...(result.action === 'contact' ? { contactUrl: deps.config.supportContactUrl } : {}),
+              ...(result.action === 'ticket_form'
+                ? { contactUrl: deps.config.supportContactUrl }
+                : {}),
             },
           };
         } catch (error) {
