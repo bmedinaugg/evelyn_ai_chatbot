@@ -68,6 +68,14 @@ export async function requireAgent(
   return agent;
 }
 
+/**
+ * The callback is a browser navigation: failures go back to the portal, which explains them in
+ * nl/en and offers to sign in again. No session is created.
+ */
+function signInFailed(reply: FastifyReply, reason: 'invalid' | 'no_role') {
+  return reply.redirect(`/portal/?signin_error=${reason}`, 302);
+}
+
 /** Entra ID sign-in (authorization code + PKCE) and the signed-in agent's details. */
 export function registerPortalAuthRoutes(app: FastifyInstance, deps: PortalDeps): void {
   const { config } = deps;
@@ -122,7 +130,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, deps: PortalDeps)
       );
       const { code, state } = request.query;
       if (!saved.success || !code || !state || !sameString(state, saved.data.state)) {
-        return reply.code(400).send({ error: 'invalid_login' });
+        return signInFailed(reply, 'invalid');
       }
 
       let claims: Awaited<ReturnType<EntraClient['redeem']>>;
@@ -135,7 +143,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, deps: PortalDeps)
         });
       } catch (error) {
         request.log.warn({ err: error }, 'portal login: code exchange failed');
-        return reply.code(400).send({ error: 'invalid_login' });
+        return signInFailed(reply, 'invalid');
       }
       if (
         claims.tid !== config.tenantId ||
@@ -144,10 +152,10 @@ export function registerPortalAuthRoutes(app: FastifyInstance, deps: PortalDeps)
         !claims.nonce ||
         !sameString(claims.nonce, saved.data.nonce)
       ) {
-        return reply.code(400).send({ error: 'invalid_login' });
+        return signInFailed(reply, 'invalid');
       }
       const roles = PORTAL_ROLES.filter((role) => claims.roles?.includes(role));
-      if (roles.length === 0) return reply.code(403).send({ error: 'no_portal_role' });
+      if (roles.length === 0) return signInFailed(reply, 'no_role');
 
       const sessionId = random();
       const actor = { oid: claims.oid, name: claims.name ?? claims.oid };

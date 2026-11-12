@@ -91,3 +91,18 @@ test('signs out', async ({ page }) => {
     true,
   );
 });
+
+test('explains a failed sign-in and offers to try again', async ({ page }) => {
+  await mockPortal(page, 401);
+  await page.goto('/portal/?signin_error=invalid');
+  await expect(page.getByRole('alert')).toHaveText(
+    'Inloggen is niet gelukt (mogelijk verlopen of afgebroken). Probeer het opnieuw.',
+  );
+  await expect(page.getByRole('link', { name: 'Inloggen met Microsoft' })).toBeVisible();
+});
+
+test('explains a missing portal role', async ({ page }) => {
+  await mockPortal(page, 401);
+  await page.goto('/portal/?signin_error=no_role');
+  await expect(page.getByRole('alert')).toContainText('geen rol voor dit portaal');
+});

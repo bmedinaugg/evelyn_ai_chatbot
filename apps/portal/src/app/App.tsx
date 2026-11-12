@@ -15,6 +15,15 @@ type Route =
   | { page: 'capabilities' }
   | { page: 'limitations' };
 
+/** Set by the API when a sign-in failed (`/portal/?signin_error=…`). */
+function readSignInError(): 'invalid' | 'no_role' | null {
+  const value = new URLSearchParams(location.search).get('signin_error');
+  if (value !== 'invalid' && value !== 'no_role') return null;
+  // Shown once: drop it from the address bar.
+  history.replaceState(null, '', `${location.pathname}${location.hash}`);
+  return value;
+}
+
 function parseRoute(hash: string): Route {
   const conversation = /^#\/conversations\/([0-9a-f-]{36})$/i.exec(hash);
   if (conversation?.[1]) return { page: 'conversation', id: conversation[1] };
@@ -32,6 +41,7 @@ export function App(props: {
   const [lang, setLang] = useState<Lang>(props.initialLang);
   const [auth, setAuth] = useState<Auth>('loading');
   const [route, setRoute] = useState<Route>(parseRoute(location.hash));
+  const [signInError] = useState(readSignInError);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -109,6 +119,11 @@ export function App(props: {
       <section class="tm-signin">
         <h1>{t(lang, 'portal.title')}</h1>
         <p>{t(lang, 'portal.signInIntro')}</p>
+        {signInError && (
+          <p class="tm-notice" role="alert">
+            {t(lang, signInError === 'no_role' ? 'portal.signInNoRole' : 'portal.signInInvalid')}
+          </p>
+        )}
         {/* A real navigation: the server redirects to Microsoft. */}
         <a class="tm-button tm-button--primary" href="/portal/auth/login">
           {t(lang, 'portal.signIn')}

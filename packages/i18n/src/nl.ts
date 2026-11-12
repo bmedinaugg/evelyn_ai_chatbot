@@ -128,6 +128,10 @@ export const nl = {
     title: 'TrainMore chatbot-portaal',
     signIn: 'Inloggen met Microsoft',
     signInIntro: 'Alleen voor TrainMore-supportmedewerkers.',
+    signInInvalid:
+      'Inloggen is niet gelukt (mogelijk verlopen of afgebroken). Probeer het opnieuw.',
+    signInNoRole:
+      'Je Microsoft-account heeft geen rol voor dit portaal. Vraag een chatbotbeheerder om je aan de juiste groep toe te voegen.',
     signOut: 'Uitloggen',
     forbidden: 'Je account heeft geen toegang tot deze pagina.',
     error: 'Er ging iets mis. Probeer het opnieuw.',

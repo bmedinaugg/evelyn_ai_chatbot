@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import type { EntraClaims } from '../src/portal/entra.ts';
 import { createTestApi, PORTAL_ORIGIN } from './helpers.ts';
 
 type Api = ReturnType<typeof createTestApi>;
@@ -112,7 +113,9 @@ describe('portal login (Entra ID)', () => {
       url: '/portal/auth/callback?code=c&state=forged',
       headers: { cookie: `tm_portal_login=${loginCookie}` },
     });
-    expect(res.statusCode).toBe(400);
+    // A browser navigation: back to the portal, which explains it in nl/en and offers a retry.
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe('/portal/?signin_error=invalid');
     expect(api.entraCalls.redeem).toEqual([]);
     expect(api.portalSessions.size).toBe(0);
   });
@@ -127,24 +130,35 @@ describe('portal login (Entra ID)', () => {
         url: `/portal/auth/callback?code=c&state=${encodeURIComponent(state)}`,
         headers: cookie ? { cookie } : {},
       });
-      expect(res.statusCode).toBe(400);
+      expect(res.headers.location).toBe('/portal/?signin_error=invalid');
     }
     expect(api.portalSessions.size).toBe(0);
   });
 
   it('refuses a token from another tenant, for another app, with a wrong nonce or without a role', async () => {
-    for (const claims of [
-      { tid: '99999999-9999-4999-8999-999999999999' },
-      { aud: '99999999-9999-4999-8999-999999999999' },
-      { nonce: 'other' },
-      { roles: [] },
-      { roles: ['Reader'] },
-    ]) {
+    for (const [claims, reason] of [
+      [{ tid: '99999999-9999-4999-8999-999999999999' }, 'invalid'],
+      [{ aud: '99999999-9999-4999-8999-999999999999' }, 'invalid'],
+      [{ nonce: 'other' }, 'invalid'],
+      [{ roles: [] }, 'no_role'],
+      [{ roles: ['Reader'] }, 'no_role'],
+    ] satisfies [Partial<EntraClaims>, 'invalid' | 'no_role'][]) {
       const api = createTestApi({ portal: { claims } });
       const { callback } = await login(api);
-      expect([400, 403]).toContain(callback.statusCode);
+      expect(callback.statusCode).toBe(302);
+      expect(callback.headers.location).toBe(`/portal/?signin_error=${reason}`);
+      expect(setCookieLine(callback.headers['set-cookie'], 'tm_portal')).toBe('');
       expect(api.portalSessions.size).toBe(0);
     }
+  });
+
+  it('sends a sign-in cancelled at Microsoft back to the portal', async () => {
+    const api = createTestApi({ portal: {} });
+    const res = await api.app.inject({
+      method: 'GET',
+      url: '/portal/auth/callback?error=access_denied&state=x',
+    });
+    expect(res.headers.location).toBe('/portal/?signin_error=invalid');
   });
 
   it('needs a valid, unexpired session for the portal API', async () => {

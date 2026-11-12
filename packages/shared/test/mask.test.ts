@@ -18,4 +18,30 @@ describe('maskText', () => {
   it('masks an IBAN written without spaces', () => {
     expect(maskText('NL91ABNA0417164300')).toBe('[•••]');
   });
+
+  it('masks dotted and slashed phone numbers', () => {
+    expect(maskText('bel 06.12.34.56.78')).toBe('bel [•••]');
+    expect(maskText('bel 020/123 45 67')).toBe('bel [•••]');
+  });
+
+  it('masks IBANs with dots or a space after the country code, entirely', () => {
+    expect(maskText('NL91.ABNA.0417.1643.00')).toBe('[•••]');
+    expect(maskText('NL 91 ABNA 0417 1643 00')).toBe('[•••]');
+  });
+
+  it('masks spaced or written-out email addresses', () => {
+    expect(maskText('mail jan @ gmail.com')).toBe('mail [•••]');
+    expect(maskText('mail jan [at] gmail [dot] com')).toBe('mail [•••]');
+  });
+
+  it('does not mistake ordinary words and numbers for an IBAN or phone number', () => {
+    for (const text of [
+      'Is 12 euro meer of minder dan vorige maand?',
+      'Op 12.03.2026 om 10.30 uur',
+      'Kost €1.299,00 per jaar',
+    ]) {
+      expect(maskText(text)).toBe(text);
+    }
+  });
 });
+

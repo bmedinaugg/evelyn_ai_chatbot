@@ -128,6 +128,10 @@ export const en = {
     title: 'TrainMore chatbot portal',
     signIn: 'Sign in with Microsoft',
     signInIntro: 'For TrainMore support staff only.',
+    signInInvalid:
+      'Signing in did not work (it may have expired or been cancelled). Please try again.',
+    signInNoRole:
+      'Your Microsoft account has no role for this portal. Ask a chatbot admin to add you to the right group.',
     signOut: 'Sign out',
     forbidden: 'Your account has no access to this page.',
     error: 'Something went wrong. Please try again.',
