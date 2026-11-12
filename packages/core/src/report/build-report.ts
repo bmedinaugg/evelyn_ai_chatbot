@@ -5,6 +5,13 @@ import type { TopicWithExamples } from './topics.ts';
 const rate = (part: number, whole: number) =>
   whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—';
 
+/** Linear time (a `/\/+$/` regex backtracks quadratically on long runs of slashes). */
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === '/') end -= 1;
+  return url.slice(0, end);
+}
+
 /**
  * The daily report email (plain text). Labels and examples were made safe upstream
  * (isSafeLabel, exampleText); everything else is numbers and fixed texts.
@@ -20,7 +27,7 @@ export function buildDailyReport(input: {
   const { day, metrics: m, lang } = input;
   const flagged = input.topics.reduce((sum, topic) => sum + topic.count, 0);
   const rated = m.thumbsUp + m.thumbsDown;
-  const base = input.portalBaseUrl.replace(/\/+$/, '');
+  const base = trimTrailingSlashes(input.portalBaseUrl);
   const flagList = Object.entries(m.flags)
     .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
     .map(([reason, n]) => `${t(lang, `portal.reasons.${reason}` as Parameters<typeof t>[1])} ${n}`)

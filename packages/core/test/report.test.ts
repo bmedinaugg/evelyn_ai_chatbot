@@ -280,6 +280,19 @@ describe('buildDailyReport', () => {
     expect(text).not.toContain('NaN');
   });
 
+  it('trims trailing slashes from the portal URL, in linear time', () => {
+    const { text } = buildDailyReport({
+      ...base,
+      portalBaseUrl: 'https://chat.example.com///',
+      lang: 'en',
+    });
+    expect(text).toContain('https://chat.example.com/portal/#/metrics');
+
+    const started = performance.now();
+    buildDailyReport({ ...base, portalBaseUrl: `https://a${'/'.repeat(50_000)}x`, lang: 'en' });
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it('says when automatic grouping was unavailable', () => {
     const { text } = buildDailyReport({ ...base, clustered: false, lang: 'en' });
     expect(text).toContain('Automatic grouping was unavailable');
