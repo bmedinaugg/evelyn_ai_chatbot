@@ -43,7 +43,7 @@ select throws_ok(
 reset role;
 
 -- Second layer: even with a grant, RLS without policies returns nothing.
-insert into public.audit_log (actor, action) values ('test', 'probe');
+insert into public.audit_log (actor, action) values ('test', 'portal.login');
 grant select on public.audit_log to authenticated;
 set local role authenticated;
 select is_empty('select * from public.audit_log', 'RLS hides audit_log rows even when granted');

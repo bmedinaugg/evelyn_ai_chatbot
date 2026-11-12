@@ -34,6 +34,17 @@ export type {
 } from './faq-types.ts';
 export type { Database } from './generated/database.types.ts';
 export {
+  type AuditAction,
+  type ConversationDetail,
+  createSupabasePortalRepository,
+  type FlaggedConversation,
+  PORTAL_ROLES,
+  type PortalActor,
+  type PortalRepository,
+  type PortalRole,
+  type PortalSession,
+} from './portal-repository.ts';
+export {
   createSupabaseRetentionRepository,
   type RetentionRepository,
 } from './retention-repository.ts';
