@@ -61,6 +61,12 @@ export const en = {
         'The verification could not load. Please try again later or contact our support team.',
     },
   },
+  email: {
+    loginCode: {
+      subject: 'Your TrainMore login code',
+      body: "Your code is {code}. It is valid for {minutes} minutes.\n\nDidn't request this? You can ignore this email.",
+    },
+  },
   lead: {
     subject: 'New membership question via website chat',
   },

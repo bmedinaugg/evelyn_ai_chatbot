@@ -313,6 +313,15 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/email:
+    dependencies:
+      '@aws-sdk/client-sesv2':
+        specifier: 3.1166.0
+        version: 3.1166.0
+      '@trainmore/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+
   packages/evals:
     dependencies:
       '@anthropic-ai/sdk':
@@ -397,6 +406,10 @@ packages:
 
   '@aws-sdk/client-secrets-manager@3.1166.0':
     resolution: {integrity: sha512-KoN9kJ63cH+nK35ZeSDXiSeuy84ln5H+Igm+0TzoNXM2kNMQnEUYtFBZvNjTq8bDDbPzX7A05ZBzUINUWNmLBQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-sesv2@3.1166.0':
+    resolution: {integrity: sha512-zLbbBzpVIlozCf3njUvZsfpH943oMmXUsm+X89heUXJX2/Sutdj2eykENX8xmMr0XNlwDQ7fcEtxHxigsnjHIA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.981.0':
@@ -1574,6 +1587,18 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/credential-provider-node': 3.972.96
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
+      '@smithy/fetch-http-handler': 5.8.1
+      '@smithy/node-http-handler': 4.14.2
+      '@smithy/types': 4.20.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-sesv2@3.1166.0':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/credential-provider-node': 3.972.96
+      '@aws-sdk/signature-v4-multi-region': 3.996.52
       '@aws-sdk/types': 3.975.1
       '@smithy/core': 3.40.0
       '@smithy/fetch-http-handler': 5.8.1

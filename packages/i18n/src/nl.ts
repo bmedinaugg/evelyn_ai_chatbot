@@ -62,6 +62,12 @@ export const nl = {
         'De controle kon niet laden. Probeer het later opnieuw of neem contact op met ons supportteam.',
     },
   },
+  email: {
+    loginCode: {
+      subject: 'Je TrainMore-inlogcode',
+      body: 'Je code is {code}. Deze is {minutes} minuten geldig.\n\nHeb je dit niet aangevraagd? Dan kun je deze e-mail negeren.',
+    },
+  },
   lead: {
     subject: 'Nieuwe lidmaatschapsvraag via websitechat',
   },
