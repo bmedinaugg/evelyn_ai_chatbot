@@ -67,6 +67,20 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"daily_reports": {
+                  Row: {
+                    "claimed_at": string,"clustered": boolean | null,"day": string,"recipients_count": number | null,"sent_at": string | null,"topics": NonNullable<Json>
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "claimed_at"?: string,"clustered"?: boolean | null,"day": string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                  }
+                  Update: {
+                    "claimed_at"?: string,"clustered"?: boolean | null,"day"?: string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"escalations": {
                   Row: {
                     "conversation_id": string | null,"created_at": string,"freshdesk_ticket_id": number,"id": number,"reason": string,"topic": string
@@ -305,6 +319,9 @@ isOneToOne: false
 "claim_conversation_turn":
 { Args: { "p_id": string }; Returns: string
                            },
+"claim_daily_report":
+{ Args: { "p_day": string,"p_resend": boolean }; Returns: boolean
+                           },
 "clear_account_bindings":
 { Args: { "p_before": string }; Returns: number
                            },
@@ -316,9 +333,22 @@ isOneToOne: false
               "scenario_id": string,"version_id": number
             }[]
                            },
+"daily_metrics":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "approved_answers": number,"conversations": number,"day": string,"escalations": number,"flags": Json,"logins": number,"resolved": number,"thumbs_down": number,"thumbs_up": number
+            }[]
+                           },
 "dsar_delete":
 { Args: { "p_email_hash": string }; Returns: {
               "conversations": number,"otp_challenges": number
+            }[]
+                           },
+"finish_daily_report":
+{ Args: { "p_clustered": boolean,"p_day": string,"p_recipients_count": number,"p_topics": Json }; Returns: undefined
+                           },
+"flagged_questions":
+{ Args: { "p_from": string,"p_limit": number,"p_to": string }; Returns: {
+              "conversation_id": string,"message_id": number,"question": string,"reasons": (string)[]
             }[]
                            },
 "list_flagged_conversations":
@@ -337,6 +367,9 @@ isOneToOne: false
                            },
 "release_conversation_turn":
 { Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
+                           },
+"release_daily_report":
+{ Args: { "p_day": string }; Returns: undefined
                            },
 "replace_ticket_topics":
 { Args: { "p_values": (string)[] }; Returns: undefined

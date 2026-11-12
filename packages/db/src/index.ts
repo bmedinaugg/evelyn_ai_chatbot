@@ -34,6 +34,16 @@ export type {
 } from './faq-types.ts';
 export type { Database } from './generated/database.types.ts';
 export {
+  createSupabaseMetricsRepository,
+  type DailyMetrics,
+  type DailyReport,
+  type FlaggedQuestion,
+  MAX_METRICS_DAYS,
+  type MetricsRepository,
+  type ReportTopic,
+  reportTopicSchema,
+} from './metrics-repository.ts';
+export {
   type AuditAction,
   type ConversationDetail,
   createSupabasePortalRepository,
