@@ -225,3 +225,51 @@ export function loadMagiclineKeysConfig(env: Env = process.env): MagiclineKeysCo
     ? { kind: 'env', raw: e.MOCK_MAGICLINE_KEYS ?? '' }
     : { kind: 'secret', secretName: e.MAGICLINE_KEYS_SECRET_NAME ?? '' };
 }
+
+export type PortalConfig = {
+  tenantId: string;
+  clientId: string;
+  clientSecret: string;
+  /** Where the portal is served (redirect URI base), without trailing slash. */
+  baseUrl: string;
+  /** Signs the short-lived login cookie (state, nonce, PKCE verifier). */
+  sessionSecret: string;
+};
+
+const PORTAL_KEYS = [
+  'ENTRA_TENANT_ID',
+  'ENTRA_CLIENT_ID',
+  'ENTRA_CLIENT_SECRET',
+  'PORTAL_BASE_URL',
+  'PORTAL_SESSION_SECRET',
+] as const;
+
+/** Agent portal (Entra ID login). Null while none of its settings is present: portal off. */
+export function loadPortalConfig(env: Env = process.env): PortalConfig | null {
+  if (PORTAL_KEYS.every((key) => !env[key])) return null;
+  const e = parseEnv(
+    z.object({
+      ENTRA_TENANT_ID: z.uuid(),
+      ENTRA_CLIENT_ID: z.uuid(),
+      ENTRA_CLIENT_SECRET: z.string().min(1),
+      PORTAL_BASE_URL: z
+        .url({ protocol: /^https?$/ })
+        .refine(
+          (url) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url),
+          {
+            message: 'must be https (http only for localhost)',
+          },
+        )
+        .transform((url) => url.replace(/\/+$/, '')),
+      PORTAL_SESSION_SECRET: z.string().min(32),
+    }),
+    env,
+  );
+  return {
+    tenantId: e.ENTRA_TENANT_ID,
+    clientId: e.ENTRA_CLIENT_ID,
+    clientSecret: e.ENTRA_CLIENT_SECRET,
+    baseUrl: e.PORTAL_BASE_URL,
+    sessionSecret: e.PORTAL_SESSION_SECRET,
+  };
+}

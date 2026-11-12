@@ -135,6 +135,43 @@ The stack outputs (CloudFormation → `TrainmoreChatbot-preprod-service` → Out
 - **Embed on the help portal** (Freshdesk → Admin → Portals → Customize → Layout) only after
   preprod has been signed off. Until production (M6) it would show the preprod bot to customers.
 
+## Agent portal (Microsoft Entra ID)
+The portal (`https://dxxxx.cloudfront.net/portal/`) stays off until these steps are done.
+
+1. **App registration** (Entra admin centre → App registrations → New):
+   - Name: `TrainMore chatbot portal (preprod)`
+   - Accounts: **this organisational directory only** (single tenant)
+   - Redirect URI, platform **Web**: `https://dxxxx.cloudfront.net/portal/auth/callback`
+     (for local development also `http://localhost:5174/portal/auth/callback`)
+2. **App roles** (App registration → App roles → Create), each for "Users/Groups":
+
+   | Display name | Value |
+   |---|---|
+   | Support agent | `agent` |
+   | Approver | `approver` |
+   | Admin | `admin` |
+3. **Assign groups:** Enterprise applications → the app → Users and groups.
+   - Assign each Entra group to a role (for example: support team → `agent`, team leads →
+     `approver`, chatbot owners → `admin`).
+   - Turn on **Assignment required**, so people without a role cannot sign in.
+4. **Client secret:** Certificates & secrets → New client secret (12 months). Put it with the
+   tenant and client ids in Secrets Manager. Never commit it or paste it in chat.
+   ```sh
+   cat > portal.json <<'JSON'
+   {"ENTRA_TENANT_ID":"<directory (tenant) id>","ENTRA_CLIENT_ID":"<application (client) id>","ENTRA_CLIENT_SECRET":"…"}
+   JSON
+   aws secretsmanager put-secret-value --region eu-west-1 \
+     --secret-id trainmore-chatbot/preprod/portal --secret-string file://portal.json && rm portal.json
+   ```
+   The session-signing secret (`…/portal-session-secret`) is already generated.
+5. **Switch it on:** set the GitHub variable `PORTAL_ENABLED` to `true` and run **Deploy preprod**.
+6. **Renew the client secret** before it expires: put the new value in the same secret, then
+   redeploy.
+
+**Locally:** fill `ENTRA_*`, `PORTAL_BASE_URL=http://localhost:5174` and `PORTAL_SESSION_SECRET` in
+`.env`, start the API, then run `pnpm --filter @trainmore/portal dev` and open
+http://localhost:5174/portal/. The dev server forwards `/portal/api` and `/portal/auth` to the API.
+
 ## Routine deploys
 Run **Deploy preprod**. Images are tagged with the commit and are immutable, so redeploying the
 same commit reuses its image.

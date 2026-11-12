@@ -36,6 +36,10 @@ new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
   imageTag: context('imageTag'),
   // Built by the deploy workflow with VITE_API_BASE_URL="" (same origin as the API).
   widgetDistPath: context('widgetDistPath'),
+  // Agent portal: on once the Entra app registration exists (-c portal=on).
+  ...(app.node.tryGetContext('portal') === 'on'
+    ? { portal: { distPath: context('portalDistPath') } }
+    : {}),
   config: PREPROD_CONFIG,
 });
 new WorkerStack(app, 'TrainmoreChatbot-preprod-worker', {

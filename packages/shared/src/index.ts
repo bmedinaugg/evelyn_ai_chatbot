@@ -10,14 +10,17 @@ export {
   loadFreshdeskConfig,
   loadMagiclineKeysConfig,
   loadOtpConfig,
+  loadPortalConfig,
   loadRuntimeConfig,
   loadSupabaseConfig,
   loadTurnstileConfig,
   type MagiclineKeysConfig,
   type OtpConfigValues,
+  type PortalConfig,
   type RuntimeConfig,
   type SupabaseConfig,
   type TurnstileConfig,
 } from './config-sections.ts';
 export { createLogger, type Logger, type LoggerOptions } from './logger.ts';
+export { maskText } from './mask.ts';
 export { isPiiKey, redactDeep, scrubText } from './redact.ts';

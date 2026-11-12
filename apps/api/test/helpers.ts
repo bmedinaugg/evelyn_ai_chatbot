@@ -8,13 +8,19 @@ import type {
   ConversationRepository,
   EscalationRepository,
   FaqRepository,
+  PortalRepository,
+  PortalSession,
   StoredMessage,
 } from '@trainmore/db';
 import type { CreateTicketInput } from '@trainmore/freshdesk';
 import { createLogger } from '@trainmore/shared';
+import type { EntraClaims, EntraClient } from '../src/portal/entra.ts';
 import { type ApiDeps, buildApiServer } from '../src/server.ts';
 
 export const ORIGIN = 'https://www.support.trainmore.com';
+export const PORTAL_ORIGIN = 'https://chat.example';
+export const PORTAL_TENANT = '11111111-1111-4111-8111-111111111111';
+export const PORTAL_CLIENT = '22222222-2222-4222-8222-222222222222';
 export const CONTACT_URL = 'https://www.support.trainmore.com/en/support/tickets/new';
 
 export function createTestApi(
@@ -32,6 +38,8 @@ export function createTestApi(
       customerNumber: string | null;
     }[];
     magiclineDown?: boolean;
+    /** Portal on, with the claims the fake Entra returns on login. */
+    portal?: { claims?: Partial<EntraClaims> };
     /** Extra Freshdesk tag marking non-production tickets (e.g. chatbot-preprod). */
     envTag?: string;
     /** Synced Freshdesk topics (empty: built-in defaults apply). */
@@ -281,7 +289,128 @@ export function createTestApi(
     }),
   };
 
+  // In-memory portal repository and a fake Entra (the real one is only reached in entra.ts).
+  const portalSessions = new Map<string, PortalSession & { expiresAt: Date }>();
+  const audits: Parameters<PortalRepository['audit']>[0][] = [];
+  const capabilitySwitches: { name: string; enabled: boolean; actor: string }[] = [];
+  const entraCalls: { authUrl: unknown[]; redeem: unknown[] } = { authUrl: [], redeem: [] };
+  const portalRepo: PortalRepository = {
+    async createSession(input) {
+      portalSessions.set(input.idHash, {
+        userOid: input.userOid,
+        displayName: input.displayName,
+        roles: input.roles,
+        expiresAt: input.expiresAt,
+      });
+    },
+    async getSession(idHash) {
+      const session = portalSessions.get(idHash);
+      if (!session || session.expiresAt <= new Date()) return null;
+      return { userOid: session.userOid, displayName: session.displayName, roles: session.roles };
+    },
+    async deleteSession(idHash) {
+      portalSessions.delete(idHash);
+    },
+    async audit(entry) {
+      audits.push(entry);
+    },
+    async listFlagged() {
+      return [
+        {
+          conversationId: '00000000-0000-4000-8000-000000000001',
+          lang: 'nl',
+          lastFlagAt: '2026-11-12T10:00:00Z',
+          userMessageCount: 2,
+          reasons: ['no_match', 'thumbs_down'],
+          escalated: false,
+          loggedIn: true,
+        },
+      ];
+    },
+    async conversationDetail(id) {
+      if (id !== '00000000-0000-4000-8000-000000000001') return null;
+      return {
+        id,
+        lang: 'nl',
+        createdAt: '2026-11-12T09:00:00Z',
+        loggedIn: true,
+        messages: [
+          {
+            id: 1,
+            role: 'user',
+            text: 'Ik ben Sam, mail sam@example.com of bel 0612345678',
+            outcome: null,
+            citations: [],
+            createdAt: '2026-11-12T09:00:00Z',
+            rating: null,
+          },
+          {
+            id: 2,
+            role: 'assistant',
+            text: 'Ik kon hier geen antwoord op vinden.',
+            outcome: 'no_match',
+            citations: [],
+            createdAt: '2026-11-12T09:00:01Z',
+            rating: 'down',
+          },
+        ],
+        flags: [{ reason: 'no_match', createdAt: '2026-11-12T09:00:01Z' }],
+        escalations: [],
+      };
+    },
+    async listCapabilityFlags() {
+      return capabilitySwitches.map((c) => ({
+        name: c.name,
+        enabled: c.enabled,
+        updatedAt: 'now',
+      }));
+    },
+    async setCapability(name, enabled, actor) {
+      capabilitySwitches.push({ name, enabled, actor: actor.oid });
+      audits.push({
+        actor,
+        action: 'capability.set',
+        entityType: 'capability',
+        entityId: name,
+        details: { enabled },
+      });
+    },
+  };
+  const entra: EntraClient = {
+    async authUrl(input) {
+      entraCalls.authUrl.push(input);
+      return `https://login.example/authorize?state=${input.state}&code_challenge=${input.codeChallenge}`;
+    },
+    async redeem(input) {
+      entraCalls.redeem.push(input);
+      return {
+        tid: PORTAL_TENANT,
+        aud: PORTAL_CLIENT,
+        oid: 'oid-agent-1',
+        name: 'Agent One',
+        roles: ['agent'],
+        nonce: input.expectedNonce,
+        ...options.portal?.claims,
+      };
+    },
+  };
+
   const deps: ApiDeps = {
+    ...(options.portal
+      ? {
+          portal: {
+            config: {
+              tenantId: PORTAL_TENANT,
+              clientId: PORTAL_CLIENT,
+              clientSecret: 'secret',
+              baseUrl: PORTAL_ORIGIN,
+              sessionSecret: 'p'.repeat(32),
+            },
+            entra,
+            repo: portalRepo,
+          },
+        }
+      : {}),
     login,
     capabilities: {
       deps: {
@@ -346,6 +475,10 @@ export function createTestApi(
     notes,
     escalations,
     feedback,
+    portalSessions,
+    audits,
+    capabilitySwitches,
+    entraCalls,
     answererCalls,
     turnstileIps,
     logs: () => logOutput,
@@ -353,3 +486,25 @@ export function createTestApi(
 }
 
 export type { Reply };
+
+/** Signs in through the fake Entra (claims from createTestApi({ portal })); returns the session cookie value. */
+export async function portalLogin(api: ReturnType<typeof createTestApi>): Promise<string> {
+  const start = await api.app.inject({ method: 'GET', url: '/portal/auth/login' });
+  const loginCookie = [start.headers['set-cookie'] ?? []]
+    .flat()
+    .find((c) => c.startsWith('tm_portal_login='))
+    ?.split(';')[0];
+  const state = new URL(start.headers.location as string).searchParams.get('state') ?? '';
+  const callback = await api.app.inject({
+    method: 'GET',
+    url: `/portal/auth/callback?code=c&state=${encodeURIComponent(state)}`,
+    headers: { cookie: loginCookie ?? '' },
+  });
+  const session = [callback.headers['set-cookie'] ?? []]
+    .flat()
+    .find((c) => c.startsWith('tm_portal='))
+    ?.split(';')[0]
+    ?.slice('tm_portal='.length);
+  if (!session) throw new Error(`portal login failed: ${callback.statusCode}`);
+  return session;
+}

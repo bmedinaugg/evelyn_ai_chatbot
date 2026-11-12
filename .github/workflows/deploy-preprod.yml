@@ -26,6 +26,8 @@ jobs:
         -c emailFrom=${{ vars.EMAIL_FROM }}
         -c imageTag=${{ github.sha }}
         -c widgetDistPath=../apps/widget/dist
+        -c portal=${{ vars.PORTAL_ENABLED == 'true' && 'on' || 'off' }}
+        -c portalDistPath=../apps/portal/dist
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -42,6 +44,9 @@ jobs:
           VITE_API_BASE_URL: ""
           VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           VITE_PRIVACY_URL: ${{ vars.PRIVACY_URL }}
+
+      - name: Build the agent portal
+        run: pnpm --filter @trainmore/portal build
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:

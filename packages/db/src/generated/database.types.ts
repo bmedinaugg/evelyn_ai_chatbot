@@ -7,14 +7,14 @@ export type Database = {
           Tables: {
             "audit_log": {
                   Row: {
-                    "action": string,"actor": string,"details": NonNullable<Json>,"entity_id": string | null,"entity_type": string | null,"id": number,"occurred_at": string
+                    "action": string,"actor": string,"actor_name": string | null,"details": NonNullable<Json>,"entity_id": string | null,"entity_type": string | null,"id": number,"occurred_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "action": string,"actor": string,"details"?: NonNullable<Json>,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: never,"occurred_at"?: string
+                    "action": string,"actor": string,"actor_name"?: string | null,"details"?: NonNullable<Json>,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: never,"occurred_at"?: string
                   }
                   Update: {
-                    "action"?: string,"actor"?: string,"details"?: NonNullable<Json>,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: never,"occurred_at"?: string
+                    "action"?: string,"actor"?: string,"actor_name"?: string | null,"details"?: NonNullable<Json>,"entity_id"?: string | null,"entity_type"?: string | null,"id"?: never,"occurred_at"?: string
                   }
                   Relationships: [
                     
@@ -207,6 +207,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"portal_sessions": {
+                  Row: {
+                    "created_at": string,"display_name": string,"expires_at": string,"id_hash": string,"roles": (string)[],"user_oid": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"display_name": string,"expires_at": string,"id_hash": string,"roles": (string)[],"user_oid": string
+                  }
+                  Update: {
+                    "created_at"?: string,"display_name"?: string,"expires_at"?: string,"id_hash"?: string,"roles"?: (string)[],"user_oid"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"ticket_topics": {
                   Row: {
                     "active": boolean,"synced_at": string,"value": string
@@ -250,6 +264,11 @@ isOneToOne: false
               "conversations": number,"otp_challenges": number
             }[]
                            },
+"list_flagged_conversations":
+{ Args: { "p_limit": number,"p_offset": number,"p_reason": string,"p_since": string }; Returns: {
+              "conversation_id": string,"escalated": boolean,"lang": string,"last_flag_at": string,"logged_in": boolean,"reasons": (string)[],"user_message_count": number
+            }[]
+                           },
 "purge_otp_challenges":
 { Args: { "p_before": string }; Returns: number
                            },
@@ -269,6 +288,9 @@ isOneToOne: false
                            },
 "set_account_candidates":
 { Args: { "p_candidates": Json,"p_conversation_id": string }; Returns: undefined
+                           },
+"set_capability":
+{ Args: { "p_actor_name": string,"p_actor_oid": string,"p_enabled": boolean,"p_name": string }; Returns: undefined
                            },
 "verify_otp_attempt":
 { Args: { "p_challenge_id": string,"p_code_hash": string,"p_conversation_id": string,"p_max_attempts": number }; Returns: string

@@ -8,7 +8,20 @@ import { FoundationStack } from '../lib/foundation-stack.ts';
 import { ServiceStack } from '../lib/service-stack.ts';
 
 const CACHING_DISABLED = '4135ea2d-6df8-44a3-9df3-4b5a84be39ad';
+const PREPROD_TEST_CONFIG = {
+  portalOrigins: ['https://www.support.trainmore.com'],
+  supportContactUrl: 'https://www.support.trainmore.com/nl/support/tickets/new',
+  freshdesk: {
+    domain: 'example.freshdesk.com',
+    portalUrl: 'https://www.support.trainmore.com',
+    portalId: '103000108492',
+    faqFolderIds: '1,2',
+    topicField: 'ticket_type',
+  },
+  chatModel: 'claude-sonnet-5-5',
+};
 let template: Template;
+let portalTemplate: Template;
 
 beforeAll(() => {
   // Stand-in for the built widget (apps/widget/dist).
@@ -17,6 +30,8 @@ beforeAll(() => {
   writeFileSync(join(dist, 'index.html'), '<!doctype html>');
   writeFileSync(join(dist, 'loader.js'), '');
   writeFileSync(join(dist, 'assets', 'app-abc123.js'), '');
+  const portalDist = mkdtempSync(join(tmpdir(), 'portal-dist-'));
+  writeFileSync(join(portalDist, 'index.html'), '<!doctype html>');
 
   const app = new App();
   const env = { region: 'eu-west-1' };
@@ -31,21 +46,29 @@ beforeAll(() => {
     foundation,
     imageTag: 'abc123',
     widgetDistPath: dist,
-    config: {
-      portalOrigins: ['https://www.support.trainmore.com'],
-      supportContactUrl: 'https://www.support.trainmore.com/nl/support/tickets/new',
-      freshdesk: {
-        domain: 'example.freshdesk.com',
-        portalUrl: 'https://www.support.trainmore.com',
-        portalId: '103000108492',
-        faqFolderIds: '1,2',
-        topicField: 'ticket_type',
-      },
-      chatModel: 'claude-sonnet-5-5',
-    },
+    config: PREPROD_TEST_CONFIG,
     webAclArn: 'arn:aws:wafv2:us-east-1:111111111111:global/webacl/test/abc',
   });
   template = Template.fromStack(service);
+
+  // Same stacks with the portal switched on.
+  const portalApp = new App();
+  const portalFoundation = new FoundationStack(portalApp, 'F', {
+    envName: 'preprod',
+    emailFrom: 'chat@example.com',
+    env,
+  });
+  portalTemplate = Template.fromStack(
+    new ServiceStack(portalApp, 'S', {
+      env,
+      envName: 'preprod',
+      foundation: portalFoundation,
+      imageTag: 'abc123',
+      widgetDistPath: dist,
+      portal: { distPath: portalDist },
+      config: PREPROD_TEST_CONFIG,
+    }),
+  );
 });
 
 function apiContainer() {
@@ -240,5 +263,69 @@ describe('ServiceStack (preprod)', () => {
     const outputs = template.toJSON().Outputs ?? {};
     expect(Object.keys(outputs)).toEqual(expect.arrayContaining(['WidgetUrl', 'EmbedSnippet']));
     expect(JSON.stringify(outputs)).not.toMatch(/secretsmanager/);
+  });
+
+  it('leaves the portal out until it is switched on', () => {
+    const { api } = apiContainer();
+    const secretNames = api.Secrets.map((s: { Name: string }) => s.Name);
+    expect(secretNames).not.toContain('ENTRA_CLIENT_SECRET');
+    expect(JSON.stringify(template.toJSON())).not.toContain('/portal/api/*');
+  });
+});
+
+describe('ServiceStack with the agent portal', () => {
+  function portalApi() {
+    for (const def of Object.values(portalTemplate.findResources('AWS::ECS::TaskDefinition'))) {
+      const api = def.Properties.ContainerDefinitions.find(
+        (c: { Name: string }) => c.Name === 'api',
+      );
+      if (api) return api;
+    }
+    throw new Error('no api container');
+  }
+
+  it('routes the portal API and sign-in to the API, uncached, before the portal files', () => {
+    const [dist] = Object.values(portalTemplate.findResources('AWS::CloudFront::Distribution'));
+    const behaviors = dist?.Properties.DistributionConfig.CacheBehaviors as {
+      PathPattern: string;
+      CachePolicyId: string;
+    }[];
+    const order = behaviors.map((b) => b.PathPattern);
+    expect(order.indexOf('/portal/api/*')).toBeLessThan(order.indexOf('/portal/*'));
+    expect(order.indexOf('/portal/auth/*')).toBeLessThan(order.indexOf('/portal/*'));
+    for (const path of ['/portal/api/*', '/portal/auth/*']) {
+      expect(behaviors.find((b) => b.PathPattern === path)?.CachePolicyId).toBe(CACHING_DISABLED);
+    }
+  });
+
+  it('never lets the portal be framed', () => {
+    portalTemplate.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
+      ResponseHeadersPolicyConfig: Match.objectLike({
+        SecurityHeadersConfig: Match.objectLike({
+          ContentSecurityPolicy: {
+            ContentSecurityPolicy: "frame-ancestors 'none'",
+            Override: true,
+          },
+        }),
+      }),
+    });
+  });
+
+  it('serves /portal/ as its index page (CloudFront function)', () => {
+    portalTemplate.resourceCountIs('AWS::CloudFront::Function', 1);
+  });
+
+  it('gives the API the Entra settings from Secrets Manager and its own address', () => {
+    const api = portalApi();
+    const secretNames = api.Secrets.map((s: { Name: string }) => s.Name);
+    expect(secretNames).toEqual(
+      expect.arrayContaining([
+        'ENTRA_TENANT_ID',
+        'ENTRA_CLIENT_ID',
+        'ENTRA_CLIENT_SECRET',
+        'PORTAL_SESSION_SECRET',
+      ]),
+    );
+    expect(api.Environment.map((e: { Name: string }) => e.Name)).toContain('PORTAL_BASE_URL');
   });
 });

@@ -40,6 +40,8 @@ export type ServiceStackProps = StackProps & {
   config: ServiceConfig;
   /** WAF web ACL (CLOUDFRONT scope, us-east-1) to attach to the distribution. */
   webAclArn?: string;
+  /** Agent portal (Entra ID), served under /portal/. Off until the app registration exists. */
+  portal?: { distPath: string };
 };
 
 /**
@@ -117,32 +119,62 @@ export class ServiceStack extends Stack {
       // A logged-in turn may call Claude several times (tool rounds); the default is 30 s.
       readTimeout: Duration.seconds(60),
     });
+    const widgetOriginS3 = origins.S3BucketOrigin.withOriginAccessControl(
+      this.widgetBucket(isProd),
+    );
+    const apiBehavior: cloudfront.BehaviorOptions = {
+      origin: apiOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      // Origin, cookies and Authorization (POST) reach the API; Host is the load balancer's.
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+    };
+    // Order matters: CloudFront uses the first matching path, so the API paths come first.
+    const portalBehaviors: Record<string, cloudfront.BehaviorOptions> = props.portal
+      ? {
+          '/portal/api/*': apiBehavior,
+          '/portal/auth/*': apiBehavior,
+          '/portal/*': {
+            origin: widgetOriginS3,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            responseHeadersPolicy: this.portalHeaders(),
+            functionAssociations: [
+              {
+                eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+                function: new cloudfront.Function(this, 'PortalIndex', {
+                  comment: 'Serve /portal/ (and sub-folders) as index.html',
+                  runtime: cloudfront.FunctionRuntime.JS_2_0,
+                  code: cloudfront.FunctionCode.fromInline(
+                    "function handler(event) { var r = event.request; if (r.uri.endsWith('/')) { r.uri += 'index.html'; } return r; }",
+                  ),
+                }),
+              },
+            ],
+          },
+        }
+      : {};
+
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `trainmore-chatbot ${props.envName}`,
       ...(props.webAclArn ? { webAclId: props.webAclArn } : {}),
       defaultRootObject: 'index.html',
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(this.widgetBucket(isProd)),
+        origin: widgetOriginS3,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         responseHeadersPolicy: this.widgetHeaders(config.portalOrigins),
       },
-      additionalBehaviors: Object.fromEntries(
-        ['/widget/*', '/health'].map((path) => [
-          path,
-          {
-            origin: apiOrigin,
-            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
-            allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-            // Origin and Authorization (POST) reach the API; Host is the load balancer's.
-            originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          },
-        ]),
-      ),
+      additionalBehaviors: {
+        '/widget/*': apiBehavior,
+        '/health': apiBehavior,
+        ...portalBehaviors,
+      },
     });
     const widgetOrigin = `https://${this.distribution.distributionDomainName}`;
     this.deployWidget(props.widgetDistPath);
+    if (props.portal) this.deployPortal(props.portal.distPath);
 
     const api = taskDefinition.addContainer('api', {
       image,
@@ -170,6 +202,8 @@ export class ServiceStack extends Stack {
         MAGICLINE_USE_MOCK: 'true',
         MAGICLINE_BASE_URL: `http://localhost:${MOCK_PORT}`,
         MOCK_MAGICLINE_KEYS,
+        // The portal is served from the same distribution as the widget.
+        ...(props.portal ? { PORTAL_BASE_URL: widgetOrigin } : {}),
       },
       secrets: {
         ...Object.fromEntries(
@@ -182,6 +216,17 @@ export class ServiceStack extends Stack {
           ].map((name) => [name, ecs.Secret.fromSecretsManager(foundation.appSecret, name)]),
         ),
         OTP_HMAC_SECRET: ecs.Secret.fromSecretsManager(foundation.otpHmacSecret),
+        ...(props.portal
+          ? {
+              ...Object.fromEntries(
+                ['ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET'].map((name) => [
+                  name,
+                  ecs.Secret.fromSecretsManager(foundation.portalSecret, name),
+                ]),
+              ),
+              PORTAL_SESSION_SECRET: ecs.Secret.fromSecretsManager(foundation.portalSessionSecret),
+            }
+          : {}),
       },
     });
     const mock = taskDefinition.addContainer('mock-magicline', {
@@ -278,6 +323,49 @@ export class ServiceStack extends Stack {
       cacheControl: [s3deploy.CacheControl.fromString('public, max-age=60')],
       distribution: this.distribution,
       distributionPaths: ['/index.html', '/loader.js', '/loader.css', '/'],
+    });
+  }
+
+  /** Uploads the built portal under portal/: hashed assets for a year, the rest for a minute. */
+  private deployPortal(distPath: string): void {
+    const bucket = this.widgetBucket(false);
+    new s3deploy.BucketDeployment(this, 'PortalAssets', {
+      sources: [s3deploy.Source.asset(distPath)],
+      destinationBucket: bucket,
+      destinationKeyPrefix: 'portal/',
+      include: ['assets/*'],
+      exclude: ['*'],
+      prune: false,
+      cacheControl: [s3deploy.CacheControl.fromString('public, max-age=31536000, immutable')],
+    });
+    new s3deploy.BucketDeployment(this, 'PortalEntry', {
+      sources: [s3deploy.Source.asset(distPath)],
+      destinationBucket: bucket,
+      destinationKeyPrefix: 'portal/',
+      exclude: ['assets/*'],
+      prune: false,
+      cacheControl: [s3deploy.CacheControl.fromString('no-cache')],
+      distribution: this.distribution,
+      distributionPaths: ['/portal/*'],
+    });
+  }
+
+  /** The portal is never framed; HSTS, nosniff, no referrer outside the portal. */
+  private portalHeaders(): cloudfront.ResponseHeadersPolicy {
+    return new cloudfront.ResponseHeadersPolicy(this, 'PortalHeaders', {
+      securityHeadersBehavior: {
+        contentSecurityPolicy: { contentSecurityPolicy: "frame-ancestors 'none'", override: true },
+        strictTransportSecurity: {
+          accessControlMaxAge: Duration.days(365),
+          includeSubdomains: true,
+          override: true,
+        },
+        contentTypeOptions: { override: true },
+        referrerPolicy: {
+          referrerPolicy: cloudfront.HeadersReferrerPolicy.SAME_ORIGIN,
+          override: true,
+        },
+      },
     });
   }
 

@@ -11,7 +11,8 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Compute | AWS ECS Fargate (ARM/Graviton) | Product owner |
 | Environments | **Preprod only for now**; production built after preprod is tested and signed off | Product owner |
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
-| Portal auth | Microsoft Entra ID SSO, roles from Entra groups | Product owner |
+| Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
+| Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
 | Approved answers | Versioned **scenarios in Supabase** (not written back to Freshdesk) | Product owner |
 | Daily report | Email | Product owner |
 | Account questions | Everything Magicline can answer, as a **capability catalogue** with examples and an on/off switch per capability | Product owner |
@@ -59,7 +60,7 @@ support.trainmore.com (Freshdesk portal, nl/en)
                                                  ├─ Magicline Open API  (mock server in local/preprod)
                                                  ├─ Freshdesk API (tickets, Solutions)
                                                  └─ AWS SES (OTP + daily report email)
-  portal.<domain> (React SPA, Entra SSO) ─► same api, /portal routes
+  /portal/ (Preact app, Entra SSO) on the same domain ─► same api, /portal/api and /portal/auth
   EventBridge Scheduler ─► ECS RunTask "worker": faq-sync (daily), daily-report, retention-purge
 ```
 
@@ -328,8 +329,17 @@ history and process lists. `--email` is accepted only with `APP_ENV=local`.
   - schema-validated output
   - citation check
   - eval suite with injection attempts (NL/EN)
-- **Portal**: Entra OIDC (authorization code + PKCE, `@azure/msal-node`), server-side session
-  cookie, roles `agent` / `approver` / `admin` from Entra groups.
+- **Portal**: Entra OIDC (authorization code + PKCE, `@azure/msal-node`).
+  - **Tokens:** Entra tokens never reach the browser.
+  - **Login cookie:** a signed single-use cookie (Lax, 10 minutes) holds state, nonce and the
+    PKCE verifier.
+  - **Session cookie:** HttpOnly, Secure, SameSite=Strict, 8 hours. Only its SHA-256 hash is
+    stored.
+  - **Callback checks:** tenant, audience, nonce and app roles `agent` / `approver` / `admin`.
+  - **Changes:** accepted only with the portal's own `Origin`.
+  - **Transcripts:** masked (emails, phones, IBANs, long numbers); "show original" is written
+    to `audit_log`.
+  - **Audit log:** append-only for the server.
 - **AWS**:
   - least-privilege task roles (each env reads only its own secrets)
   - encrypted logs
@@ -405,6 +415,11 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M4a ✅ 2026-11-12 (code; Entra sign-in waits for the app registration): agent portal (Preact, nl/en) under `/portal/` on the same CloudFront domain.
+  - **Sign-in:** Entra ID (code + PKCE, app roles agent/approver/admin), 8 h Strict session cookie (only its hash stored).
+  - **Review:** flagged conversations with personal data masked; "show original" is audited.
+  - **Capabilities:** switches (admin only, audited), plus the "what the bot can answer" and limitations pages.
+  - **Activation:** off until `PORTAL_ENABLED`.
 - M3c ✅ 2026-11-12 (code; deploy waits for AWS access): container image, CDK stacks (foundation secrets + SES, WAF in us-east-1, CloudFront + S3 + internal ALB + Fargate API with mock sidecar, nightly worker schedules), manual GitHub deploy workflow (OIDC), `docs/DEPLOY.md`. Load test after the first deploy.
 - M3b ✅ 2026-11-12: thumbs up/down feedback, retention job (90-day anonymising, 24 h login codes and bindings), `dsar-delete`, one-command local stack (`pnpm dev:local`, local Freshdesk stand-in), `docs/TESTING.md`. WAF, load test and schedules come with the first preprod deploy.
 - M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.

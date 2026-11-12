@@ -38,7 +38,7 @@
         const param = new URLSearchParams(location.search).get('widget');
         const host = param && /^https:\/\/[a-z0-9.-]+\/$/.test(param) ? param : 'http://localhost:5173/';
         const tag = document.createElement('script');
-        tag.src = host + 'loader.js';
+        tag.src = `${host}loader.js`;
         tag.dataset.widgetUrl = host;
         tag.async = true;
         document.head.append(tag);
