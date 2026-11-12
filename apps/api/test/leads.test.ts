@@ -37,6 +37,12 @@ describe('POST /widget/leads', () => {
     expect(api.leads).toEqual([{ conversationId: null, freshdeskTicketId: 777, lang: 'nl' }]);
   });
 
+  it('tags leads from a non-production environment', async () => {
+    const api = createTestApi({ envTag: 'chatbot-preprod' });
+    await submit(api, lead);
+    expect(api.tickets[0]?.tags).toEqual(['chatbot', 'lead', 'nl', 'chatbot-preprod']);
+  });
+
   it('links the lead to a conversation when given', async () => {
     const api = createTestApi();
     const conversationId = '00000000-0000-4000-8000-000000000042';

@@ -135,6 +135,13 @@ describe('POST /widget/conversations/:id/tickets', () => {
     expect(api.logs()).not.toContain('Sam');
   });
 
+  it('tags tickets from a non-production environment so support can route them away', async () => {
+    const api = createTestApi({ envTag: 'chatbot-preprod' });
+    const conv = await start(api);
+    await submit(api, conv);
+    expect(api.tickets[0]?.tags).toEqual(['chatbot', 'escalation', 'nl', 'chatbot-preprod']);
+  });
+
   it('needs the conversation token: 401 without, 404 with a wrong one', async () => {
     const api = createTestApi();
     const conv = await start(api);

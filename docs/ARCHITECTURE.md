@@ -48,9 +48,10 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 
 ```
 support.trainmore.com (Freshdesk portal, nl/en)
-  └─ <script> loader ──► iframe  chat.<domain>  (widget, Preact)
-                              │ HTTPS + SSE, session token in Authorization header
-                     CloudFront + WAF ─► ALB ─► ECS Fargate "api" (Fastify, Node)
+  └─ <script> loader ──► iframe  (widget, Preact)        ┐ one CloudFront distribution + WAF:
+                              │ HTTPS, token in Authorization │  /          → S3 (widget, private, OAC)
+                     CloudFront + WAF ─► internal ALB ─► ECS Fargate "api" (Fastify, Node)
+                       (VPC origin; /widget/*, /health)
                                                  ├─ Claude API (chat model + fast model)
                                                  ├─ Voyage embeddings
                                                  ├─ Supabase Postgres (+ pgvector)
@@ -72,20 +73,29 @@ support.trainmore.com (Freshdesk portal, nl/en)
 | Env | When | Magicline | Supabase | Freshdesk |
 |---|---|---|---|---|
 | local | now | mock server | Supabase CLI (docker) | sandbox or test group |
-| **preprod** | **now: only deployed env** | mock server + synthetic profiles | own project | real FAQ sync (public content); tickets tagged `chatbot-preprod` to a test group |
+| **preprod** | **now: only deployed env** | mock server (sidecar) + synthetic profiles | own project | real FAQ sync (public content); tickets and leads tagged `chatbot-preprod` (a Freshdesk automation routes them to a test group) |
 | prod | M6, after preprod sign-off | real, per-club keys | own project | real |
 
 Infrastructure code (CDK) takes an `env` parameter, so adding prod later is a new deploy, not a rewrite.
-Prod preferably goes in a separate AWS account.
+Prod preferably goes in a separate AWS account. Preprod (M3c, `docs/DEPLOY.md`):
+- **One domain:** a single CloudFront domain (`dxxxx.cloudfront.net`, no custom domain needed)
+  serves the widget and the API on the same origin.
+- **Private load balancer:** the ALB is internal and only reachable through the CloudFront VPC
+  origin.
+- **Network:** tasks have a public IP for outbound calls only; inbound traffic comes only from
+  the ALB.
+- **Deploys:** GitHub Actions with OIDC; no AWS keys are stored.
 
 ### Estimated AWS cost (eu-west-1, excluding Claude and Voyage usage; verify in the AWS calculator)
 | Item | Preprod (now) | Prod (later) |
 |---|---|---|
 | Fargate ARM 0.5 vCPU / 1 GB | 1 task ≈ $14 | 2 tasks ≈ $29 |
-| ALB | ≈ $19 | ≈ $19–25 |
-| Logs, WAF, secrets | ≈ $13 | ≈ $15 |
+| ALB (internal) + CloudFront (VPC origin, free tier) | ≈ $19 | ≈ $19–25 |
+| WAF (web ACL + 4 rules + requests) | ≈ $10 | ≈ $12 |
+| Logs, KMS, 4 secrets | ≈ $6 | ≈ $8 |
+| Worker runs (3 short tasks per night) | < $1 | < $1 |
 | Outbound network | public subnet + public IP ≈ $4 (no NAT) | NAT gateway ≈ $35, or keep public subnet |
-| **Total** | **≈ $50/month** | **≈ $65–105/month** |
+| **Total** | **≈ $55/month** | **≈ $70–110/month** |
 
 ## 3. Key flows
 
@@ -395,6 +405,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M3c ✅ 2026-11-12 (code; deploy waits for AWS access): container image, CDK stacks (foundation secrets + SES, WAF in us-east-1, CloudFront + S3 + internal ALB + Fargate API with mock sidecar, nightly worker schedules), manual GitHub deploy workflow (OIDC), `docs/DEPLOY.md`. Load test after the first deploy.
 - M3b ✅ 2026-11-12: thumbs up/down feedback, retention job (90-day anonymising, 24 h login codes and bindings), `dsar-delete`, one-command local stack (`pnpm dev:local`, local Freshdesk stand-in), `docs/TESTING.md`. WAF, load test and schedules come with the first preprod deploy.
 - M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.
 - M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
@@ -464,6 +475,8 @@ Each milestone ends with tests passing and a preprod deploy.
 - (M3) Retention periods (implemented as above) and consent text: confirm with the DPO.
 - (M3) Confirm with support which Freshdesk field holds the topics (`FRESHDESK_TOPIC_FIELD`,
   default `ticket_type`) and its values; until the first sync, tickets carry no `type`.
-- (M3) Add the EventBridge schedules for `sync-faq` and `sync-ticket-topics` to the CDK app.
+- ★ (preprod) AWS account + CDK bootstrap, GitHub OIDC role, Supabase preprod project,
+  Turnstile keys, SES sender: see `docs/DEPLOY.md` "One-time setup".
+- (preprod) Freshdesk automation: route tickets tagged `chatbot-preprod` to a test group.
 - (M4) Entra app registration and group names.
 - Exact club count and expected volume (brief still says [X]).

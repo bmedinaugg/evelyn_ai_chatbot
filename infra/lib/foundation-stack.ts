@@ -6,11 +6,16 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as ses from 'aws-cdk-lib/aws-ses';
 import type { Construct } from 'constructs';
 
 export type EnvName = 'preprod' | 'prod';
 
-export type FoundationStackProps = StackProps & { envName: EnvName };
+export type FoundationStackProps = StackProps & {
+  envName: EnvName;
+  /** Sender of login-code emails (preprod: one verified address, SES sandbox). */
+  emailFrom: string;
+};
 
 /** Shared, long-lived resources per environment. Services are added in later milestones. */
 export class FoundationStack extends Stack {
@@ -20,6 +25,10 @@ export class FoundationStack extends Stack {
   readonly logGroup: logs.LogGroup;
   readonly magiclineStudioKeys: secretsmanager.Secret;
   readonly magiclineCrossStudioKey: secretsmanager.Secret;
+  /** JSON: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FRESHDESK_API_KEY, TURNSTILE_SECRET_KEY. */
+  readonly appSecret: secretsmanager.Secret;
+  readonly otpHmacSecret: secretsmanager.Secret;
+  readonly emailIdentity: ses.EmailIdentity;
 
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
@@ -30,14 +39,22 @@ export class FoundationStack extends Stack {
     Tags.of(this).add('project', 'trainmore-chatbot');
     Tags.of(this).add('env', env);
 
-    // Public subnets only: tasks get a public IP behind security groups instead of a NAT gateway (~$35/month).
+    // Tasks run in public subnets with a public IP behind security groups instead of a NAT gateway
+    // (~$35/month). Isolated subnets (no internet route, no cost) hold the internal load balancer.
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 2,
       natGateways: 0,
-      subnetConfiguration: [{ name: 'public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 }],
+      subnetConfiguration: [
+        { name: 'public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+        { name: 'isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
+      ],
     });
 
-    this.cluster = new ecs.Cluster(this, 'Cluster', { vpc: this.vpc });
+    this.cluster = new ecs.Cluster(this, 'Cluster', {
+      vpc: this.vpc,
+      // Interactive sessions are not logged: operators type email addresses for deletion requests.
+      executeCommandConfiguration: { logging: ecs.ExecuteCommandLogging.NONE },
+    });
 
     this.repository = new ecr.Repository(this, 'Repository', {
       repositoryName: `trainmore-chatbot-${env}`,
@@ -83,6 +100,26 @@ export class FoundationStack extends Stack {
       secretName: `${prefix}/magicline-cross-studio-key`,
       description: 'Magicline cross-studio API key',
       removalPolicy: retain,
+    });
+
+    // Set by hand after the first deploy (docs/DEPLOY.md); the template never holds the values.
+    this.appSecret = new secretsmanager.Secret(this, 'AppSecret', {
+      secretName: `${prefix}/app`,
+      description:
+        'JSON: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FRESHDESK_API_KEY, TURNSTILE_SECRET_KEY',
+      removalPolicy: retain,
+    });
+    // Generated once; hashes of login codes and emails depend on it, so it is never rotated casually.
+    this.otpHmacSecret = new secretsmanager.Secret(this, 'OtpHmacSecret', {
+      secretName: `${prefix}/otp-hmac-secret`,
+      description: 'Pepper for login-code and email hashes',
+      generateSecretString: { passwordLength: 64, excludePunctuation: true },
+      removalPolicy: retain,
+    });
+
+    // SES sandbox in preprod: the sender (and test recipients) are verified by email link.
+    this.emailIdentity = new ses.EmailIdentity(this, 'EmailIdentity', {
+      identity: ses.Identity.email(props.emailFrom),
     });
   }
 }

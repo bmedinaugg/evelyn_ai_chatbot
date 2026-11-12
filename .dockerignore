@@ -1,0 +1,27 @@
+# Never in the image
+.env
+.env.*
+!.env.example
+.git
+.github
+.dev-local
+.superpowers
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+
+# Not needed at runtime (package.json files stay so the lockfile matches the workspace)
+docs
+**/test
+**/e2e
+**/*.test.ts
+infra/*
+!infra/package.json
+apps/widget/*
+!apps/widget/package.json
+packages/evals/*
+!packages/evals/package.json
+.turbo
+**/.turbo

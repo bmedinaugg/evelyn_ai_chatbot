@@ -38,7 +38,7 @@ export function registerLeadRoutes(app: FastifyInstance, deps: ApiDeps): void {
           ...(body.phone === undefined ? {} : { phone: body.phone }),
           subject: t(body.lang, 'lead.subject'),
           descriptionText: `${body.question}\n\n—\nSource: website chat (lead form)`,
-          tags: ['chatbot', 'lead', body.lang],
+          tags: ['chatbot', 'lead', body.lang, ...(deps.config.envTag ? [deps.config.envTag] : [])],
         });
         ticketId = ticket.id;
       } catch (error) {

@@ -89,7 +89,12 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
           ...(body.name === undefined ? {} : { name: body.name }),
           subject: body.subject,
           descriptionText: body.description,
-          tags: ['chatbot', 'escalation', body.lang],
+          tags: [
+            'chatbot',
+            'escalation',
+            body.lang,
+            ...(deps.config.envTag ? [deps.config.envTag] : []),
+          ],
           ...(topics.synced ? { type: body.topic } : {}),
         });
         ticketId = ticket.id;

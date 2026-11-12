@@ -112,6 +112,8 @@ const app = buildApiServer({
     allowedOrigins: api.allowedOrigins,
     supportContactUrl: api.supportContactUrl,
     trustProxyHops: api.trustProxyHops,
+    // Non-production tickets are tagged so support can route them to a test group.
+    ...(runtime.appEnv === 'prod' ? {} : { envTag: `chatbot-${runtime.appEnv}` }),
   },
   logger,
 });

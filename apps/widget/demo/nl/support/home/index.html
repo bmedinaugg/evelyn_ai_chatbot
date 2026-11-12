@@ -28,8 +28,22 @@
         letter-spacing: 0.05em; }
       .card p { margin: 0; color: var(--grey); font-size: 14px; }
     </style>
-    <!-- Exactly what goes into the Freshdesk portal layout (with the real widget host). -->
-    <script src="http://localhost:5173/loader.js" data-widget-url="http://localhost:5173/" async></script>
+    <!--
+      The Freshdesk portal layout gets exactly this tag (with the real widget host):
+      <script src="https://<widget host>/loader.js" data-widget-url="https://<widget host>/" async></script>
+      Here the host is local by default, or a deployed one via ?widget=https://<host>/ (preprod).
+    -->
+    <script>
+      (() => {
+        const param = new URLSearchParams(location.search).get('widget');
+        const host = param && /^https:\/\/[a-z0-9.-]+\/$/.test(param) ? param : 'http://localhost:5173/';
+        const tag = document.createElement('script');
+        tag.src = host + 'loader.js';
+        tag.dataset.widgetUrl = host;
+        tag.async = true;
+        document.head.append(tag);
+      })();
+    </script>
   </head>
   <body>
     <div class="banner">Lokale demo: geen echte TrainMore-pagina. De chat zit rechtsonder.</div>
