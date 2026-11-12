@@ -124,7 +124,7 @@ Once a customer is logged in, Claude can call read-only account tools for the bo
 | `get_account_balance` | member, former member | balance, debt collection, reminder level |
 | `get_upcoming_payments` | member | next payments |
 | `get_recent_visits` | member | visits in the last 30 days |
-| `get_class_bookings` | member, prospect | class bookings for the next 14 days |
+| `get_class_bookings` | member, prospect | class bookings at their club for the next 7 days |
 
 Switch a tool off: `insert into capability_flags (name, enabled) values ('get_recent_visits', false)`
 (the agent portal will do this in M4). Account answers are only shown when a tool ran in that turn.

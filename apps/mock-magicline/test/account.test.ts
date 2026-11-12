@@ -45,12 +45,21 @@ describe('account data routes', () => {
     expect((await get('/v1/customers/1/account/balances', 'key-1002')).statusCode).toBe(404);
   });
 
+  it('rejects parameters outside the documented ranges (like the real API)', async () => {
+    expect(
+      (await get('/v1/customers/1/activities/checkins?sliceSize=100', 'key-1001')).statusCode,
+    ).toBe(400);
+    expect(
+      (await get('/v1/cross-studio/customers/1/class-bookings?daysAhead=14', 'cross-key'))
+        .statusCode,
+    ).toBe(400);
+  });
+
   it('class bookings need the cross-studio key', async () => {
     expect(
-      (await get('/v1/cross-studio/customers/1/class-bookings?daysAhead=14', 'key-1001'))
-        .statusCode,
+      (await get('/v1/cross-studio/customers/1/class-bookings?daysAhead=6', 'key-1001')).statusCode,
     ).toBe(401);
-    const res = await get('/v1/cross-studio/customers/1/class-bookings?daysAhead=14', 'cross-key');
+    const res = await get('/v1/cross-studio/customers/1/class-bookings?daysAhead=6', 'cross-key');
     expect(res.json().result[0]).toMatchObject({ classInformation: { title: expect.any(String) } });
   });
 });

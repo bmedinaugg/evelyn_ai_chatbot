@@ -90,6 +90,13 @@ export function buildMockServer(opts: MockServerOptions): FastifyInstance {
     return accountData[customer.id];
   };
   const sliced = (result: unknown[]) => ({ result, hasNext: false, offset: '0' });
+  // Enforce the documented parameter ranges, like the real API (docs/api/magicline-openapi.json).
+  const inRange = (request: FastifyRequest, name: string, min: number, max: number) => {
+    const raw = (request.query as Record<string, string | undefined>)[name];
+    if (raw === undefined) return true;
+    const value = Number(raw);
+    return Number.isInteger(value) && value >= min && value <= max;
+  };
 
   app.get(
     '/v1/customers/:customerId/contracts',
@@ -104,10 +111,13 @@ export function buildMockServer(opts: MockServerOptions): FastifyInstance {
     return data ? sliced(data.upcoming) : reply;
   });
   app.get('/v1/customers/:customerId/activities/checkins', async (request, reply) => {
+    if (!inRange(request, 'sliceSize', 1, 50)) return reply.code(400).send();
     const data = studioCustomer(request, reply);
     return data ? sliced(data.checkins) : reply;
   });
   app.get('/v1/cross-studio/customers/:customerId/class-bookings', async (request, reply) => {
+    if (!inRange(request, 'daysAhead', 0, 6) || !inRange(request, 'sliceSize', 1, 50))
+      return reply.code(400).send();
     if (apiKey(request) !== opts.keys.crossStudio) return reply.code(401).send();
     const params = customerParamsSchema.safeParse(request.params);
     const data = params.success ? accountData[params.data.customerId] : undefined;

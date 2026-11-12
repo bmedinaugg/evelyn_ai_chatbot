@@ -28,13 +28,17 @@ const client = (label: string): MagiclineClient =>
     },
     async getCheckins(id: number, from: string, to: string) {
       calls.push(`${label}:checkins:${id}:${from}:${to}`);
-      return Array.from({ length: 8 }, (_, i) => ({
-        checkInDateTime: `2026-11-0${i + 1}T08:00:00Z`,
-        studioName: 'Club A',
-      }));
+      // Oldest first on purpose: the tool must sort newest first.
+      return {
+        visits: Array.from({ length: 8 }, (_, i) => ({
+          checkInDateTime: `2026-11-0${i + 1}T08:00:00Z`,
+          studioName: 'Club A',
+        })),
+        hasMore: false,
+      };
     },
-    async getCrossStudioClassBookings(id: number, days: number) {
-      calls.push(`${label}:classes:${id}:${days}`);
+    async getCrossStudioClassBookings(id: number, studioId: number, days: number) {
+      calls.push(`${label}:classes:${id}:${studioId}:${days}`);
       return [];
     },
   }) as unknown as MagiclineClient; // only the account methods are exercised here
@@ -92,7 +96,26 @@ describe('capability catalogue', () => {
     expect(await runCapability('get_class_bookings', member, deps, all)).toMatchObject({
       ok: true,
     });
-    expect(calls).toEqual(['studio1001:contracts:4', 'cross:classes:4:14']);
+    expect(calls).toEqual(['studio1001:contracts:4', 'cross:classes:4:1001:6']);
+  });
+
+  it('uses Amsterdam dates and lists the newest visits first', async () => {
+    calls.length = 0;
+    // 00:30 in Amsterdam on 12 November is still 11 November in UTC.
+    const lateNight: CapabilityDeps = { ...deps, today: () => new Date('2026-11-11T23:30:00Z') };
+    const result = await runCapability('get_recent_visits', member, lateNight, all);
+    expect(calls).toEqual(['studio1001:checkins:4:2026-10-13:2026-11-12']);
+    const recent = result.ok
+      ? (result.data as { recent: { checkInDateTime: string }[] }).recent
+      : [];
+    expect(recent[0]?.checkInDateTime).toBe('2026-11-08T08:00:00Z');
+  });
+
+  it('describes the contract price as a base price, not a monthly one', () => {
+    const memberships = availableCapabilities('MEMBER', all).find(
+      (c) => c.name === 'get_memberships',
+    );
+    expect(memberships?.description).not.toMatch(/monthly/i);
   });
 
   it('summarises visits over the last 30 days', async () => {

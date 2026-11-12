@@ -234,3 +234,43 @@ describe('answerMessage with a bound account', () => {
     expect(calls[0]?.tools).toBeUndefined();
   });
 });
+
+describe('history that already contains tool calls', () => {
+  it('still defines those tools (the API rejects tool blocks without definitions), but never runs them without an account', async () => {
+    const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+    await conv.repo.appendTurn({
+      conversationId: ID,
+      claimId: 'claim-1',
+      user: { displayText: 'q', apiContent: 'q' },
+      steps: [
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 't1', name: 'get_memberships', input: {} }],
+        },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'x' }] },
+      ],
+      assistant: { displayText: 'a', apiContent: [{ type: 'text', text: '{}' }] },
+      flags: [],
+    });
+    const { answerer, calls } = recordingAnswerer(answered);
+    await answerMessage(
+      {
+        faq: fakeFaq([]),
+        conversations: conv.repo,
+        answerer,
+        logger,
+        capabilities: {
+          deps: {
+            studioClient: async () => ({}) as never,
+            crossStudioClient: async () => ({}) as never,
+            today: () => new Date(),
+          },
+          disabled: async () => new Set(['get_memberships']),
+        },
+      },
+      { conversationId: ID, text: 'nog een vraag', pageLang: 'nl', account: null },
+    );
+    expect(calls[0]?.tools?.definitions.map((d) => d.name)).toEqual(['get_memberships']);
+    expect(await calls[0]?.tools?.execute('get_memberships')).toEqual({ ok: false });
+  });
+});

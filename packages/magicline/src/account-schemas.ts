@@ -69,15 +69,16 @@ export const upcomingPaymentsSchema = sliced(
 );
 export type PaymentInfo = z.output<typeof upcomingPaymentsSchema>[number];
 
-export const checkinsSchema = sliced(
-  z
-    .object({ checkInDateTime: z.string().nullish(), studioName: z.string().nullish() })
-    .transform((c) => ({
-      checkInDateTime: c.checkInDateTime ?? null,
-      studioName: c.studioName ?? null,
-    })),
-);
-export type VisitInfo = z.output<typeof checkinsSchema>[number];
+const visitSchema = z
+  .object({ checkInDateTime: z.string().nullish(), studioName: z.string().nullish() })
+  .transform((c) => ({
+    checkInDateTime: c.checkInDateTime ?? null,
+    studioName: c.studioName ?? null,
+  }));
+export const checkinsSchema = z
+  .object({ result: z.array(visitSchema), hasNext: z.boolean().optional() })
+  .transform(({ result, hasNext }) => ({ visits: result, hasMore: hasNext ?? false }));
+export type VisitInfo = z.output<typeof visitSchema>;
 
 export const classBookingsSchema = sliced(
   z

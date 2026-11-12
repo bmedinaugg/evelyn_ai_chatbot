@@ -104,8 +104,8 @@ describe('account methods (allowlisted fields only)', () => {
 
   it('getCheckins', async () => {
     body = {
-      hasNext: false,
-      offset: '0',
+      hasNext: true,
+      offset: '50',
       result: [
         {
           checkinId: 1,
@@ -115,11 +115,12 @@ describe('account methods (allowlisted fields only)', () => {
         },
       ],
     };
-    expect(await client.getCheckins(1, '2026-10-13', '2026-11-12')).toEqual([
-      { checkInDateTime: '2026-11-10T08:00:00Z', studioName: 'Club A' },
-    ]);
+    expect(await client.getCheckins(1, '2026-10-13', '2026-11-12')).toEqual({
+      visits: [{ checkInDateTime: '2026-11-10T08:00:00Z', studioName: 'Club A' }],
+      hasMore: true,
+    });
     expect(req.url).toBe(
-      'http://mock/v1/customers/1/activities/checkins?fromDate=2026-10-13&toDate=2026-11-12&sliceSize=100',
+      'http://mock/v1/customers/1/activities/checkins?fromDate=2026-10-13&toDate=2026-11-12&sliceSize=50',
     );
   });
 
@@ -148,7 +149,7 @@ describe('account methods (allowlisted fields only)', () => {
         },
       ],
     };
-    expect(await client.getCrossStudioClassBookings(1, 14)).toEqual([
+    expect(await client.getCrossStudioClassBookings(1, 1001, 6)).toEqual([
       {
         title: 'Spinning',
         startDateTime: '2026-11-14T18:00:00Z',
@@ -158,7 +159,8 @@ describe('account methods (allowlisted fields only)', () => {
       },
     ]);
     expect(req.url).toBe(
-      'http://mock/v1/cross-studio/customers/1/class-bookings?daysAhead=14&sliceSize=20',
+      'http://mock/v1/cross-studio/customers/1/class-bookings?studioId=1001&daysAhead=6&sliceSize=20',
     );
+    await expect(client.getCrossStudioClassBookings(1, 1001, 7)).rejects.toThrow();
   });
 });

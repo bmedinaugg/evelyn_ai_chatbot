@@ -37,10 +37,18 @@ export interface MagiclineClient {
   getContracts(customerId: number): Promise<MembershipInfo[]>;
   getAccountBalance(customerId: number): Promise<BalanceInfo>;
   getUpcomingTransactions(customerId: number, limit: number): Promise<PaymentInfo[]>;
-  /** fromDate/toDate as YYYY-MM-DD (at most 365 days apart). */
-  getCheckins(customerId: number, fromDate: string, toDate: string): Promise<VisitInfo[]>;
-  /** Needs the cross-studio key. */
-  getCrossStudioClassBookings(customerId: number, daysAhead: number): Promise<ClassBookingInfo[]>;
+  /** fromDate/toDate as YYYY-MM-DD (at most 365 days apart). First page only (max 50). */
+  getCheckins(
+    customerId: number,
+    fromDate: string,
+    toDate: string,
+  ): Promise<{ visits: VisitInfo[]; hasMore: boolean }>;
+  /** Needs the cross-studio key; filtered to one studio; daysAhead 0..6 (API maximum). */
+  getCrossStudioClassBookings(
+    customerId: number,
+    studioId: number,
+    daysAhead: number,
+  ): Promise<ClassBookingInfo[]>;
 }
 
 export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineClient {
@@ -112,7 +120,7 @@ export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineCl
       const query = new URLSearchParams({
         fromDate: isoDate(fromDate),
         toDate: isoDate(toDate),
-        sliceSize: '100',
+        sliceSize: '50',
       });
       return request(
         'GET',
@@ -121,10 +129,17 @@ export function createMagiclineClient(opts: MagiclineClientOptions): MagiclineCl
       );
     },
 
-    async getCrossStudioClassBookings(customerId, daysAhead) {
+    async getCrossStudioClassBookings(customerId, studioId, daysAhead) {
+      if (!Number.isInteger(daysAhead) || daysAhead < 0 || daysAhead > 6)
+        throw new Error('daysAhead must be 0..6');
+      const query = new URLSearchParams({
+        studioId: id(studioId),
+        daysAhead: id(daysAhead),
+        sliceSize: '20',
+      });
       return request(
         'GET',
-        `/v1/cross-studio/customers/${id(customerId)}/class-bookings?daysAhead=${id(daysAhead)}&sliceSize=20`,
+        `/v1/cross-studio/customers/${id(customerId)}/class-bookings?${query}`,
         classBookingsSchema,
       );
     },

@@ -24,8 +24,8 @@
 | `get_memberships` | `GET /v1/customers/{id}/contracts` (studio) | MEMBER, FORMER_MEMBER | rateName, startDate, endDate, contractStatus, cancelled, cancellationDate, lastPossibleCancellationDate, cancellationPeriod, term, price |
 | `get_account_balance` | `GET /v1/customers/{id}/account/balances` (studio) | MEMBER, FORMER_MEMBER | accountBalance, inDebtCollection, dunningLevel |
 | `get_upcoming_payments` | `GET /v1/customers/{id}/account/transactions/upcoming?sliceSize=6` (studio) | MEMBER | dueDate, description, amount, openAmount |
-| `get_recent_visits` | `GET /v1/customers/{id}/activities/checkins?fromDate&toDate` (last 30 days) (studio) | MEMBER | count, last 5 `{checkInDateTime, studioName}` |
-| `get_class_bookings` | `GET /v1/cross-studio/customers/{id}/class-bookings?daysAhead=14` (cross) | MEMBER, PROSPECT | title, startDateTime, endDateTime, studio name, bookingStatus |
+| `get_recent_visits` | `GET /v1/customers/{id}/activities/checkins?fromDate&toDate&sliceSize=50` (last 30 days, Amsterdam dates) (studio) | MEMBER | count, last 5 `{checkInDateTime, studioName}` |
+| `get_class_bookings` | `GET /v1/cross-studio/customers/{id}/class-bookings?studioId&daysAhead=6` (cross; API max 6) | MEMBER, PROSPECT | title, startDateTime, endDateTime, studio name, bookingStatus |
 
 ## Global Constraints
 - **Tool inputs:** no tool input contains a customer or studio id. Schemas are `{type:'object', properties:{}, additionalProperties:false}`, `strict: true`.

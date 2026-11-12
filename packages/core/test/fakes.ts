@@ -44,6 +44,7 @@ export function fakeConversations(
     async listApiHistory(): Promise<ApiHistoryEntry[]> {
       return turns.flatMap((turn) => [
         { role: 'user' as const, content: turn.user.apiContent },
+        ...(turn.steps ?? []),
         ...(turn.assistant
           ? [{ role: 'assistant' as const, content: turn.assistant.apiContent }]
           : []),

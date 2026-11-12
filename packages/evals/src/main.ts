@@ -18,6 +18,7 @@ import {
 } from '@trainmore/shared';
 import { CASES } from './cases.ts';
 import { estimateUsd, runEvals } from './run-evals.ts';
+import { isLocalMagicline } from './safety.ts';
 
 const PASS_RATE_REQUIRED = 0.9;
 
@@ -36,9 +37,13 @@ const logger = createLogger({ name: 'evals', level: 'warn' });
 // Logged-in cases use the mock Magicline server (synthetic profiles) — never real customer data.
 const magiclineConfig = loadConfig(env).magicline;
 const keysConfig = loadMagiclineKeysConfig(env);
-if (!magiclineConfig.useMock || keysConfig.kind !== 'env') {
+if (
+  !magiclineConfig.useMock ||
+  keysConfig.kind !== 'env' ||
+  !isLocalMagicline(magiclineConfig.baseUrl)
+) {
   process.stderr.write(
-    'Evals only run against the mock Magicline server (MAGICLINE_USE_MOCK=true).\n',
+    'Evals only run against the local mock Magicline server (MAGICLINE_USE_MOCK=true, localhost URL).\n',
   );
   process.exit(2);
 }

@@ -22,14 +22,22 @@ export type Capability = {
 const MAX_ITEMS = 20;
 const VISIT_DAYS = 30;
 
-const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+/** Calendar date in the clubs' timezone (YYYY-MM-DD). */
+const amsterdamDay = (date: Date) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Amsterdam',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+const CLASS_DAYS_AHEAD = 6; // API maximum
 
 /** Read-only capabilities (docs/superpowers/plans/2026-11-12-m2b-account-answers.md). Order = tool order. */
 export const CAPABILITIES: readonly Capability[] = [
   {
     name: 'get_memberships',
     description:
-      "The customer's membership contracts: plan name, start and end date, status, cancellation status and dates, notice period, term and monthly price.",
+      "The customer's membership contracts: plan name, start and end date, status, cancellation status and dates, notice period, term and base price of the contract (not necessarily per month).",
     statuses: ['MEMBER', 'FORMER_MEMBER'],
     run: async (a, d) =>
       (await (await d.studioClient(a.studioId)).getContracts(a.customerId)).slice(0, MAX_ITEMS),
@@ -56,12 +64,20 @@ export const CAPABILITIES: readonly Capability[] = [
     run: async (a, d) => {
       const to = d.today();
       const from = new Date(to.getTime() - VISIT_DAYS * 24 * 60 * 60 * 1000);
-      const visits = await (await d.studioClient(a.studioId)).getCheckins(
+      const { visits, hasMore } = await (await d.studioClient(a.studioId)).getCheckins(
         a.customerId,
-        isoDay(from),
-        isoDay(to),
+        amsterdamDay(from),
+        amsterdamDay(to),
       );
-      return { periodDays: VISIT_DAYS, count: visits.length, recent: visits.slice(0, 5) };
+      const newestFirst = [...visits].sort((x, y) =>
+        (y.checkInDateTime ?? '').localeCompare(x.checkInDateTime ?? ''),
+      );
+      // The API returns at most 50 per page; more than that is reported as "at least".
+      return {
+        periodDays: VISIT_DAYS,
+        count: hasMore ? `${visits.length}+` : visits.length,
+        recent: newestFirst.slice(0, 5),
+      };
     },
   },
   {
@@ -70,10 +86,11 @@ export const CAPABILITIES: readonly Capability[] = [
       "The customer's class bookings for the next 14 days (class, start and end time, club, booking status).",
     statuses: ['MEMBER', 'PROSPECT'],
     run: async (a, d) =>
-      (await (await d.crossStudioClient()).getCrossStudioClassBookings(a.customerId, 14)).slice(
-        0,
-        MAX_ITEMS,
-      ),
+      (
+        await (
+          await d.crossStudioClient()
+        ).getCrossStudioClassBookings(a.customerId, a.studioId, CLASS_DAYS_AHEAD)
+      ).slice(0, MAX_ITEMS),
   },
 ];
 

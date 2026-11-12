@@ -1,4 +1,5 @@
 import {
+  type ApiHistoryEntry,
   ClaimLostError,
   type ConversationRepository,
   type FaqRepository,
@@ -10,6 +11,7 @@ import type { Logger } from '@trainmore/shared';
 import {
   type AccountContext,
   availableCapabilities,
+  CAPABILITIES,
   type CapabilityDeps,
   runCapability,
   toolDefinitions,
@@ -86,12 +88,13 @@ export async function answerMessage(
       pageLang: input.pageLang,
     });
 
-    const tools = await accountTools(deps, input.account ?? null, input.conversationId);
+    const history = await conversations.listApiHistory(input.conversationId);
+    const tools = await accountTools(deps, input.account ?? null, input.conversationId, history);
 
     let result: AnswererResult | { kind: 'error' };
     try {
       result = await deps.answerer({
-        history: await conversations.listApiHistory(input.conversationId),
+        history,
         userTurn,
         ...(tools ? { tools } : {}),
       });
@@ -161,21 +164,48 @@ export async function answerMessage(
   }
 }
 
-/** Tools for the bound account: by membership status, minus switched-off ones. Ids come from the server. */
+/** Names of tools called anywhere in the stored history. */
+function toolsInHistory(history: ApiHistoryEntry[]): Set<string> {
+  const names = new Set<string>();
+  for (const entry of history) {
+    if (!Array.isArray(entry.content)) continue;
+    for (const block of entry.content as { type?: unknown; name?: unknown }[]) {
+      if (block?.type === 'tool_use' && typeof block.name === 'string') names.add(block.name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Tools for the bound account: by membership status, minus switched-off ones. Ids come from the
+ * server. Tools already used in the stored history stay defined (the API rejects tool blocks
+ * without definitions), but execute() still refuses anything not available right now.
+ */
 async function accountTools(
   deps: AnswerMessageDeps,
   account: AccountContext | null,
   conversationId: string,
+  history: ApiHistoryEntry[],
 ): Promise<AnswererTools | undefined> {
-  if (!account || !deps.capabilities) return undefined;
+  const used = toolsInHistory(history);
+  if (!deps.capabilities || (!account && used.size === 0)) return undefined;
   const { capabilities, logger } = deps;
-  const disabled = await capabilities.disabled();
-  const available = availableCapabilities(account.status, disabled);
-  if (available.length === 0) return undefined;
+  let disabled: ReadonlySet<string>;
+  try {
+    disabled = await capabilities.disabled();
+  } catch (error) {
+    logger.error({ err: error, conversationId }, 'capability flags unavailable; tools off');
+    disabled = new Set(CAPABILITIES.map((c) => c.name));
+  }
+  const available = account ? availableCapabilities(account.status, disabled) : [];
+  const defined = CAPABILITIES.filter((c) => available.includes(c) || used.has(c.name));
+  if (defined.length === 0) return undefined;
   return {
-    definitions: toolDefinitions(available),
+    definitions: toolDefinitions(defined),
     async execute(name) {
-      const result = await runCapability(name, account, capabilities.deps, disabled);
+      const result = account
+        ? await runCapability(name, account, capabilities.deps, disabled)
+        : { ok: false as const };
       // Tool name and outcome only: never the account data.
       logger.info({ conversationId, tool: name, ok: result.ok }, 'account tool');
       return result;
