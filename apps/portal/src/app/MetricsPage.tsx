@@ -142,17 +142,21 @@ function Chart(props: { lang: Lang; days: DayMetrics[] }) {
         preserveAspectRatio="none"
         role="img"
         aria-label={t(lang, 'portal.metrics.chartTitle')}
-        onMouseLeave={() => setActive(null)}
+        // Column under the pointer (the svg stretches to the page width).
+        onPointerMove={(e) => {
+          const box = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          const i = Math.floor(((e.clientX - box.left) / box.width) * days.length);
+          setActive(days[Math.min(Math.max(i, 0), days.length - 1)] ?? null);
+        }}
+        onPointerLeave={() => setActive(null)}
       >
         <line class="tm-chart__base" x1="0" x2={width} y1={CHART_HEIGHT} y2={CHART_HEIGHT} />
         {days.map((d, i) => {
           const h = (d.conversations / max) * (CHART_HEIGHT - 8);
           return (
-            <g key={d.day} onMouseEnter={() => setActive(d)}>
-              {/* Hit target: the whole column, bigger than the bar. */}
-              <rect class="tm-chart__hit" x={i * step} y="0" width={step} height={CHART_HEIGHT} />
+            <g key={d.day}>
               <rect
-                class="tm-chart__bar"
+                class={`tm-chart__bar${active?.day === d.day ? ' tm-chart__bar--active' : ''}`}
                 x={i * step + BAR_GAP / 2}
                 y={CHART_HEIGHT - h}
                 width={Math.max(step - BAR_GAP, 1)}

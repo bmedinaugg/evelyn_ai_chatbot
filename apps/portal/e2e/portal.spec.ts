@@ -118,6 +118,11 @@ test('shows metrics for the last 7 days and yesterday’s report topics', async 
   await expect(tile('Tevredenheid (duimpjes)')).toContainText('75%');
   await expect(page.getByRole('img', { name: 'Gesprekken per dag' })).toBeVisible();
   await expect(page.locator('.tm-chart__bar')).toHaveCount(7);
+  const chart = page.getByRole('img', { name: 'Gesprekken per dag' });
+  const box = await chart.boundingBox();
+  if (box) await page.mouse.move(box.x + box.width - 5, box.y + box.height / 2);
+  await expect(page.locator('.tm-chart__readout')).toContainText('10 gesprekken, 6 opgelost');
+  await expect(page.locator('.tm-chart__bar--active')).toHaveCount(1);
   await expect(page.getByText('Bevriezen bij zwangerschap')).toBeVisible();
   const metricsCall = api.requests.find((r) => r.path === '/portal/api/metrics');
   expect(metricsCall).toBeDefined();
@@ -127,6 +132,9 @@ test('shows metrics for the last 7 days and yesterday’s report topics', async 
 
   await page.getByRole('link', { name: /Bekijk de gesprekken die op/ }).click();
   await expect(page.getByText(/Gemarkeerd op/)).toBeVisible();
-  expect(api.requests.at(-1)?.path).toBe('/portal/api/flagged');
-  expect(api.requests.at(-1)?.query).toContain('day=');
+  await expect
+    .poll(() =>
+      api.requests.some((r) => r.path === '/portal/api/flagged' && r.query?.includes('day=')),
+    )
+    .toBe(true);
 });
