@@ -80,7 +80,7 @@ select ok(
   'the audit log is append-only'
 );
 select ok(not has_function_privilege('anon', 'public.set_capability(text,boolean,text,text)', 'execute'), 'anon cannot switch');
-select ok(not has_function_privilege('anon', 'public.list_flagged_conversations(text,timestamptz,integer,integer)', 'execute'), 'anon cannot list');
+select ok(not has_function_privilege('anon', 'public.list_flagged_conversations(text,timestamptz,integer,integer,timestamptz)', 'execute'), 'anon cannot list');
 
 -- Sessions store only a hash of the session id.
 select ok(

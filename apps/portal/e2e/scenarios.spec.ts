@@ -82,7 +82,13 @@ test('replays a conversation with a draft, side by side', async ({ page }) => {
   await expect(row).toContainText('Ik kon hier geen betrouwbaar antwoord op vinden.');
   await expect(row).toContainText('Alleen hulphonden zijn toegestaan.');
   await expect(row).toContainText('Gebruikt het concept');
-  expect(api.requests.find((r) => r.path.endsWith('/replay'))?.body).toEqual({ versionId: 2 });
+  await expect(row).toContainText('Beter');
+  await expect(row).toContainText('Beantwoordt de vraag nu wel.');
+  await expect(panel.getByText('1 beter · 0 gelijk · 0 slechter')).toBeVisible();
+  expect(api.requests.find((r) => r.path.endsWith('/replay'))?.body).toEqual({
+    versionId: 2,
+    lang: 'nl',
+  });
 });
 
 test('says when testing is not available', async ({ page }) => {

@@ -1,7 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { Reply } from '@trainmore/core';
+import type { JudgeItem, Reply, Verdict } from '@trainmore/core';
 import {
   type CustomerStatus,
+  type MetricsRepository,
   PORTAL_ROLES,
   type PortalRepository,
   type PortalRole,
@@ -24,13 +25,23 @@ export type ReplayRunner = (input: {
   draft: ScenarioHit;
 }) => Promise<{ question: string; reply: Reply }[]>;
 
+/** Advisory verdict per replayed question (core judgeReplay); null when the judge failed. */
+export type ReplayJudge = (input: {
+  items: JudgeItem[];
+  draftAnswer: string;
+  lang: Lang;
+}) => Promise<Verdict[] | null>;
+
 export type PortalDeps = {
   config: PortalConfig;
   entra: EntraClient;
   repo: PortalRepository;
   scenarios: ScenarioRepository;
+  metrics: MetricsRepository;
   /** Null where Magicline is not the mock (production): replay is refused there. */
   replay: ReplayRunner | null;
+  /** Null when no judge is configured: replays are then shown without verdicts. */
+  judge: ReplayJudge | null;
 };
 
 const LOGIN_COOKIE = 'tm_portal_login';

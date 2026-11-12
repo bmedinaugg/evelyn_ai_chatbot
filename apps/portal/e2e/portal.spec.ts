@@ -106,3 +106,35 @@ test('explains a missing portal role', async ({ page }) => {
   await page.goto('/portal/?signin_error=no_role');
   await expect(page.getByRole('alert')).toContainText('geen rol voor dit portaal');
 });
+
+test('shows metrics for the last 7 days and yesterday’s report topics', async ({ page }) => {
+  const api = await mockPortal(page, agent);
+  await page.goto('/portal/#/metrics');
+  await expect(page.getByRole('heading', { name: 'Statistieken' })).toBeVisible();
+  const tile = (label: string) =>
+    page.locator('.tm-tile', { has: page.getByText(label, { exact: true }) });
+  await expect(tile('Gesprekken')).toContainText('70');
+  await expect(tile('Opgelost door de bot')).toContainText('60%');
+  await expect(tile('Tevredenheid (duimpjes)')).toContainText('75%');
+  await expect(page.getByRole('img', { name: 'Gesprekken per dag' })).toBeVisible();
+  await expect(page.locator('.tm-chart__bar')).toHaveCount(7);
+  const chart = page.getByRole('img', { name: 'Gesprekken per dag' });
+  const box = await chart.boundingBox();
+  if (box) await page.mouse.move(box.x + box.width - 5, box.y + box.height / 2);
+  await expect(page.locator('.tm-chart__readout')).toContainText('10 gesprekken, 6 opgelost');
+  await expect(page.locator('.tm-chart__bar--active')).toHaveCount(1);
+  await expect(page.getByText('Bevriezen bij zwangerschap')).toBeVisible();
+  const metricsCall = api.requests.find((r) => r.path === '/portal/api/metrics');
+  expect(metricsCall).toBeDefined();
+
+  await page.getByRole('combobox').selectOption({ label: 'Afgelopen 30 dagen' });
+  await expect(page.locator('.tm-chart__bar')).toHaveCount(30);
+
+  await page.getByRole('link', { name: /Bekijk de gesprekken die op/ }).click();
+  await expect(page.getByText(/Gemarkeerd op/)).toBeVisible();
+  await expect
+    .poll(() =>
+      api.requests.some((r) => r.path === '/portal/api/flagged' && r.query?.includes('day=')),
+    )
+    .toBe(true);
+});

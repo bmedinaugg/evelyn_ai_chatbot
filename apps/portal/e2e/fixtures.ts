@@ -2,7 +2,9 @@ import type { Page, Route } from '@playwright/test';
 
 export const CONV = '00000000-0000-4000-8000-000000000001';
 
-export type MockPortal = { requests: { method: string; path: string; body: unknown }[] };
+export type MockPortal = {
+  requests: { method: string; path: string; body: unknown; query?: string }[];
+};
 
 /** Mocks /portal/api and /portal/auth/logout. `me`: the signed-in agent, or an HTTP status. */
 type Version = {
@@ -112,7 +114,12 @@ export async function mockPortal(
   await page.route('**/portal/api/**', async (route: Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    api.requests.push({ method: request.method(), path, body: request.postDataJSON() });
+    api.requests.push({
+      method: request.method(),
+      path,
+      body: request.postDataJSON(),
+      query: new URL(request.url()).search,
+    });
     if (path === '/portal/api/me') {
       if (!signedIn || me === 401)
         return route.fulfill({ status: 401, json: { error: 'unauthorized' } });
@@ -197,6 +204,66 @@ export async function mockPortal(
               usesDraft: true,
               outcome: 'answered',
               action: 'none',
+            },
+          ],
+          judgement: {
+            verdicts: [{ verdict: 'better', reason: 'Beantwoordt de vraag nu wel.' }],
+            summary: { better: 1, same: 0, worse: 0 },
+          },
+        },
+      });
+    }
+    if (path === '/portal/api/metrics') {
+      const url = new URL(request.url());
+      const from = url.searchParams.get('from') ?? '';
+      const to = url.searchParams.get('to') ?? '';
+      const days: Record<string, unknown>[] = [];
+      for (let d = new Date(`${from}T00:00:00Z`); d <= new Date(`${to}T00:00:00Z`); ) {
+        days.push({
+          day: d.toISOString().slice(0, 10),
+          conversations: 10,
+          resolved: 6,
+          escalations: 1,
+          thumbsUp: 3,
+          thumbsDown: 1,
+          approvedAnswers: 1,
+          logins: 2,
+          flags: { no_match: 2 },
+        });
+        d.setUTCDate(d.getUTCDate() + 1);
+      }
+      const n = days.length;
+      return route.fulfill({
+        json: {
+          from,
+          to,
+          days,
+          totals: {
+            conversations: 10 * n,
+            resolved: 6 * n,
+            escalations: n,
+            thumbsUp: 3 * n,
+            thumbsDown: n,
+            approvedAnswers: n,
+            logins: 2 * n,
+            flags: { no_match: 2 * n },
+          },
+        },
+      });
+    }
+    if (path.startsWith('/portal/api/reports/')) {
+      return route.fulfill({
+        json: {
+          day: path.split('/').at(-1),
+          sentAt: '2026-11-13T06:00:00Z',
+          recipientsCount: 2,
+          clustered: true,
+          topics: [
+            {
+              labelNl: 'Bevriezen bij zwangerschap',
+              labelEn: 'Freezing when pregnant',
+              count: 4,
+              conversationIds: [CONV],
             },
           ],
         },

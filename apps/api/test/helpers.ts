@@ -8,6 +8,7 @@ import type {
   ConversationRepository,
   EscalationRepository,
   FaqRepository,
+  MetricsRepository,
   PortalActor,
   PortalRepository,
   PortalSession,
@@ -17,7 +18,7 @@ import type {
   StoredMessage,
 } from '@trainmore/db';
 import type { CreateTicketInput } from '@trainmore/freshdesk';
-import { createLogger } from '@trainmore/shared';
+import { createLogger, shiftDay } from '@trainmore/shared';
 import type { EntraClaims, EntraClient } from '../src/portal/entra.ts';
 import { type ApiDeps, buildApiServer } from '../src/server.ts';
 
@@ -43,7 +44,12 @@ export function createTestApi(
     }[];
     magiclineDown?: boolean;
     /** Portal on, with the claims the fake Entra returns on login. */
-    portal?: { claims?: Partial<EntraClaims>; replayAvailable?: boolean };
+    portal?: {
+      claims?: Partial<EntraClaims>;
+      replayAvailable?: boolean;
+      /** Replay judge: answers 'better' for every question (default), fails, or is not configured. */
+      judge?: 'ok' | 'fail' | 'off';
+    };
     /** Extra Freshdesk tag marking non-production tickets (e.g. chatbot-preprod). */
     envTag?: string;
     /** Synced Freshdesk topics (empty: built-in defaults apply). */
@@ -299,6 +305,49 @@ export function createTestApi(
   const audits: Parameters<PortalRepository['audit']>[0][] = [];
   const capabilitySwitches: { name: string; enabled: boolean; actor: string }[] = [];
   const entraCalls: { authUrl: unknown[]; redeem: unknown[] } = { authUrl: [], redeem: [] };
+  const flaggedCalls: Parameters<PortalRepository['listFlagged']>[0][] = [];
+  const metricsCalls: [string, string][] = [];
+  const metricsRepo: MetricsRepository = {
+    async dailyMetrics(from, to) {
+      metricsCalls.push([from, to]);
+      const days: string[] = [];
+      for (let d = from; d <= to; d = shiftDay(d, 1)) days.push(d);
+      return days.map((day) => ({
+        day,
+        conversations: 10,
+        resolved: 6,
+        escalations: 1,
+        thumbsUp: 2,
+        thumbsDown: 1,
+        approvedAnswers: 1,
+        logins: 3,
+        flags: { no_match: 2 },
+      }));
+    },
+    async flaggedQuestions() {
+      return [];
+    },
+    async claimReport() {
+      return 'claim-1';
+    },
+    async finishReport() {
+      return true;
+    },
+    async releaseReport() {},
+    async getReport(day) {
+      return day === '2026-11-12'
+        ? {
+            day,
+            sentAt: '2026-11-13T06:00:00Z',
+            recipientsCount: 2,
+            clustered: true,
+            topics: [
+              { labelNl: 'Bevriezen', labelEn: 'Freezing', count: 2, conversationIds: ['c1'] },
+            ],
+          }
+        : null;
+    },
+  };
   const portalRepo: PortalRepository = {
     async createSession(input) {
       portalSessions.set(input.idHash, {
@@ -319,7 +368,8 @@ export function createTestApi(
     async audit(entry) {
       audits.push(entry);
     },
-    async listFlagged() {
+    async listFlagged(input) {
+      flaggedCalls.push(input);
       return [
         {
           conversationId: '00000000-0000-4000-8000-000000000001',
@@ -472,6 +522,7 @@ export function createTestApi(
     },
   };
   const replayCalls: unknown[] = [];
+  const judgeCalls: unknown[] = [];
 
   let portalClaims = options.portal?.claims;
   const entra: EntraClient = {
@@ -507,6 +558,7 @@ export function createTestApi(
             entra,
             repo: portalRepo,
             scenarios: scenarioRepo,
+            metrics: metricsRepo,
             replay:
               options.portal.replayAvailable === false
                 ? null
@@ -523,6 +575,17 @@ export function createTestApi(
                         flags: [],
                         scenarioVersionId: input.draft.versionId,
                       },
+                    }));
+                  },
+            judge:
+              options.portal.judge === 'off'
+                ? null
+                : async (input) => {
+                    judgeCalls.push(input);
+                    if (options.portal?.judge === 'fail') return null;
+                    return input.items.map(() => ({
+                      verdict: 'better' as const,
+                      reason: 'Answers the question.',
                     }));
                   },
           },
@@ -598,6 +661,9 @@ export function createTestApi(
     entraCalls,
     scenarioVersions,
     replayCalls,
+    judgeCalls,
+    flaggedCalls,
+    metricsCalls,
     /** The next portal sign-in returns these claims (a second person on the same server). */
     setPortalClaims(claims: Partial<EntraClaims>) {
       portalClaims = claims;

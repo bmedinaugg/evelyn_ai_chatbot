@@ -33,6 +33,34 @@ describe('parseArgs', () => {
     expect(parseArgs(['sync-faq', '--email', 'a@example.com'])).toBeUndefined();
   });
 
+  it('parses daily-report with --day and --resend', () => {
+    expect(parseArgs(['daily-report'])).toEqual({
+      command: 'daily-report',
+      allowMassChange: false,
+      resend: false,
+    });
+    expect(parseArgs(['daily-report', '--day', '2026-10-25', '--resend'])).toEqual({
+      command: 'daily-report',
+      allowMassChange: false,
+      day: '2026-10-25',
+      resend: true,
+    });
+    expect(parseArgs(['daily-report', '--day'])).toBeUndefined();
+    expect(parseArgs(['daily-report', '--day', '2026-02-30'])).toBeUndefined();
+    expect(parseArgs(['daily-report', '--allow-mass-change'])).toBeUndefined();
+    expect(parseArgs(['retention', '--resend'])).toBeUndefined();
+  });
+
+  it('accepts --day only locally (servers report on yesterday)', async () => {
+    await expect(
+      runCommand(
+        'daily-report',
+        { NODE_ENV: 'production', APP_ENV: 'preprod', AWS_REGION: 'eu-west-1' },
+        { allowMassChange: false, day: '2026-10-25', resend: false },
+      ),
+    ).rejects.toThrow(/--day only works with APP_ENV=local/);
+  });
+
   it('rejects unknown commands and flags', () => {
     expect(parseArgs(['drop-everything'])).toBeUndefined();
     expect(parseArgs(['sync-faq', '--force'])).toBeUndefined();

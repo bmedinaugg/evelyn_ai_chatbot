@@ -126,8 +126,51 @@ const replaySchema = z.object({
       action: z.string(),
     }),
   ),
+  /** Advisory verdicts of the LLM judge; null when it is unavailable. */
+  judgement: z
+    .object({
+      verdicts: z.array(
+        z.object({ verdict: z.enum(['better', 'same', 'worse']), reason: z.string() }),
+      ),
+      summary: z.object({ better: z.number(), same: z.number(), worse: z.number() }),
+    })
+    .nullable()
+    .default(null),
 });
 export type ReplayResult = z.infer<typeof replaySchema>;
+
+const metricsFields = {
+  conversations: z.number(),
+  resolved: z.number(),
+  escalations: z.number(),
+  thumbsUp: z.number(),
+  thumbsDown: z.number(),
+  approvedAnswers: z.number(),
+  logins: z.number(),
+  flags: z.partialRecord(z.enum(FLAG_REASONS), z.number()),
+};
+const metricsSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  days: z.array(z.object({ day: z.string(), ...metricsFields })),
+  totals: z.object(metricsFields),
+});
+export type Metrics = z.infer<typeof metricsSchema>;
+export type DayMetrics = Metrics['days'][number];
+
+const reportSchema = z.object({
+  day: z.string(),
+  clustered: z.boolean().nullable(),
+  topics: z.array(
+    z.object({
+      labelNl: z.string(),
+      labelEn: z.string(),
+      count: z.number(),
+      conversationIds: z.array(z.string()),
+    }),
+  ),
+});
+export type Report = z.infer<typeof reportSchema>;
 
 export type PortalApiErrorKind =
   | 'unauthorized'
@@ -154,13 +197,18 @@ export class PortalApiError extends Error {
 export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
   const doFetch = opts.fetch ?? fetch.bind(globalThis);
 
-  async function call<T>(path: string, init: RequestInit, schema: z.ZodType<T> | null): Promise<T> {
+  async function call<T>(
+    path: string,
+    init: RequestInit,
+    schema: z.ZodType<T> | null,
+    timeoutMs = 20_000,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await doFetch(`/portal${path}`, {
         ...init,
         credentials: 'same-origin',
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new PortalApiError('network');
@@ -197,9 +245,11 @@ export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
 
   return {
     me: () => call('/api/me', {}, meSchema),
-    flagged(filter: { reason?: FlagReason; days: number; page: number }) {
+    /** `day` (YYYY-MM-DD, Amsterdam) limits the list to that day and overrides `days`. */
+    flagged(filter: { reason?: FlagReason; days: number; page: number; day?: string }) {
       const query = new URLSearchParams({ days: String(filter.days), page: String(filter.page) });
       if (filter.reason) query.set('reason', filter.reason);
+      if (filter.day) query.set('day', filter.day);
       return call(`/api/flagged?${query}`, {}, flaggedSchema);
     },
     conversation: (id: string) =>
@@ -241,12 +291,26 @@ export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
     },
     archive: (id: string) =>
       call<void>(`/api/scenarios/${encodeURIComponent(id)}/archive`, { method: 'POST' }, null),
-    replay: (conversationId: string, versionId: number) =>
+    /** `lang`: the reviewer's language, for the judge's reasons. */
+    replay: (conversationId: string, versionId: number, lang: 'nl' | 'en') =>
       call(
         `/api/conversations/${encodeURIComponent(conversationId)}/replay`,
-        json('POST', { versionId }),
+        json('POST', { versionId, lang }),
         replaySchema,
+        // Up to 10 answers plus the judge: just under the 60 s CloudFront origin timeout.
+        55_000,
       ),
+    metrics: (from: string, to: string) =>
+      call(`/api/metrics?${new URLSearchParams({ from, to })}`, {}, metricsSchema),
+    /** Null when no report was sent for that day. */
+    async report(day: string): Promise<Report | null> {
+      try {
+        return await call(`/api/reports/${encodeURIComponent(day)}`, {}, reportSchema);
+      } catch (error) {
+        if (error instanceof PortalApiError && error.kind === 'not_found') return null;
+        throw error;
+      }
+    },
   };
 }
 

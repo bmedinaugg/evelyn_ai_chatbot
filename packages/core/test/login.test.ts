@@ -1,6 +1,6 @@
 import { Writable } from 'node:stream';
 import type { AccountCandidate, AuthRepository, AuthState, VerifyResult } from '@trainmore/db';
-import type { EmailSender, LoginCodeMessage } from '@trainmore/email';
+import type { LoginCodeMessage } from '@trainmore/email';
 import type { CustomerLookup } from '@trainmore/magicline';
 import { createLogger } from '@trainmore/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -93,7 +93,7 @@ let logOutput: string;
 let auth: ReturnType<typeof fakeAuth>;
 
 function deps(): LoginDeps {
-  const email: EmailSender = {
+  const email: LoginDeps['email'] = {
     async sendLoginCode(message) {
       sent.push(message);
     },

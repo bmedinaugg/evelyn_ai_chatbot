@@ -69,7 +69,7 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
   };
 }
 
-export type ClaudeConfig = { chatModel: string };
+export type ClaudeConfig = { chatModel: string; fastModel: string };
 export type ApiConfig = {
   port: number;
   trustProxyHops: number;
@@ -78,19 +78,24 @@ export type ApiConfig = {
 };
 export type TurnstileConfig = { secretKey: string };
 
+const claudeModel = (fallback: string) =>
+  z
+    .string()
+    .default(fallback)
+    .refine((model) => /^claude-[a-z0-9-]+$/.test(model), {
+      message: `must be a Claude model id such as ${fallback}`,
+    });
+
 export function loadClaudeConfig(env: Env = process.env): ClaudeConfig {
   const e = parseEnv(
     z.object({
-      CLAUDE_CHAT_MODEL: z
-        .string()
-        .default('claude-sonnet-5-5')
-        .refine((model) => /^claude-[a-z0-9-]+$/.test(model), {
-          message: 'must be a Claude model id such as claude-sonnet-5-5',
-        }),
+      CLAUDE_CHAT_MODEL: claudeModel('claude-sonnet-5-5'),
+      // Clustering the daily report and judging replays (M5).
+      CLAUDE_FAST_MODEL: claudeModel('claude-haiku-5-5'),
     }),
     env,
   );
-  return { chatModel: e.CLAUDE_CHAT_MODEL };
+  return { chatModel: e.CLAUDE_CHAT_MODEL, fastModel: e.CLAUDE_FAST_MODEL };
 }
 
 const HTTPS_ORIGIN = /^https:\/\/[a-z0-9.-]+(:\d+)?$/;
@@ -226,6 +231,43 @@ export function loadMagiclineKeysConfig(env: Env = process.env): MagiclineKeysCo
     : { kind: 'secret', secretName: e.MAGICLINE_KEYS_SECRET_NAME ?? '' };
 }
 
+export type ReportConfig = { recipients: string[]; lang: 'nl' | 'en'; portalBaseUrl: string };
+
+const portalBaseUrl = z
+  .url({ protocol: /^https?$/ })
+  .refine(
+    (url) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url),
+    {
+      message: 'must be https (http only for localhost)',
+    },
+  )
+  .transform((url) => url.replace(/\/+$/, ''));
+
+/** Daily report email (worker `daily-report`). */
+export function loadReportConfig(env: Env = process.env): ReportConfig {
+  const e = parseEnv(
+    z.object({
+      DAILY_REPORT_RECIPIENTS: z
+        .string()
+        .transform((raw) =>
+          raw
+            .split(',')
+            .map((address) => address.trim())
+            .filter(Boolean),
+        )
+        .pipe(z.array(z.email()).min(1).max(50)),
+      DAILY_REPORT_LANG: z.enum(['nl', 'en']).default('nl'),
+      PORTAL_BASE_URL: portalBaseUrl,
+    }),
+    env,
+  );
+  return {
+    recipients: e.DAILY_REPORT_RECIPIENTS,
+    lang: e.DAILY_REPORT_LANG,
+    portalBaseUrl: e.PORTAL_BASE_URL,
+  };
+}
+
 export type PortalConfig = {
   tenantId: string;
   clientId: string;
@@ -252,15 +294,7 @@ export function loadPortalConfig(env: Env = process.env): PortalConfig | null {
       ENTRA_TENANT_ID: z.uuid(),
       ENTRA_CLIENT_ID: z.uuid(),
       ENTRA_CLIENT_SECRET: z.string().min(1),
-      PORTAL_BASE_URL: z
-        .url({ protocol: /^https?$/ })
-        .refine(
-          (url) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url),
-          {
-            message: 'must be https (http only for localhost)',
-          },
-        )
-        .transform((url) => url.replace(/\/+$/, '')),
+      PORTAL_BASE_URL: portalBaseUrl,
       PORTAL_SESSION_SECRET: z.string().min(32),
     }),
     env,

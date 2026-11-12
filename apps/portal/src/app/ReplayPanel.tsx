@@ -28,7 +28,7 @@ export function ReplayPanel(props: { api: PortalApi; lang: Lang; conversationId:
     setState('running');
     setResult(null);
     try {
-      setResult(await api.replay(props.conversationId, Number(versionId)));
+      setResult(await api.replay(props.conversationId, Number(versionId), lang));
       setState('idle');
     } catch (error) {
       setState(
@@ -83,12 +83,21 @@ export function ReplayPanel(props: { api: PortalApi; lang: Lang; conversationId:
         </p>
       )}
       {result && (
+        <p class="tm-judge-summary">
+          <strong>{t(lang, 'portal.replay.judge.title')}: </strong>
+          {result.judgement
+            ? t(lang, 'portal.replay.judge.summary', result.judgement.summary)
+            : t(lang, 'portal.replay.judge.unavailable')}
+        </p>
+      )}
+      {result && (
         <table class="tm-table">
           <thead>
             <tr>
               <th scope="col">{t(lang, 'portal.replay.question')}</th>
               <th scope="col">{t(lang, 'portal.replay.before')}</th>
               <th scope="col">{t(lang, 'portal.replay.after')}</th>
+              {result.judgement && <th scope="col">{t(lang, 'portal.replay.judge.title')}</th>}
             </tr>
           </thead>
           <tbody>
@@ -105,6 +114,22 @@ export function ReplayPanel(props: { api: PortalApi; lang: Lang; conversationId:
                     </span>
                   )}
                 </td>
+                {result.judgement && (
+                  <td>
+                    {(() => {
+                      const v = result.judgement.verdicts[i];
+                      if (!v) return null;
+                      return (
+                        <>
+                          <span class={`tm-verdict tm-verdict--${v.verdict}`}>
+                            {t(lang, `portal.replay.judge.${v.verdict}`)}
+                          </span>{' '}
+                          {v.reason}
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -56,5 +56,19 @@ Test logins (mock Magicline):
 11. **Mobile:** narrow the browser below 480 px → the chat covers the screen; Escape closes it.
 
 ## Answer quality (costs money, asks first)
-The eval suite runs 31 bilingual cases against the synthetic FAQ set with the real model; see
-"Evals" in the README (first run 2026-11-12: 30/31, about $0.06).
+The eval suite runs 35 bilingual cases against the synthetic FAQ set with the real model; see
+"Evals" in the README (first run 2026-11-12, with 31 cases: 30/31, about $0.06).
+
+The fast-model prompts (M5: daily report grouping and the replay judge) have their own 4 cases,
+including injection attempts, on synthetic text only. Run them with
+`APP_ENV=local EVAL_CONFIRM_SPEND=yes pnpm --filter @trainmore/evals eval:fast` (a fraction of a
+cent). Without those settings the script refuses to start.
+
+## Daily report and metrics (M5)
+1. Chat a little locally (`pnpm dev:local`), give one answer a thumbs down, and ask something the
+   FAQ cannot answer.
+2. Run `node apps/worker/src/main.ts daily-report --day <today> --resend` with `APP_ENV=local`,
+   `DAILY_REPORT_RECIPIENTS` and `PORTAL_BASE_URL`. The local outbox prints the email. Check that
+   email addresses and phone numbers in your questions show as `[•••]`.
+3. In the portal, open **Statistieken / Metrics**. The numbers match your chats, and the topic link
+   opens the conversations flagged on that day.

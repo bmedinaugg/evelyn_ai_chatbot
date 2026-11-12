@@ -83,6 +83,8 @@ Settings → Environments → **preprod** (add yourself as required reviewer), t
 | Variable | `EMAIL_FROM` | sender of login codes, e.g. `chatbot-preprod@trainmore.nl` |
 | Variable | `TURNSTILE_SITE_KEY` | Turnstile site key (public) |
 | Variable | `PRIVACY_URL` | privacy statement URL shown in the consent notice |
+| Variable | `DAILY_REPORT_RECIPIENTS` | optional: comma-separated support addresses (no spaces, at most 50) for the 07:00 daily report; the report is only scheduled with the portal on and this set |
+| Variable | `DAILY_REPORT_LANG` | optional: `nl` (default) or `en` |
 | Secret | `SUPABASE_DB_URL` | Supabase database connection string (migrations) |
 
 ## First deploy (three steps)
@@ -175,6 +177,18 @@ http://localhost:5174/portal/. The dev server forwards `/portal/api` and `/porta
 ## Routine deploys
 Run **Deploy preprod**. Images are tagged with the commit and are immutable, so redeploying the
 same commit reuses its image.
+
+## Daily report
+- **Schedule:** 07:00 Europe/Amsterdam, about the previous day. The report task is the only worker
+  with the Claude key (topic grouping) and SES permission.
+- **SES sandbox (preprod):** every recipient address must be verified in SES first. Each person
+  clicks the link in the verification email.
+- **Send again** (for example after a failed run): run the report task once with the command
+  override `node apps/worker/src/main.ts daily-report --resend`. That reports yesterday again.
+  Other days can only be re-sent locally (`--day`).
+- **Locally:** set `DAILY_REPORT_RECIPIENTS` and `PORTAL_BASE_URL`, then run
+  `node apps/worker/src/main.ts daily-report --day 2026-11-12 --resend` with `APP_ENV=local`. The
+  local outbox prints the email instead of sending it.
 
 ## Deletion requests (DSAR)
 The address is **typed** in an interactive session, never put on a command line or in a task

@@ -27,7 +27,7 @@ const waf = new WafStack(app, 'TrainmoreChatbot-preprod-waf', {
   env: { region: 'us-east-1' },
   crossRegionReferences: true,
 });
-new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
+const service = new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
   envName: 'preprod',
   env,
   crossRegionReferences: true,
@@ -42,10 +42,23 @@ new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
     : {}),
   config: PREPROD_CONFIG,
 });
+// Daily report: needs the portal (its links) and recipients (-c reportRecipients=a@x,b@y).
+const reportRecipients: unknown = app.node.tryGetContext('reportRecipients');
+const dailyReport =
+  app.node.tryGetContext('portal') === 'on' &&
+  typeof reportRecipients === 'string' &&
+  reportRecipients.trim() !== ''
+    ? {
+        recipients: reportRecipients,
+        lang: app.node.tryGetContext('reportLang') === 'en' ? ('en' as const) : ('nl' as const),
+        portalBaseUrl: `https://${service.distribution.distributionDomainName}`,
+      }
+    : undefined;
 new WorkerStack(app, 'TrainmoreChatbot-preprod-worker', {
   envName: 'preprod',
   env,
   foundation,
   imageTag: context('imageTag'),
   config: PREPROD_CONFIG,
+  ...(dailyReport ? { dailyReport } : {}),
 });

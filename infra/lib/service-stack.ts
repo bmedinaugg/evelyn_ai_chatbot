@@ -28,6 +28,8 @@ export type ServiceConfig = {
     topicField: string;
   };
   chatModel: string;
+  /** Fast model for the daily report clustering and the replay judge. */
+  fastModel: string;
 };
 
 export type ServiceStackProps = StackProps & {
@@ -193,6 +195,7 @@ export class ServiceStack extends Stack {
         WIDGET_ALLOWED_ORIGINS: widgetOrigin,
         SUPPORT_CONTACT_URL: config.supportContactUrl,
         CLAUDE_CHAT_MODEL: config.chatModel,
+        CLAUDE_FAST_MODEL: config.fastModel,
         FRESHDESK_DOMAIN: config.freshdesk.domain,
         FRESHDESK_PORTAL_URL: config.freshdesk.portalUrl,
         FRESHDESK_PORTAL_ID: config.freshdesk.portalId,

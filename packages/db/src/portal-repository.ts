@@ -62,6 +62,8 @@ export interface PortalRepository {
   listFlagged(input: {
     reason?: FlagReason;
     since: Date;
+    /** Exclusive end of the window (one report day); open-ended when absent. */
+    until?: Date;
     limit: number;
     offset: number;
   }): Promise<FlaggedConversation[]>;
@@ -140,6 +142,7 @@ export function createSupabasePortalRepository(client: ServiceClient): PortalRep
         p_since: input.since.toISOString(),
         p_limit: input.limit,
         p_offset: input.offset,
+        ...(input.until ? { p_until: input.until.toISOString() } : {}),
       });
       if (error) throw new DbError('list_flagged_conversations', error.code);
       return z
