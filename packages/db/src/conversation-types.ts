@@ -1,5 +1,7 @@
 import type { Lang } from '@trainmore/i18n';
 
+export type CustomerStatus = 'MEMBER' | 'PROSPECT' | 'FORMER_MEMBER';
+
 export const OUTCOMES = [
   'answered',
   'declined',

@@ -21,14 +21,14 @@ export type Database = {
                   ]
                 },"conversations": {
                   Row: {
-                    "created_at": string,"id": string,"lang": string,"last_message_at": string | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number
+                    "account_candidates": Json | null,"created_at": string,"customer_id": number | null,"customer_status": string | null,"id": string,"lang": string,"last_message_at": string | null,"studio_id": number | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number,"verified_at": string | null,"verified_email_hash": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"lang": string,"last_message_at"?: string | null,"token_hash": string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                    "account_candidates"?: Json | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang": string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash": string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"token_hash"?: string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number
+                    "account_candidates"?: Json | null,"created_at"?: string,"customer_id"?: number | null,"customer_status"?: string | null,"id"?: string,"lang"?: string,"last_message_at"?: string | null,"studio_id"?: number | null,"token_hash"?: string,"turn_claim_id"?: string | null,"turn_claimed_at"?: string | null,"user_message_count"?: number,"verified_at"?: string | null,"verified_email_hash"?: string | null
                   }
                   Relationships: [
                     
@@ -113,6 +113,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"otp_challenges": {
+                  Row: {
+                    "attempts": number,"code_hash": string,"consumed_at": string | null,"conversation_id": string,"created_at": string,"email_hash": string,"expires_at": string,"id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"code_hash": string,"consumed_at"?: string | null,"conversation_id": string,"created_at"?: string,"email_hash": string,"expires_at": string,"id": string
+                  }
+                  Update: {
+                    "attempts"?: number,"code_hash"?: string,"consumed_at"?: string | null,"conversation_id"?: string,"created_at"?: string,"email_hash"?: string,"expires_at"?: string,"id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "otp_challenges_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -122,8 +142,14 @@ isOneToOne: false
             "append_chat_turn":
 { Args: { "p_assistant": Json,"p_claim_id": string,"p_conversation_id": string,"p_flags": (string)[],"p_user": Json }; Returns: undefined
                            },
+"bind_account":
+{ Args: { "p_conversation_id": string,"p_index": number }; Returns: boolean
+                           },
 "claim_conversation_turn":
 { Args: { "p_id": string }; Returns: string
+                           },
+"create_otp_challenge":
+{ Args: { "p_code_hash": string,"p_conversation_id": string,"p_email_hash": string,"p_id": string,"p_max_per_window": number,"p_ttl_seconds": number,"p_window_seconds": number }; Returns: boolean
                            },
 "release_conversation_turn":
 { Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
@@ -132,6 +158,12 @@ isOneToOne: false
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {
               "article_id": number,"body": string,"lang": string,"rank": number,"title": string,"url": string
             }[]
+                           },
+"set_account_candidates":
+{ Args: { "p_candidates": Json,"p_conversation_id": string }; Returns: undefined
+                           },
+"verify_otp_attempt":
+{ Args: { "p_challenge_id": string,"p_code_hash": string,"p_conversation_id": string,"p_max_attempts": number }; Returns: string
                            }
           }
           Enums: {

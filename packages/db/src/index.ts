@@ -1,3 +1,5 @@
+export { createSupabaseAuthRepository } from './auth-repository.ts';
+export type { AccountCandidate, AuthRepository, AuthState, VerifyResult } from './auth-types.ts';
 export { createServiceClient, DbError, type ServiceClient } from './client.ts';
 export { createSupabaseConversationRepository } from './conversation-repository.ts';
 export {
@@ -6,6 +8,7 @@ export {
   ClaimLostError,
   type ConversationRecord,
   type ConversationRepository,
+  type CustomerStatus,
   FLAG_REASONS,
   type FlagReason,
   OUTCOMES,
