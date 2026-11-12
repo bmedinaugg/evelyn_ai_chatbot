@@ -294,12 +294,18 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 ## 8. Milestones
 Each milestone ends with tests passing and a preprod deploy.
 
-**M0: Foundations**
+**M0: Foundations** ✅ done 2026-11-11 (branch `m0-foundations`, plan `docs/superpowers/plans/2026-11-11-m0-foundations.md`)
 - monorepo, lint/typecheck, CI, CodeQL, Dependabot
 - Supabase baseline migrations with RLS
 - config loader, redacting logger, i18n package
 - CDK skeleton for preprod
 - generated Magicline types, mock server skeleton
+- Deviations:
+  - TypeScript 6.0.3 and Biome instead of TypeScript 7 (tooling compatibility)
+  - Node 26 instead of 24
+  - Types generated with `--default-non-nullable false`
+  - Database denies `anon`/`authenticated` by both grants and RLS
+  - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**
 - daily FAQ sync, hybrid retrieval
