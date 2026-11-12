@@ -4,12 +4,17 @@ const booleanString = z
   .enum(['true', 'false', '1', '0'])
   .transform((value) => value === 'true' || value === '1');
 
+/** Env keys every service needs; reused by loadRuntimeConfig. */
+export const runtimeEnvShape = {
+  NODE_ENV: z.enum(['development', 'test', 'production']),
+  APP_ENV: z.enum(['local', 'preprod', 'prod']),
+  AWS_REGION: z.string().min(1),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+};
+
 const envSchema = z
   .object({
-    NODE_ENV: z.enum(['development', 'test', 'production']),
-    APP_ENV: z.enum(['local', 'preprod', 'prod']),
-    AWS_REGION: z.string().min(1),
-    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+    ...runtimeEnvShape,
     MAGICLINE_BASE_URL: z.url(),
     MAGICLINE_USE_MOCK: booleanString,
   })
@@ -49,10 +54,15 @@ export class ConfigError extends Error {
   }
 }
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
-  const result = envSchema.safeParse(env, { reportInput: false });
+export type Env = Record<string, string | undefined>;
+
+/**
+ * Parses env with a schema, throwing ConfigError that names keys but never received values.
+ * Custom issue messages must not include values either.
+ */
+export function parseEnv<T extends z.ZodType>(schema: T, env: Env): z.output<T> {
+  const result = schema.safeParse(env, { reportInput: false });
   if (!result.success) {
-    // Only key names and our own messages: received values may be secrets.
     const issues = result.error.issues.map((issue) => {
       const key = issue.path.join('.') || '(root)';
       const reason = issue.code === 'custom' ? issue.message : describeIssue(issue);
@@ -60,7 +70,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     });
     throw new ConfigError(issues);
   }
-  const e = result.data;
+  return result.data;
+}
+
+export function loadConfig(env: Env = process.env): Config {
+  const e = parseEnv(envSchema, env);
   return {
     nodeEnv: e.NODE_ENV,
     appEnv: e.APP_ENV,

@@ -47,4 +47,5 @@ https://developers.freshdesk.com/api/#solutions and our live instance before rel
 - Article URL pattern (observed on the portal):
   `https://www.support.trainmore.com/{en|nl}/support/solutions/articles/{id}-{slug}`
   e.g. `/en/support/solutions/articles/103000345000-where-can-i-find-my-membership-number-`.
-  The URL works without the slug (unverified); store the URL per language at sync time.
+  Verified 2026-11-11: `/{en|nl}/support/solutions/articles/{id}` without a slug returns 200, so
+  the sync builds both URLs from the article id.

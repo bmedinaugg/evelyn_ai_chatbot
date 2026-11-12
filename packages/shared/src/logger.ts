@@ -9,6 +9,8 @@ import {
 import type { Config } from './config.ts';
 import { redactDeep, redactLogObject, scrubText } from './redact.ts';
 
+export type { Logger };
+
 export type LoggerOptions = {
   name: string;
   level: Config['logLevel'];

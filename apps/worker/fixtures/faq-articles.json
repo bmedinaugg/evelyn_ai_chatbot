@@ -1,0 +1,114 @@
+[
+  {
+    "id": 900101,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Hoe zeg ik mijn lidmaatschap op?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>Je kunt je lidmaatschap opzeggen via de app onder <b>Account &gt; Lidmaatschap</b>. De opzegtermijn is één maand. Je ontvangt een bevestiging per e-mail.</p>"
+    },
+    "en": {
+      "title": "How do I cancel my membership?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>You can cancel your membership in the app under <b>Account &gt; Membership</b>. The notice period is one month. You will receive a confirmation by email.</p>"
+    }
+  },
+  {
+    "id": 900102,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Wat zijn de openingstijden?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>De meeste clubs zijn open van maandag t/m vrijdag 07:00–23:00 en in het weekend 08:00–20:00. De exacte tijden per club staan in de app.</p>"
+    },
+    "en": {
+      "title": "What are the opening hours?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>Most clubs are open Monday to Friday 07:00–23:00 and at weekends 08:00–20:00. Exact times per club are shown in the app.</p>"
+    }
+  },
+  {
+    "id": 900103,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Kan ik mijn lidmaatschap bevriezen?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>Ja, bij langdurige blessure of zwangerschap kun je je lidmaatschap bevriezen. Neem hiervoor contact op met de klantenservice en stuur een verklaring mee.</p>"
+    },
+    "en": {
+      "title": "Can I freeze my membership?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>Yes, in case of a long-term injury or pregnancy you can freeze your membership. Contact customer service and include a statement.</p>"
+    }
+  },
+  {
+    "id": 900104,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Wanneer wordt de contributie afgeschreven?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>De contributie wordt per maand vooraf via automatische incasso afgeschreven, rond de eerste werkdag van de maand. Mislukt een incasso, dan proberen we het later opnieuw.</p>"
+    },
+    "en": {
+      "title": "When is the membership fee collected?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>The membership fee is collected monthly in advance by direct debit, around the first working day of the month. If a direct debit fails, we try again later.</p>"
+    }
+  },
+  {
+    "id": 900105,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Mag ik een vriend meenemen?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>Met een gastpas kun je een vriend meenemen. Je vriend moet zich vooraf registreren in de app en een geldig identiteitsbewijs meenemen.</p>"
+    },
+    "en": {
+      "title": "Can I bring a friend?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>With a guest pass you can bring a friend. Your friend must register in the app beforehand and bring valid ID.</p>"
+    }
+  },
+  {
+    "id": 900106,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Ik kan niet inloggen in de app",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><ul><li>Controleer of je het e-mailadres van je lidmaatschap gebruikt.</li><li>Gebruik <i>Wachtwoord vergeten</i> om een nieuw wachtwoord in te stellen.</li><li>Werk de app bij naar de nieuwste versie.</li></ul>"
+    },
+    "en": {
+      "title": "I can't log in to the app",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><ul><li>Check that you use the email address of your membership.</li><li>Use <i>Forgot password</i> to set a new password.</li><li>Update the app to the latest version.</li></ul>"
+    }
+  },
+  {
+    "id": 900107,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": {
+      "title": "Hoe werken de kluisjes?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>De kluisjes in de kleedkamer zijn gratis tijdens je bezoek. Neem je eigen hangslot mee. Kluisjes worden 's nachts geleegd.</p>"
+    },
+    "en": null
+  },
+  {
+    "id": 900108,
+    "folderId": 900001,
+    "updatedAt": "2026-11-01T09:00:00Z",
+    "nl": null,
+    "en": {
+      "title": "How do I book a personal trainer?",
+      "status": 2,
+      "descriptionHtml": "<p>[SYNTHETIC TEST CONTENT — not TrainMore policy]</p><p>You can book an intake with a personal trainer at the front desk of your club. Personal training packages are paid separately from your membership.</p>"
+    }
+  }
+]

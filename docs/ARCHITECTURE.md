@@ -19,6 +19,10 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Magicline writes | **Read-only**; changes go through tickets | Product owner |
 | Hand-off | **One general ticket form** (plus lead form for sales) | Product owner |
 | FAQ sync | **Daily**, plus manual "sync now" | Product owner |
+| Chat model | **Claude Sonnet 5.5** (`claude-sonnet-5-5`), configurable via `CLAUDE_CHAT_MODEL` | Product owner (2026-11-11) |
+| Answer delivery | **Check, then show**: the full answer is validated before the customer sees it (no token streaming; plain JSON, typing indicator) | Product owner (2026-11-11) |
+| Retrieval | **Full-text search first** (Postgres `dutch` + `english`); Voyage embeddings deferred behind a retrieval interface | Product owner (2026-11-11) |
+| M1 delivery | Split into M1a (FAQ knowledge base), M1b (answering), M1c (widget); preprod deploy is a separate step once AWS access exists | Architect (2026-11-11) |
 | Everything else below | Architect's proposal; open to change | Architect |
 
 ## 1. Proven patterns we adopt (Intercom Fin, Zendesk AI)
@@ -86,8 +90,8 @@ Prod preferably goes in a separate AWS account.
 2. Detect language (nl/en). The reply and UI labels follow the user.
 3. Classify the message: on-topic FAQ, account question, sales lead, wants a human, off-topic.
    Off-topic questions are politely declined.
-4. Retrieve: hybrid search (Postgres full-text with `dutch`/`english` configs + pgvector over
-   Voyage embeddings) over FAQ chunks and published scenarios. Scenarios rank first.
+4. Retrieve: Postgres full-text search (`dutch` + `english`) over whole FAQ articles and published
+   scenarios. Scenarios rank first. Voyage embeddings can be added later behind the same interface.
 5. Call Claude with:
    - system prompt and guardrails
    - retrieved content wrapped and labelled as **untrusted data**
@@ -96,7 +100,10 @@ Prod preferably goes in a separate AWS account.
    `{ answer, citations[], confidence, needs_escalation, suggested_form? }`.
    A citation must reference a retrieved document; otherwise the answer is downgraded to escalation.
    Policies, prices and account facts may only come from retrieved content or tool results.
-7. Stream the reply over SSE. Store the turn, set flags, and log without personal data.
+7. Return the validated reply as JSON (the widget shows a typing indicator meanwhile). Store the turn,
+   set flags, and log without personal data.
+8. Assistant turns are stored verbatim (API content blocks, including thinking blocks) and the
+   history sent to Claude is append-only, as Sonnet 5.5's preserved thinking requires.
 
 ### 3.2 Authentication (OTP)
 1. User enters email. Turnstile check, then rate limit per email and per IP.
@@ -196,7 +203,7 @@ Why Supabase scenarios rather than Freshdesk write-back:
 
 ## 4. Data model (Supabase)
 Tables:
-- `faq_articles`, `faq_chunks` (tsvector + vector)
+- `faq_articles` (whole articles with nl/en tsvectors; FAQs are short, so chunking only if they grow)
 - `scenarios`, `scenario_versions`, `capability_flags`
 - `conversations`, `messages`, `feedback`, `flags`, `escalations`
 - `otp_challenges`, `sessions`
@@ -255,10 +262,10 @@ Each dependency is confirmed with the product owner when introduced.
 | Language | TypeScript 6.0.3, strict | required; typescript-eslint supports `<6.1` and openapi-typescript declares `^5.x`, so 7.x waits for the ecosystem | TypeScript 7 (native, faster) once tooling supports it |
 | Lint/format | Biome 2.6 | one fast tool, no TypeScript peer dependency | ESLint 10 + typescript-eslint (type-aware rules, needs TS ≤ 6.0) |
 | Monorepo | pnpm 12 workspaces + Turborepo 2.11 | strict deps, cached tasks | Nx (heavier) |
-| API | Fastify 5.12 + @fastify/rate-limit 11 | mature, fast, schema-first, SSE-friendly | Hono 4 (lighter, smaller ecosystem) |
+| API | Fastify 5.12 + @fastify/rate-limit 11 | mature, fast, schema-first | Hono 4 (lighter, smaller ecosystem) |
 | Validation | zod 4.6 | one schema language for API, LLM output, config | valibot (smaller) |
 | LLM | @anthropic-ai/sdk 1.8; `claude-sonnet-5-5` for chat, `claude-haiku-5-5` for classify/judge (env-configurable) | tool use, streaming | — |
-| Embeddings | Voyage `voyage-4` + pgvector HNSW | Anthropic-recommended, multilingual. **New sub-processor (DPA) and Dutch quality to verify** | full-text only (no vendor, weaker recall) |
+| Embeddings | **Deferred**: M1 uses Postgres full-text search. Later: Voyage `voyage-4` + pgvector HNSW | no new sub-processor yet | Voyage needs DPA approval and Dutch quality testing |
 | Database | @supabase/supabase-js 2.119, Supabase CLI 3.1 (migrations, generated types) | fits fixed stack; RLS in SQL | Drizzle (pre-1.0) |
 | HTTP | built-in fetch/undici 8 + openapi-typescript 7.13 types from the Magicline spec | typed, spec-driven, no extra client | ky |
 | AWS | @aws-sdk/client-secrets-manager, @aws-sdk/client-sesv2 | official SDK v3 | Resend (another vendor) |
@@ -312,7 +319,8 @@ Each milestone ends with tests passing and a preprod deploy.
   - Database denies `anon`/`authenticated` by both grants and RLS
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
-**M1: FAQ bot (anonymous)**
+**M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE
 - widget with consent notice, language detection, citations with NL/EN URLs
