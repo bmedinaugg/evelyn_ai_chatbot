@@ -88,7 +88,9 @@ describe('portal repository', () => {
       loggedIn: false,
     });
 
+    await client.from('conversations').update({ customer_status: 'MEMBER' }).eq('id', id);
     const detail = await portal.conversationDetail(id);
+    expect(detail?.customerStatus).toBe('MEMBER');
     expect(detail?.messages).toEqual([
       expect.objectContaining({ role: 'user', text: 'Mail me op sam@example.com', rating: null }),
       expect.objectContaining({

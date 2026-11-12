@@ -1,17 +1,37 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { Reply } from '@trainmore/core';
 import {
+  type CustomerStatus,
   PORTAL_ROLES,
   type PortalRepository,
   type PortalRole,
   type PortalSession,
+  type ScenarioHit,
+  type ScenarioRepository,
 } from '@trainmore/db';
+import type { Lang } from '@trainmore/i18n';
 import type { PortalConfig } from '@trainmore/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { parseCookies, serializeCookie, signValue, verifySignedValue } from './cookies.ts';
 import type { EntraClient } from './entra.ts';
 
-export type PortalDeps = { config: PortalConfig; entra: EntraClient; repo: PortalRepository };
+/** Re-asks a conversation's questions with a draft approved answer (core replayConversation). */
+export type ReplayRunner = (input: {
+  questions: string[];
+  pageLang: Lang;
+  status: CustomerStatus | null;
+  draft: ScenarioHit;
+}) => Promise<{ question: string; reply: Reply }[]>;
+
+export type PortalDeps = {
+  config: PortalConfig;
+  entra: EntraClient;
+  repo: PortalRepository;
+  scenarios: ScenarioRepository;
+  /** Null where Magicline is not the mock (production): replay is refused there. */
+  replay: ReplayRunner | null;
+};
 
 const LOGIN_COOKIE = 'tm_portal_login';
 const SESSION_COOKIE = 'tm_portal';

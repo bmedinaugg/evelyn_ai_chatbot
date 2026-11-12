@@ -19,6 +19,7 @@ import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
 import { type PortalDeps, portalOrigin, registerPortalAuthRoutes } from './portal/auth.ts';
 import { registerPortalReviewRoutes } from './portal/review.ts';
+import { registerPortalScenarioRoutes } from './portal/scenarios.ts';
 import { proxyTrust } from './proxy-trust.ts';
 import { registerTicketRoutes } from './tickets.ts';
 
@@ -158,6 +159,7 @@ export function buildApiServer(deps: ApiDeps) {
     app.register(async (scope) => {
       registerPortalAuthRoutes(scope, portal);
       registerPortalReviewRoutes(scope, portal);
+      registerPortalScenarioRoutes(scope, portal);
     });
   }
 

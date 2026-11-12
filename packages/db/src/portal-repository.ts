@@ -7,7 +7,14 @@ export type PortalRole = (typeof PORTAL_ROLES)[number];
 
 export type PortalActor = { oid: string; name: string };
 export type PortalSession = { userOid: string; displayName: string; roles: PortalRole[] };
-export type AuditAction = 'capability.set' | 'conversation.reveal' | 'portal.login';
+export type AuditAction =
+  | 'capability.set'
+  | 'conversation.reveal'
+  | 'portal.login'
+  | 'scenario.draft'
+  | 'scenario.publish'
+  | 'scenario.archive'
+  | 'scenario.replay';
 
 export type FlaggedConversation = {
   conversationId: string;
@@ -25,6 +32,8 @@ export type ConversationDetail = {
   lang: 'nl' | 'en';
   createdAt: string;
   loggedIn: boolean;
+  /** Status of the account the customer logged in with (kept until anonymising), for replay. */
+  customerStatus: 'MEMBER' | 'PROSPECT' | 'FORMER_MEMBER' | null;
   messages: {
     id: number;
     role: 'user' | 'assistant';
@@ -151,7 +160,7 @@ export function createSupabasePortalRepository(client: ServiceClient): PortalRep
       if (!UUID.test(id)) return null;
       const conversation = await client
         .from('conversations')
-        .select('id, lang, created_at, verified_email_hash, anonymised_at')
+        .select('id, lang, created_at, verified_email_hash, anonymised_at, customer_status')
         .eq('id', id)
         .maybeSingle();
       if (conversation.error) throw new DbError('conversations select', conversation.error.code);
@@ -208,6 +217,10 @@ export function createSupabasePortalRepository(client: ServiceClient): PortalRep
         lang: z.enum(['nl', 'en']).parse(conversation.data.lang),
         createdAt: conversation.data.created_at,
         loggedIn: conversation.data.verified_email_hash !== null,
+        customerStatus: z
+          .enum(['MEMBER', 'PROSPECT', 'FORMER_MEMBER'])
+          .nullable()
+          .parse(conversation.data.customer_status),
         messages: messageRows.map((m) => {
           const feedback = Array.isArray(m.message_feedback)
             ? m.message_feedback[0]
