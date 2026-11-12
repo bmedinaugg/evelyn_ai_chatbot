@@ -29,10 +29,14 @@ beforeAll(() => {
 function commands(): Record<string, string[]> {
   const defs = template.findResources('AWS::ECS::TaskDefinition');
   return Object.fromEntries(
-    Object.values(defs).map((d) => {
-      const c = d.Properties.ContainerDefinitions[0];
-      return [c.Command.at(-1), c.Command];
-    }),
+    Object.values(defs)
+      .filter(
+        (d) => d.Properties.Family !== undefined && !String(d.Properties.Family).includes('Ops'),
+      )
+      .map((d) => {
+        const c = d.Properties.ContainerDefinitions[0];
+        return [c.Command.at(-1), c.Command];
+      }),
   );
 }
 
@@ -42,6 +46,20 @@ describe('WorkerStack (preprod)', () => {
       'sync-faq': ['node', 'apps/worker/src/main.ts', 'sync-faq'],
       'sync-ticket-topics': ['node', 'apps/worker/src/main.ts', 'sync-ticket-topics'],
       retention: ['node', 'apps/worker/src/main.ts', 'retention'],
+    });
+  });
+
+  it('has an ops task for deletion requests: idle, reachable by ECS Exec', () => {
+    const ops = Object.values(template.findResources('AWS::ECS::TaskDefinition')).find((d) =>
+      String(d.Properties.Family).includes('Ops'),
+    );
+    expect(ops?.Properties.ContainerDefinitions[0].Command).toEqual(['sleep', '1800']);
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: Match.arrayWith(['ssmmessages:CreateDataChannel']) }),
+        ]),
+      },
     });
   });
 

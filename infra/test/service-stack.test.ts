@@ -65,6 +65,64 @@ describe('ServiceStack (preprod)', () => {
     template.resourceCountIs('AWS::CloudFront::VpcOrigin', 1);
   });
 
+  it('the load balancer admits CloudFront (origin-facing prefix list), not the VPC range', () => {
+    const rules = Object.values(
+      template.findResources('AWS::EC2::SecurityGroupIngress', { Properties: { FromPort: 80 } }),
+    );
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.Properties.SourcePrefixListId).toBeDefined();
+    expect(rules[0]?.Properties.CidrIp).toBeUndefined();
+    const [sg] = Object.values(
+      template.findResources('AWS::EC2::SecurityGroup', {
+        Properties: { GroupDescription: Match.stringLikeRegexp('Internal ALB') },
+      }),
+    );
+    expect(sg?.Properties.SecurityGroupIngress).toBeUndefined();
+    expect(JSON.stringify(template.toJSON())).toContain(
+      'com.amazonaws.global.cloudfront.origin-facing',
+    );
+  });
+
+  it('the load balancer sits in the private (isolated) subnets', () => {
+    const [alb] = Object.values(
+      template.findResources('AWS::ElasticLoadBalancingV2::LoadBalancer'),
+    );
+    expect(JSON.stringify(alb?.Properties.Subnets)).toMatch(/Isolated/i);
+    expect(JSON.stringify(alb?.Properties.Subnets)).not.toMatch(/publicSubnet/i);
+  });
+
+  it('waits up to 60 s for a chat answer (tool turns take longer than the 30 s default)', () => {
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        Origins: Match.arrayWith([
+          Match.objectLike({
+            VpcOriginConfig: Match.objectLike({ OriginReadTimeout: 60 }),
+          }),
+        ]),
+      }),
+    });
+    template.hasResourceProperties('AWS::ElasticLoadBalancingV2::LoadBalancer', {
+      LoadBalancerAttributes: Match.arrayWith([
+        { Key: 'idle_timeout.timeout_seconds', Value: '75' },
+      ]),
+    });
+  });
+
+  it('preprod (SES sandbox) may also send to verified recipient identities of the account', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'ses:SendEmail',
+            Resource: Match.objectLike({
+              'Fn::Join': Match.arrayWith([Match.arrayWith([':identity/*'])]),
+            }),
+          }),
+        ]),
+      },
+    });
+  });
+
   it('tasks accept traffic only from the load balancer', () => {
     const ingress = template.findResources('AWS::EC2::SecurityGroupIngress', {
       Properties: { FromPort: 8080 },

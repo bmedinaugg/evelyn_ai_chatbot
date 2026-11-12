@@ -4,8 +4,10 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import type { Construct } from 'constructs';
 import type { EnvName, FoundationStack } from './foundation-stack.ts';
 
@@ -56,18 +58,42 @@ export class ServiceStack extends Stack {
     const isProd = props.envName === 'prod';
     const publicSubnets = { subnetType: ec2.SubnetType.PUBLIC };
 
-    // Internal: no internet route; CloudFront reaches it through the VPC origin inside the VPC.
+    // Internal, in isolated subnets; CloudFront reaches it through the VPC origin. VPC-origin
+    // traffic arrives from CloudFront's origin-facing addresses, so that managed prefix list is
+    // the only source allowed (its id differs per region, hence the lookup).
+    const cloudFrontPrefixList = new cr.AwsCustomResource(this, 'CloudFrontOriginFacing', {
+      onUpdate: {
+        service: 'EC2',
+        action: 'describeManagedPrefixLists',
+        parameters: {
+          Filters: [
+            { Name: 'prefix-list-name', Values: ['com.amazonaws.global.cloudfront.origin-facing'] },
+          ],
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('cloudfront-origin-facing'),
+        outputPaths: ['PrefixLists.0.PrefixListId'],
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+      }),
+      installLatestAwsSdk: false,
+    });
     const albSecurityGroup = new ec2.SecurityGroup(this, 'AlbSecurityGroup', {
       vpc,
-      description: 'Internal ALB: HTTP from inside the VPC (CloudFront VPC origin) only',
+      description: 'Internal ALB: HTTP from CloudFront (VPC origin) only',
       allowAllOutbound: true,
     });
-    albSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(80));
+    albSecurityGroup.addIngressRule(
+      ec2.Peer.prefixList(cloudFrontPrefixList.getResponseField('PrefixLists.0.PrefixListId')),
+      ec2.Port.tcp(80),
+    );
     const alb = new elbv2.ApplicationLoadBalancer(this, 'Alb', {
       vpc,
       internetFacing: false,
-      vpcSubnets: publicSubnets,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroup: albSecurityGroup,
+      // Longer than CloudFront's 60 s read timeout below.
+      idleTimeout: Duration.seconds(75),
     });
 
     // API task: the API plus (preprod) the mock Magicline on localhost.
@@ -88,6 +114,8 @@ export class ServiceStack extends Stack {
     const apiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(alb, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: 80,
+      // A logged-in turn may call Claude several times (tool rounds); the default is 30 s.
+      readTimeout: Duration.seconds(60),
     });
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `trainmore-chatbot ${props.envName}`,
@@ -172,6 +200,15 @@ export class ServiceStack extends Stack {
       condition: ecs.ContainerDependencyCondition.START,
     });
     foundation.emailIdentity.grantSendEmail(taskDefinition.taskRole);
+    if (!isProd) {
+      // SES sandbox (preprod) also checks permission on each verified recipient identity.
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          actions: ['ses:SendEmail'],
+          resources: [this.formatArn({ service: 'ses', resource: 'identity', resourceName: '*' })],
+        }),
+      );
+    }
 
     const taskSecurityGroup = new ec2.SecurityGroup(this, 'TaskSecurityGroup', {
       vpc,

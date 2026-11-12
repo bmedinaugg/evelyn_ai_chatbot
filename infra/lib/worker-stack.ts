@@ -1,6 +1,7 @@
 import { Stack, type StackProps, TimeZone } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import * as targets from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
@@ -34,8 +35,8 @@ export class WorkerStack extends Stack {
       allowAllOutbound: true,
     });
 
-    for (const job of JOBS) {
-      const taskDefinition = new ecs.FargateTaskDefinition(this, `${job.command}-task`, {
+    const workerTask = (id: string, command: string[], streamPrefix: string) => {
+      const taskDefinition = new ecs.FargateTaskDefinition(this, id, {
         cpu: 256,
         memoryLimitMiB: 512,
         runtimePlatform: {
@@ -46,11 +47,8 @@ export class WorkerStack extends Stack {
       taskDefinition.addContainer('worker', {
         image,
         essential: true,
-        command: ['node', 'apps/worker/src/main.ts', job.command],
-        logging: ecs.LogDrivers.awsLogs({
-          logGroup: foundation.logGroup,
-          streamPrefix: `worker-${job.command}`,
-        }),
+        command,
+        logging: ecs.LogDrivers.awsLogs({ logGroup: foundation.logGroup, streamPrefix }),
         environment: {
           NODE_ENV: 'production',
           APP_ENV: props.envName,
@@ -72,10 +70,35 @@ export class WorkerStack extends Stack {
             foundation.appSecret,
             'FRESHDESK_API_KEY',
           ),
-          // dsar-delete (run by hand) hashes emails exactly like the login.
+          // dsar-delete hashes emails exactly like the login.
           OTP_HMAC_SECRET: ecs.Secret.fromSecretsManager(foundation.otpHmacSecret),
         },
       });
+      return taskDefinition;
+    };
+
+    // Ops task for deletion requests: idles for 30 minutes so an operator can open an ECS Exec
+    // session and run `dsar-delete` interactively (docs/DEPLOY.md). Sessions are not logged.
+    const ops = workerTask('Ops', ['sleep', '1800'], 'worker-ops');
+    ops.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        // ECS Exec (SSM Session Manager channels); AWS does not support narrower resources here.
+        actions: [
+          'ssmmessages:CreateControlChannel',
+          'ssmmessages:CreateDataChannel',
+          'ssmmessages:OpenControlChannel',
+          'ssmmessages:OpenDataChannel',
+        ],
+        resources: ['*'],
+      }),
+    );
+
+    for (const job of JOBS) {
+      const taskDefinition = workerTask(
+        `${job.command}-task`,
+        ['node', 'apps/worker/src/main.ts', job.command],
+        `worker-${job.command}`,
+      );
 
       new scheduler.Schedule(this, `${job.command}-schedule`, {
         description: `trainmore-chatbot ${props.envName}: ${job.command}`,

@@ -39,14 +39,22 @@ export class FoundationStack extends Stack {
     Tags.of(this).add('project', 'trainmore-chatbot');
     Tags.of(this).add('env', env);
 
-    // Public subnets only: tasks get a public IP behind security groups instead of a NAT gateway (~$35/month).
+    // Tasks run in public subnets with a public IP behind security groups instead of a NAT gateway
+    // (~$35/month). Isolated subnets (no internet route, no cost) hold the internal load balancer.
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 2,
       natGateways: 0,
-      subnetConfiguration: [{ name: 'public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 }],
+      subnetConfiguration: [
+        { name: 'public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+        { name: 'isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
+      ],
     });
 
-    this.cluster = new ecs.Cluster(this, 'Cluster', { vpc: this.vpc });
+    this.cluster = new ecs.Cluster(this, 'Cluster', {
+      vpc: this.vpc,
+      // Interactive sessions are not logged: operators type email addresses for deletion requests.
+      executeCommandConfiguration: { logging: ecs.ExecuteCommandLogging.NONE },
+    });
 
     this.repository = new ecr.Repository(this, 'Repository', {
       repositoryName: `trainmore-chatbot-${env}`,

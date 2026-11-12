@@ -105,7 +105,8 @@ Settings → Environments → **preprod** (add yourself as required reviewer), t
      codes and deletion requests depend on it.
    - **SES:** click the verification link sent to `EMAIL_FROM`. While SES is in sandbox mode, also
      verify each tester's address (SES → Identities), because login codes only reach verified
-     addresses.
+     addresses. The preprod task role may send to any verified identity of the account, as the
+     sandbox requires; prod sends from its identity only.
 3. **Full deploy.** Run the workflow again without the tick. It does the following:
    1. runs the tests
    2. builds the widget
@@ -139,12 +140,25 @@ Run **Deploy preprod**. Images are tagged with the commit and are immutable, so 
 same commit reuses its image.
 
 ## Deletion requests (DSAR)
-Run `dsar-delete` in an **interactive** session on a worker task and type the address when asked
-(ARCHITECTURE §4). Never put the address on a command line or in a task override: those land in
-CloudTrail.
+The address is **typed** in an interactive session, never put on a command line or in a task
+override (those land in CloudTrail). The cluster does not log interactive sessions. Steps:
+
+1. Start the idle ops task. It sleeps for 30 minutes; ECS Exec must be on:
+   ```sh
+   aws ecs run-task --region eu-west-1 --cluster <ClusterName> --launch-type FARGATE \
+     --task-definition <the worker stack's Ops task definition> --enable-execute-command \
+     --network-configuration "awsvpcConfiguration={subnets=[<public subnet>],securityGroups=[<WorkerSecurityGroup>],assignPublicIp=ENABLED}"
+   ```
+2. Open a session and run the command. It asks for the address and prints counts only:
+   ```sh
+   aws ecs execute-command --region eu-west-1 --cluster <ClusterName> --task <task id> \
+     --container worker --interactive --command "node apps/worker/src/main.ts dsar-delete"
+   ```
+   (needs the Session Manager plugin for the AWS CLI)
+3. Stop the task (`aws ecs stop-task …`), or let it end by itself after 30 minutes.
+
+Delete the person's tickets in Freshdesk separately (ARCHITECTURE §4).
 
 ## Not automated yet
 - **Load test:** needs this deployed target first.
 - **Custom domains and HTTPS between CloudFront and the load balancer:** M6.
-- **The ALB's inbound rule** allows the VPC range (the ALB is internal). It can be narrowed to
-  CloudFront's VPC-origin security group once that exists.
