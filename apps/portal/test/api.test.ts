@@ -52,4 +52,42 @@ describe('createPortalApi', () => {
     responses.push(json(200, { name: 1 }));
     await expect(api.me()).rejects.toMatchObject({ kind: 'server' });
   });
+
+  it('publishes a version and reports the four-eyes refusal', async () => {
+    responses.push(new Response(null, { status: 204 }), json(403, { error: 'own_version' }));
+    expect(await api.publish(4)).toBe('ok');
+    expect(requests[0]?.url).toBe('https://portal.test/portal/api/scenario-versions/4/publish');
+    expect(await api.publish(4)).toBe('own_version');
+  });
+
+  it('drafts an approved answer and replays a conversation with it', async () => {
+    responses.push(json(201, { scenarioId: 's1', versionId: 9 }));
+    const content = {
+      triggersNl: ['Hond?'],
+      triggersEn: ['Dog?'],
+      answerNl: 'Nee.',
+      answerEn: 'No.',
+      statuses: [],
+      articleId: null,
+    };
+    expect(await api.createScenario(content)).toEqual({ scenarioId: 's1', versionId: 9 });
+    expect(await requests[0]?.json()).toEqual(content);
+    responses.push(
+      json(200, {
+        results: [
+          {
+            question: 'Hond?',
+            oldAnswer: null,
+            newAnswer: 'Nee.',
+            usesDraft: true,
+            outcome: 'answered',
+            action: 'none',
+          },
+        ],
+      }),
+    );
+    const replay = await api.replay('c1', 9);
+    expect(replay.results[0]?.usesDraft).toBe(true);
+    expect(requests[1]?.url).toBe('https://portal.test/portal/api/conversations/c1/replay');
+  });
 });

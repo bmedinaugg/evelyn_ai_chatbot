@@ -8,6 +8,7 @@ import {
   PortalApiError,
 } from '../lib/api.ts';
 import { formatDate } from './FlaggedPage.tsx';
+import { ReplayPanel } from './ReplayPanel.tsx';
 
 const isFlagReason = (value: string): value is FlagReason =>
   (FLAG_REASONS as readonly string[]).includes(value);
@@ -73,6 +74,7 @@ export function ConversationPage(props: { api: PortalApi; lang: Lang; id: string
               </button>
             </div>
           )}
+          <ReplayPanel api={api} lang={lang} conversationId={data.id} />
           <ol class="tm-transcript">
             {data.messages.map((m) => (
               <li key={m.id} class={`tm-message tm-message--${m.role}`}>

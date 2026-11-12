@@ -66,14 +66,87 @@ const capabilitiesSchema = z.object({
 });
 export type Capability = z.infer<typeof capabilitiesSchema>['capabilities'][number];
 
-export type PortalApiErrorKind = 'unauthorized' | 'forbidden' | 'not_found' | 'network' | 'server';
+const STATUSES = ['MEMBER', 'PROSPECT', 'FORMER_MEMBER'] as const;
+export type ScenarioContent = {
+  triggersNl: string[];
+  triggersEn: string[];
+  answerNl: string;
+  answerEn: string;
+  statuses: (typeof STATUSES)[number][];
+  articleId: number | null;
+};
+
+const scenarioListSchema = z.object({
+  scenarios: z.array(
+    z.object({
+      id: z.string(),
+      createdAt: z.string(),
+      archived: z.boolean(),
+      latestVersion: z.number(),
+      latestVersionId: z.number(),
+      publishedVersion: z.number().nullable(),
+      firstTriggerNl: z.string(),
+      firstTriggerEn: z.string(),
+    }),
+  ),
+});
+export type ScenarioSummary = z.infer<typeof scenarioListSchema>['scenarios'][number];
+
+const scenarioSchema = z.object({
+  id: z.string(),
+  archived: z.boolean(),
+  versions: z.array(
+    z.object({
+      id: z.number(),
+      version: z.number(),
+      status: z.enum(['draft', 'published', 'superseded', 'withdrawn']),
+      triggersNl: z.array(z.string()),
+      triggersEn: z.array(z.string()),
+      answerNl: z.string(),
+      answerEn: z.string(),
+      statuses: z.array(z.enum(STATUSES)),
+      articleId: z.number().nullable(),
+      authorName: z.string(),
+      createdAt: z.string(),
+      publishedByName: z.string().nullable(),
+      publishedAt: z.string().nullable(),
+    }),
+  ),
+});
+export type Scenario = z.infer<typeof scenarioSchema>;
+
+const replaySchema = z.object({
+  results: z.array(
+    z.object({
+      question: z.string(),
+      oldAnswer: z.string().nullable(),
+      newAnswer: z.string(),
+      usesDraft: z.boolean(),
+      outcome: z.string(),
+      action: z.string(),
+    }),
+  ),
+});
+export type ReplayResult = z.infer<typeof replaySchema>;
+
+export type PortalApiErrorKind =
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'conflict'
+  | 'invalid'
+  | 'network'
+  | 'server';
 
 export class PortalApiError extends Error {
   readonly kind: PortalApiErrorKind;
-  constructor(kind: PortalApiErrorKind) {
+  /** The server's error code, e.g. `own_version`. */
+  readonly code: string | null;
+  constructor(kind: PortalApiErrorKind, code: string | null = null) {
     super(`Portal API error: ${kind}`);
     this.name = 'PortalApiError';
     this.kind = kind;
+    this.code = code;
   }
 }
 
@@ -92,10 +165,24 @@ export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
     } catch {
       throw new PortalApiError('network');
     }
-    if (response.status === 401) throw new PortalApiError('unauthorized');
-    if (response.status === 403) throw new PortalApiError('forbidden');
-    if (response.status === 404) throw new PortalApiError('not_found');
-    if (!response.ok) throw new PortalApiError('server');
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      const error = (body as { error?: unknown } | null)?.error;
+      const code = typeof error === 'string' ? error : null;
+      const kind: PortalApiErrorKind =
+        response.status === 401
+          ? 'unauthorized'
+          : response.status === 403
+            ? 'forbidden'
+            : response.status === 404
+              ? 'not_found'
+              : response.status === 409
+                ? 'conflict'
+                : response.status === 400
+                  ? 'invalid'
+                  : 'server';
+      throw new PortalApiError(kind, code);
+    }
     if (schema === null) return undefined as T;
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) throw new PortalApiError('server');
@@ -127,6 +214,39 @@ export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
     setCapability: (name: string, enabled: boolean) =>
       call<void>(`/api/capabilities/${encodeURIComponent(name)}`, json('PUT', { enabled }), null),
     logout: () => call<void>('/auth/logout', { method: 'POST' }, null),
+    scenarios: () => call('/api/scenarios', {}, scenarioListSchema),
+    scenario: (id: string) => call(`/api/scenarios/${encodeURIComponent(id)}`, {}, scenarioSchema),
+    createScenario: (content: ScenarioContent) =>
+      call(
+        '/api/scenarios',
+        json('POST', content),
+        z.object({ scenarioId: z.string(), versionId: z.number() }),
+      ),
+    addVersion: (id: string, content: ScenarioContent) =>
+      call(
+        `/api/scenarios/${encodeURIComponent(id)}/versions`,
+        json('POST', content),
+        z.object({ versionId: z.number() }),
+      ),
+    /** 'own_version' when the four-eyes rule refuses it. */
+    async publish(versionId: number): Promise<'ok' | 'own_version'> {
+      try {
+        await call<void>(`/api/scenario-versions/${versionId}/publish`, { method: 'POST' }, null);
+        return 'ok';
+      } catch (error) {
+        // 403 here is either "not an approver" or "your own version"; the server says which.
+        if (error instanceof PortalApiError && error.code === 'own_version') return 'own_version';
+        throw error;
+      }
+    },
+    archive: (id: string) =>
+      call<void>(`/api/scenarios/${encodeURIComponent(id)}/archive`, { method: 'POST' }, null),
+    replay: (conversationId: string, versionId: number) =>
+      call(
+        `/api/conversations/${encodeURIComponent(conversationId)}/replay`,
+        json('POST', { versionId }),
+        replaySchema,
+      ),
   };
 }
 

@@ -6,6 +6,9 @@ import { CapabilitiesPage } from './CapabilitiesPage.tsx';
 import { ConversationPage } from './ConversationPage.tsx';
 import { FlaggedPage } from './FlaggedPage.tsx';
 import { LimitationsPage } from './LimitationsPage.tsx';
+import { ScenarioEditor } from './ScenarioEditor.tsx';
+import { ScenarioPage } from './ScenarioPage.tsx';
+import { ScenariosPage } from './ScenariosPage.tsx';
 
 type Auth = 'loading' | 'signed_out' | 'forbidden' | 'error' | Me;
 
@@ -13,7 +16,10 @@ type Route =
   | { page: 'flagged' }
   | { page: 'conversation'; id: string }
   | { page: 'capabilities' }
-  | { page: 'limitations' };
+  | { page: 'limitations' }
+  | { page: 'scenarios' }
+  | { page: 'new_scenario' }
+  | { page: 'scenario'; id: string; saved: boolean };
 
 /** Set by the API when a sign-in failed (`/portal/?signin_error=…`). */
 function readSignInError(): 'invalid' | 'no_role' | null {
@@ -27,6 +33,10 @@ function readSignInError(): 'invalid' | 'no_role' | null {
 function parseRoute(hash: string): Route {
   const conversation = /^#\/conversations\/([0-9a-f-]{36})$/i.exec(hash);
   if (conversation?.[1]) return { page: 'conversation', id: conversation[1] };
+  const scenario = /^#\/scenarios\/([0-9a-f-]{36})(\/saved)?$/i.exec(hash);
+  if (scenario?.[1]) return { page: 'scenario', id: scenario[1], saved: scenario[2] !== undefined };
+  if (hash === '#/scenarios/new') return { page: 'new_scenario' };
+  if (hash === '#/scenarios') return { page: 'scenarios' };
   if (hash === '#/capabilities') return { page: 'capabilities' };
   if (hash === '#/limitations') return { page: 'limitations' };
   return { page: 'flagged' };
@@ -85,6 +95,9 @@ export function App(props: {
           <a href="#/flagged" aria-current={route.page === 'flagged' ? 'page' : undefined}>
             {t(lang, 'portal.nav.flagged')}
           </a>
+          <a href="#/scenarios" aria-current={route.page.includes('scenario') ? 'page' : undefined}>
+            {t(lang, 'portal.nav.scenarios')}
+          </a>
           <a
             href="#/capabilities"
             aria-current={route.page === 'capabilities' ? 'page' : undefined}
@@ -137,6 +150,27 @@ export function App(props: {
   else if (route.page === 'capabilities')
     content = <CapabilitiesPage api={api} lang={lang} isAdmin={auth.roles.includes('admin')} />;
   else if (route.page === 'limitations') content = <LimitationsPage lang={lang} />;
+  else if (route.page === 'scenarios') content = <ScenariosPage api={api} lang={lang} />;
+  else if (route.page === 'new_scenario')
+    content = (
+      <ScenarioEditor
+        api={api}
+        lang={lang}
+        onSaved={(id) => {
+          location.hash = `#/scenarios/${id}/saved`;
+        }}
+      />
+    );
+  else if (route.page === 'scenario')
+    content = (
+      <ScenarioPage
+        api={api}
+        lang={lang}
+        id={route.id}
+        justSaved={route.saved}
+        isApprover={auth.roles.some((r) => r === 'approver' || r === 'admin')}
+      />
+    );
   else content = <FlaggedPage api={api} lang={lang} />;
 
   return (

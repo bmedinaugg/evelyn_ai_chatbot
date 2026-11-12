@@ -451,6 +451,7 @@ export function createTestApi(
           createdAt: '2026-11-12T10:00:00Z',
           archived: archivedScenarios.has(id),
           latestVersion: own.length,
+          latestVersionId: own.at(-1)?.id ?? 0,
           publishedVersion: own.find((v) => v.status === 'published')?.version ?? null,
           firstTriggerNl: own.at(-1)?.triggersNl[0] ?? '',
           firstTriggerEn: own.at(-1)?.triggersEn[0] ?? '',

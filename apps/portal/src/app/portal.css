@@ -284,3 +284,57 @@ select {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.tm-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tm-editor label,
+.tm-editor legend {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--tm-grey-light);
+}
+
+.tm-editor textarea,
+.tm-editor input:not([type="checkbox"]) {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--tm-grey-light);
+  border-radius: 8px;
+  background: var(--tm-black);
+  color: var(--tm-white);
+  font: inherit;
+}
+
+.tm-editor fieldset {
+  margin: 12px 0;
+  border: 1px solid var(--tm-grey-dark);
+  border-radius: 8px;
+}
+
+.tm-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-hint {
+  margin: 4px 0;
+  color: var(--tm-grey-light);
+  font-size: 12px;
+}
+
+.tm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-badge-gap {
+  margin-left: 8px;
+}

@@ -36,13 +36,16 @@ describe('scenario repository', () => {
     expect(await scenarios.publish(created.versionId, { oid: 'oid-a', name: 'Agent' })).toBe(
       'own_version',
     );
-    expect(await scenarios.search('hond sportschool', 'nl', 3)).toEqual([]);
+    // Drafts are never offered (other local data may hold published scenarios).
+    expect(
+      (await scenarios.search('hond sportschool', 'nl', 3)).map((h) => h.versionId),
+    ).not.toContain(created.versionId);
     expect(await scenarios.publish(created.versionId, { oid: 'oid-b', name: 'Approver' })).toBe(
       'ok',
     );
 
     const hits = await scenarios.search('mag mijn hond mee', 'nl', 3);
-    expect(hits[0]).toMatchObject({
+    expect(hits.find((h) => h.versionId === created.versionId)).toMatchObject({
       versionId: created.versionId,
       answerNl: 'Nee, huisdieren zijn niet toegestaan in onze clubs.',
       statuses: [],
@@ -61,6 +64,7 @@ describe('scenario repository', () => {
     expect((await scenarios.list()).find((s) => s.id === created.scenarioId)).toMatchObject({
       publishedVersion: 1,
       latestVersion: 1,
+      latestVersionId: created.versionId,
       archived: false,
     });
 

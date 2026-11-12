@@ -33,6 +33,8 @@ export type ScenarioSummary = {
   createdAt: string;
   archived: boolean;
   latestVersion: number;
+  /** Id of the latest version (e.g. the draft to replay). */
+  latestVersionId: number;
   publishedVersion: number | null;
   /** Of the latest version, for the list. */
   firstTriggerNl: string;
@@ -170,7 +172,7 @@ export function createSupabaseScenarioRepository(client: ServiceClient): Scenari
           .order('created_at', { ascending: false }),
         client
           .from('scenario_versions')
-          .select('scenario_id, version, status, triggers_nl, triggers_en')
+          .select('id, scenario_id, version, status, triggers_nl, triggers_en')
           .order('version', { ascending: true }),
       ]);
       if (scenarios.error) throw new DbError('scenarios select', scenarios.error.code);
@@ -185,6 +187,7 @@ export function createSupabaseScenarioRepository(client: ServiceClient): Scenari
             createdAt: s.created_at,
             archived: s.archived_at !== null,
             latestVersion: latest.version,
+            latestVersionId: latest.id,
             publishedVersion: own.find((v) => v.status === 'published')?.version ?? null,
             firstTriggerNl: latest.triggers_nl[0] ?? '',
             firstTriggerEn: latest.triggers_en[0] ?? '',
