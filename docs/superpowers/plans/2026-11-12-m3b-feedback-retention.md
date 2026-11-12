@@ -8,9 +8,12 @@ login codes are purged after 24 hours, and account bindings are cleared after 24
 can delete a customer's chatbot data on request (DSAR). A one-command local stack lets anyone
 click through every flow without real Freshdesk, Magicline or Claude spend.
 
-**Decisions:**
-- Product owner, 2026-11-12: transcripts are kept 90 days, then anonymised.
-- Proposed below, to confirm: marked ⚑.
+**Decisions (product owner, 2026-11-12):**
+- Transcripts are kept 90 days, then anonymised.
+- Kept after anonymising: outcome, flags, citations, feedback, escalations, leads, studio id, status, timestamps.
+- Account bindings are cleared 24 hours after login.
+- DSAR runs as an operator command until the portal (M4).
+- No permanent "log in" button: login is offered only for account questions.
 
 **Architecture:**
 - **Feedback:**
@@ -27,9 +30,9 @@ click through every flow without real Freshdesk, Magicline or Claude spend.
     - `token_hash` replaced, so the old token is useless
     - `anonymised_at` set
   - **Kept for metrics:** outcome, flags, citations, feedback, escalations, lead records, studio id,
-    customer status and timestamps ⚑.
+    customer status and timestamps.
   - **Purge** `otp_challenges` older than 24 hours.
-  - **Clear account bindings** (customer id, candidates) 24 hours after `verified_at` ⚑. The
+  - **Clear account bindings** (customer id, candidates) 24 hours after `verified_at`. The
     customer simply logs in again.
   - Everything runs in SQL functions with a batch limit, and the job loops until done. Logs carry
     counts only.
@@ -38,7 +41,7 @@ click through every flow without real Freshdesk, Magicline or Claude spend.
     verified with that hash (messages, flags, feedback cascade; escalations and leads keep a null
     link) and that email's OTP challenges.
   - It prints counts only.
-  - Run by an operator via ECS RunTask until the portal (M4) gets a button ⚑.
+  - Run by an operator via ECS RunTask until the portal (M4) gets a button.
   - Limitations:
     - Conversations that were never logged in cannot be linked to an email (they are anonymised
       at 90 days).
