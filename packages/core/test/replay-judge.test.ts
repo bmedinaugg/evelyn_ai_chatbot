@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { CreateClient } from '../src/claude-answerer.ts';
-import { judgeReplay, summarise } from '../src/replay-judge.ts';
+import { JUDGE_TIMEOUT_MS, judgeReplay, summarise } from '../src/replay-judge.ts';
 
 function fakeClient(response: Record<string, unknown> | Error) {
   const calls: Record<string, unknown>[] = [];
+  const requestOptions: unknown[] = [];
   const client = {
     // The SDK's create is overloaded; the fake records params and returns a message.
-    create: (async (params: Record<string, unknown>) => {
+    create: (async (params: Record<string, unknown>, options?: unknown) => {
       calls.push(JSON.parse(JSON.stringify(params)));
+      requestOptions.push(options);
       if (response instanceof Error) throw response;
       return response;
     }) as unknown as CreateClient['create'],
   };
-  return { client, calls };
+  return { client, calls, requestOptions };
 }
 
 const reply = (json: unknown, stop_reason = 'end_turn') => ({
@@ -85,6 +87,10 @@ describe('judgeReplay', () => {
       'a too long reason',
       { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: 'x'.repeat(201) }] },
     ],
+    [
+      'a line break in a reason',
+      { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: 'ok\nURGENT' }] },
+    ],
   ])('returns null for %s', async (_name, output) => {
     expect(
       await judgeReplay({ client: fakeClient(reply(output)).client, model: 'm' }, input),
@@ -101,6 +107,13 @@ describe('judgeReplay', () => {
     const { client, calls } = fakeClient(reply(good));
     expect(await judgeReplay({ client, model: 'm' }, { ...input, items: [] })).toEqual([]);
     expect(calls).toHaveLength(0);
+  });
+
+  it('runs on its own short time budget without retries, so a slow judge cannot hold up the replay', async () => {
+    const { client, requestOptions } = fakeClient(reply(good));
+    await judgeReplay({ client, model: 'm' }, input);
+    expect(requestOptions[0]).toEqual({ timeout: JUDGE_TIMEOUT_MS, maxRetries: 0 });
+    expect(JUDGE_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
   });
 
   it('counts verdicts', () => {

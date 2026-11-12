@@ -83,19 +83,57 @@ describe('metrics repository', () => {
     ]);
   });
 
+  it('pages through more flagged questions than one call returns', async () => {
+    const { id } = await conversations.create({ tokenHash: 'metrics-paging', lang: 'nl' });
+    created.push(id);
+    for (const n of [1, 2, 3]) {
+      const { data } = await client
+        .from('messages')
+        .insert([
+          { conversation_id: id, role: 'user', display_text: `Paging ${n}`, api_content: '"q"' },
+          {
+            conversation_id: id,
+            role: 'assistant',
+            display_text: '?',
+            api_content: [],
+            outcome: 'no_match',
+          },
+        ])
+        .select('id, role');
+      const reply = data?.find((m) => m.role === 'assistant');
+      await client
+        .from('flags')
+        .insert({ conversation_id: id, message_id: reply?.id ?? null, reason: 'no_match' });
+    }
+    const rows = await metrics.flaggedQuestions(
+      new Date(Date.now() - 60_000),
+      new Date(Date.now() + 60_000),
+      500,
+      { pageSize: 1 },
+    );
+    expect(rows.filter((r) => r.conversationId === id).map((r) => r.question)).toEqual([
+      'Paging 1',
+      'Paging 2',
+      'Paging 3',
+    ]);
+  });
+
   it('claims, finishes and reads a report once', async () => {
-    expect(await metrics.claimReport(DAY, false)).toBe(true);
-    expect(await metrics.claimReport(DAY, false)).toBe(false);
+    const claim = await metrics.claimReport(DAY, false);
+    expect(claim).toEqual(expect.any(String));
+    expect(await metrics.claimReport(DAY, false)).toBeNull();
     const topics = [{ labelNl: 'Sauna', labelEn: 'Sauna', count: 1, conversationIds: [] }];
-    await metrics.finishReport(DAY, { recipientsCount: 2, clustered: true, topics });
+    expect(
+      await metrics.finishReport(DAY, claim ?? '', { recipientsCount: 2, clustered: true, topics }),
+    ).toBe(true);
     expect(await metrics.getReport(DAY)).toMatchObject({ day: DAY, clustered: true, topics });
     expect(await metrics.getReport('2001-02-04')).toBeNull();
   });
 
   it('releases an unsent claim', async () => {
     await client.from('daily_reports').delete().eq('day', DAY);
-    expect(await metrics.claimReport(DAY, false)).toBe(true);
-    await metrics.releaseReport(DAY);
-    expect(await metrics.claimReport(DAY, false)).toBe(true);
+    const claim = await metrics.claimReport(DAY, false);
+    await metrics.releaseReport(DAY, claim ?? '');
+    expect(await metrics.claimReport(DAY, false)).toEqual(expect.any(String));
   });
 });

@@ -69,14 +69,14 @@ isOneToOne: false
                   ]
                 },"daily_reports": {
                   Row: {
-                    "claimed_at": string,"clustered": boolean | null,"day": string,"recipients_count": number | null,"sent_at": string | null,"topics": NonNullable<Json>
+                    "claim_id": string,"claimed_at": string,"clustered": boolean | null,"day": string,"recipients_count": number | null,"sent_at": string | null,"topics": NonNullable<Json>
                   }
                   ComputedFields: never
                   Insert: {
-                    "claimed_at"?: string,"clustered"?: boolean | null,"day": string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day": string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
                   }
                   Update: {
-                    "claimed_at"?: string,"clustered"?: boolean | null,"day"?: string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day"?: string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
                   }
                   Relationships: [
                     
@@ -320,7 +320,7 @@ isOneToOne: false
 { Args: { "p_id": string }; Returns: string
                            },
 "claim_daily_report":
-{ Args: { "p_day": string,"p_resend": boolean }; Returns: boolean
+{ Args: { "p_day": string,"p_resend": boolean }; Returns: string
                            },
 "clear_account_bindings":
 { Args: { "p_before": string }; Returns: number
@@ -344,10 +344,10 @@ isOneToOne: false
             }[]
                            },
 "finish_daily_report":
-{ Args: { "p_clustered": boolean,"p_day": string,"p_recipients_count": number,"p_topics": Json }; Returns: undefined
+{ Args: { "p_claim_id": string,"p_clustered": boolean,"p_day": string,"p_recipients_count": number,"p_topics": Json }; Returns: boolean
                            },
 "flagged_questions":
-{ Args: { "p_from": string,"p_limit": number,"p_to": string }; Returns: {
+{ Args: { "p_from": string,"p_limit": number,"p_offset"?: number,"p_to": string }; Returns: {
               "conversation_id": string,"message_id": number,"question": string,"reasons": (string)[]
             }[]
                            },
@@ -369,7 +369,7 @@ isOneToOne: false
 { Args: { "p_claim_id": string,"p_id": string }; Returns: undefined
                            },
 "release_daily_report":
-{ Args: { "p_day": string }; Returns: undefined
+{ Args: { "p_claim_id": string,"p_day": string }; Returns: undefined
                            },
 "replace_ticket_topics":
 { Args: { "p_values": (string)[] }; Returns: undefined

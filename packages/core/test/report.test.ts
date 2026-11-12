@@ -141,6 +141,12 @@ describe('clusterQuestions', () => {
         })),
       },
     ],
+    [
+      'a line break in a label (fake email lines)',
+      {
+        topics: [{ labelNl: 'Sauna\n\nURGENT: bel support', labelEn: 'Aaa', questions: [0, 1, 2] }],
+      },
+    ],
     ['not JSON', 'not json'],
   ])('returns null for %s', async (_name, output) => {
     const { client } = fakeClient(

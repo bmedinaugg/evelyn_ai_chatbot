@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(28);
 
 delete from public.conversations;
 delete from public.daily_reports;
@@ -110,6 +110,11 @@ select is(
   (select count(*)::int from public.flagged_questions('2026-10-24 23:00Z', '2026-10-25 23:00Z', 1)),
   1, 'limit'
 );
+select results_eq(
+  $$select question from public.flagged_questions('2026-10-24 23:00Z', '2026-10-25 23:00Z', 2, 1)$$,
+  $$values ('Mijn incasso klopt niet'), ('Mijn incasso klopt niet!!')$$,
+  'pages with an offset, in a stable order'
+);
 select is(
   (select count(*)::int from public.flagged_questions('2026-10-20 00:00Z', '2026-10-21 00:00Z', 100)),
   0, 'nothing outside the window'
@@ -126,11 +131,18 @@ select is(
   0, 'nothing flagged the next day'
 );
 
--- Daily reports: claim, finish, release, resend ------------------------------------------------
-select ok(public.claim_daily_report('2026-10-25', false), 'first claim wins');
-select ok(not public.claim_daily_report('2026-10-25', false), 'a parallel run does not claim the same day');
-select lives_ok(
-  $$select public.finish_daily_report('2026-10-25', 3, true, '[{"labelNl": "Incasso", "labelEn": "Direct debit", "count": 2, "conversationIds": []}]'::jsonb)$$,
+-- Daily reports: claim (token), finish, release, resend ---------------------------------------
+create temp table claims (name text primary key, id uuid);
+insert into claims values ('a', public.claim_daily_report('2026-10-25', false));
+select isnt((select id from claims where name = 'a'), null, 'first claim wins and gets a token');
+select is(public.claim_daily_report('2026-10-25', false), null, 'a parallel run does not claim the same day');
+select ok(
+  not public.finish_daily_report('2026-10-25', gen_random_uuid(), 3, true, '[]'::jsonb),
+  'finishing needs the claim token'
+);
+select ok(
+  public.finish_daily_report('2026-10-25', (select id from claims where name = 'a'), 3, true,
+    '[{"labelNl": "Incasso", "labelEn": "Direct debit", "count": 2, "conversationIds": []}]'::jsonb),
   'finish records the send'
 );
 select results_eq(
@@ -138,22 +150,33 @@ select results_eq(
   $$values (3, true, 1, true)$$,
   'report recorded'
 );
-select ok(not public.claim_daily_report('2026-10-25', false), 'a sent day is not sent again');
-select ok(public.claim_daily_report('2026-10-25', true), 'unless resending');
-select is((select sent_at from public.daily_reports where day = '2026-10-25'), null, 'a resend claim clears sent_at');
+select ok(
+  not public.finish_daily_report('2026-10-25', (select id from claims where name = 'a'), 3, true, '[]'::jsonb),
+  'a sent report is not finished twice'
+);
+select is(public.claim_daily_report('2026-10-25', false), null, 'a sent day is not sent again');
+select isnt(public.claim_daily_report('2026-10-25', true), null, 'unless resending');
 
-select ok(public.claim_daily_report('2026-10-26', false), 'claim another day');
-select lives_ok($$select public.release_daily_report('2026-10-26')$$, 'release after a failed send');
-select ok(public.claim_daily_report('2026-10-26', false), 'a released day can be claimed again');
+insert into claims values ('b', public.claim_daily_report('2026-10-26', false));
+select lives_ok($$select public.release_daily_report('2026-10-26', gen_random_uuid())$$, 'release with a foreign token');
+select is((select count(*)::int from public.daily_reports where day = '2026-10-26'), 1, 'does not remove someone else''s claim');
+select lives_ok($$select public.release_daily_report('2026-10-26', (select id from claims where name = 'b'))$$, 'release after a failed send');
+insert into claims values ('c', public.claim_daily_report('2026-10-26', false));
+select isnt((select id from claims where name = 'c'), null, 'a released day can be claimed again');
 update public.daily_reports set claimed_at = now() - interval '1 hour' where day = '2026-10-26';
-select ok(public.claim_daily_report('2026-10-26', false), 'a stale unsent claim (crashed run) can be taken over');
+insert into claims values ('d', public.claim_daily_report('2026-10-26', false));
+select isnt((select id from claims where name = 'd'), null, 'a stale unsent claim (crashed run) can be taken over');
+select ok(
+  not public.finish_daily_report('2026-10-26', (select id from claims where name = 'c'), 1, false, '[]'::jsonb),
+  'the run that lost its claim cannot finish'
+);
 
 -- Security -------------------------------------------------------------------------------------
 select ok(
   (select rowsecurity from pg_tables where schemaname = 'public' and tablename = 'daily_reports')
     and not has_table_privilege('anon', 'public.daily_reports', 'select')
     and not has_function_privilege('anon', 'public.daily_metrics(date,date)', 'execute')
-    and not has_function_privilege('anon', 'public.flagged_questions(timestamptz,timestamptz,int)', 'execute')
+    and not has_function_privilege('anon', 'public.flagged_questions(timestamptz,timestamptz,int,int)', 'execute')
     and not has_function_privilege('anon', 'public.claim_daily_report(date,boolean)', 'execute')
     and not has_function_privilege('anon', 'private.enable_rls_on_create()', 'execute')
     and not has_function_privilege('anon', 'private.scenario_version_immutable()', 'execute'),

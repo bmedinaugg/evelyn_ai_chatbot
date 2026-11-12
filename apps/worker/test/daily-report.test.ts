@@ -4,7 +4,7 @@ import type { DailyMetrics, FlaggedQuestion, MetricsRepository, ReportTopic } fr
 import type { ReportMessage } from '@trainmore/email';
 import { createLogger } from '@trainmore/shared';
 import { describe, expect, it } from 'vitest';
-import { runDailyReport } from '../src/daily-report.ts';
+import { createReportClusterer, runDailyReport } from '../src/daily-report.ts';
 
 let logOutput = '';
 const logger = createLogger({
@@ -40,7 +40,17 @@ const QUESTIONS: FlaggedQuestion[] = [
   { conversationId: 'c2', messageId: 4, reasons: ['thumbs_down'], question: 'Bevriezen?' },
 ];
 
-function fakeMetrics(opts: { claim?: boolean; questions?: FlaggedQuestion[] } = {}) {
+function fakeMetrics(
+  opts: {
+    claim?: boolean;
+    questions?: FlaggedQuestion[];
+    /** finishReport throws this many times before it succeeds. */
+    finishFailures?: number;
+    claimLost?: boolean;
+    releaseFails?: boolean;
+  } = {},
+) {
+  let finishFailures = opts.finishFailures ?? 0;
   const calls: { fn: string; args: unknown[] }[] = [];
   let finished: { recipientsCount: number; clustered: boolean; topics: ReportTopic[] } | null =
     null;
@@ -55,14 +65,21 @@ function fakeMetrics(opts: { claim?: boolean; questions?: FlaggedQuestion[] } = 
     },
     async claimReport(...args) {
       calls.push({ fn: 'claim', args });
-      return opts.claim ?? true;
+      return (opts.claim ?? true) ? 'claim-1' : null;
     },
-    async finishReport(_day, input) {
-      calls.push({ fn: 'finish', args: [_day] });
+    async finishReport(day, claimId, input) {
+      calls.push({ fn: 'finish', args: [day, claimId] });
+      if (finishFailures > 0) {
+        finishFailures -= 1;
+        throw new Error('db blip');
+      }
+      if (opts.claimLost) return false;
       finished = input;
+      return true;
     },
     async releaseReport(...args) {
       calls.push({ fn: 'release', args });
+      if (opts.releaseFails) throw new Error('release failed');
     },
     async getReport() {
       return null;
@@ -113,7 +130,13 @@ describe('runDailyReport', () => {
       { ...settings, resend: false },
     );
 
-    expect(result).toEqual({ status: 'sent', day: '2026-11-12', topics: 1, clustered: true });
+    expect(result).toEqual({
+      status: 'sent',
+      day: '2026-11-12',
+      topics: 1,
+      clustered: true,
+      claimLost: false,
+    });
     expect(calls.find((c) => c.fn === 'claim')?.args).toEqual(['2026-11-12', false]);
     expect(calls.find((c) => c.fn === 'metrics')?.args).toEqual(['2026-11-12', '2026-11-12']);
     expect(calls.find((c) => c.fn === 'questions')?.args.slice(0, 2)).toEqual([
@@ -220,6 +243,70 @@ describe('runDailyReport', () => {
     expect(calls.map((c) => c.fn)).not.toContain('finish');
   });
 
+  it('never releases the day once the email went out; retries recording it', async () => {
+    const { repo, calls, finished } = fakeMetrics({ finishFailures: 2 });
+    const { email, sent } = fakeEmail();
+    await runDailyReport(
+      { metrics: repo, cluster: async () => null, email, logger, now: NOW },
+      { ...settings, resend: false },
+    );
+    expect(sent).toHaveLength(1);
+    expect(calls.filter((c) => c.fn === 'finish')).toHaveLength(3);
+    expect(calls.find((c) => c.fn === 'finish')?.args).toEqual(['2026-11-12', 'claim-1']);
+    expect(finished()).not.toBeNull();
+    expect(calls.map((c) => c.fn)).not.toContain('release');
+  });
+
+  it('keeps the claim (no release) when recording keeps failing after the send', async () => {
+    const { repo, calls } = fakeMetrics({ finishFailures: 10 });
+    const { email, sent } = fakeEmail();
+    await expect(
+      runDailyReport(
+        { metrics: repo, cluster: async () => null, email, logger, now: NOW },
+        { ...settings, resend: false },
+      ),
+    ).rejects.toThrow('db blip');
+    expect(sent).toHaveLength(1);
+    expect(calls.map((c) => c.fn)).not.toContain('release');
+  });
+
+  it('reports a lost claim without failing (another run took over)', async () => {
+    const { repo } = fakeMetrics({ claimLost: true });
+    const { email } = fakeEmail();
+    const result = await runDailyReport(
+      { metrics: repo, cluster: async () => null, email, logger, now: NOW },
+      { ...settings, resend: false },
+    );
+    expect(result).toMatchObject({ status: 'sent', claimLost: true });
+  });
+
+  it('keeps the original error when releasing also fails', async () => {
+    const { repo } = fakeMetrics({ releaseFails: true });
+    const { email } = fakeEmail(true);
+    await expect(
+      runDailyReport(
+        { metrics: repo, cluster: async () => null, email, logger, now: NOW },
+        { ...settings, resend: false },
+      ),
+    ).rejects.toThrow('SES down');
+  });
+
+  it('groups all questions by reason once when clustering fails on a busy day', async () => {
+    const many: FlaggedQuestion[] = Array.from({ length: 205 }, (_, i) => ({
+      conversationId: `c${i}`,
+      messageId: i,
+      reasons: ['no_match'],
+      question: `vraag ${i}`,
+    }));
+    const { repo, finished } = fakeMetrics({ questions: many });
+    const { email } = fakeEmail();
+    await runDailyReport(
+      { metrics: repo, cluster: async () => null, email, logger, now: NOW },
+      { ...settings, resend: false },
+    );
+    expect(finished()?.topics.map((t) => [t.labelEn, t.count])).toEqual([['No answer found', 205]]);
+  });
+
   it('reports a given day and passes resend', async () => {
     const { repo, calls } = fakeMetrics();
     const { email } = fakeEmail();
@@ -232,5 +319,14 @@ describe('runDailyReport', () => {
       new Date('2026-10-24T22:00:00Z'),
       new Date('2026-10-25T23:00:00Z'),
     ]);
+  });
+});
+
+describe('createReportClusterer', () => {
+  it('falls back (null) when the Claude client cannot be created, e.g. no API key', async () => {
+    const cluster = createReportClusterer(() => {
+      throw new Error('missing ANTHROPIC_API_KEY');
+    }, 'claude-haiku-5-5');
+    expect(await cluster(['vraag'])).toBeNull();
   });
 });

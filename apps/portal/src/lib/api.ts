@@ -197,13 +197,18 @@ export class PortalApiError extends Error {
 export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
   const doFetch = opts.fetch ?? fetch.bind(globalThis);
 
-  async function call<T>(path: string, init: RequestInit, schema: z.ZodType<T> | null): Promise<T> {
+  async function call<T>(
+    path: string,
+    init: RequestInit,
+    schema: z.ZodType<T> | null,
+    timeoutMs = 20_000,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await doFetch(`/portal${path}`, {
         ...init,
         credentials: 'same-origin',
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new PortalApiError('network');
@@ -292,6 +297,8 @@ export function createPortalApi(opts: { fetch?: typeof fetch } = {}) {
         `/api/conversations/${encodeURIComponent(conversationId)}/replay`,
         json('POST', { versionId, lang }),
         replaySchema,
+        // Up to 10 answers plus the judge: just under the 60 s CloudFront origin timeout.
+        55_000,
       ),
     metrics: (from: string, to: string) =>
       call(`/api/metrics?${new URLSearchParams({ from, to })}`, {}, metricsSchema),

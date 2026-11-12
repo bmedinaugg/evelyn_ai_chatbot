@@ -75,8 +75,14 @@ $$;
 
 -- The customer question before each flagged bot reply in [p_from, p_to), one row per question
 -- (its flags merged), oldest first. Anonymised conversations and flags without a reply are
--- skipped. The text is unmasked: the caller masks it before it leaves the server.
-create function public.flagged_questions(p_from timestamptz, p_to timestamptz, p_limit int)
+-- skipped. The text is unmasked: the caller masks it before it leaves the server. At most 500 per
+-- call (below PostgREST's max_rows); the caller pages with p_offset.
+create function public.flagged_questions(
+  p_from timestamptz,
+  p_to timestamptz,
+  p_limit int,
+  p_offset int default 0
+)
 returns table (conversation_id uuid, message_id bigint, reasons text[], question text)
 language sql
 stable
@@ -96,7 +102,8 @@ as $$
     and q.display_text <> ''
   group by q.conversation_id, q.id, q.display_text
   order by min(f.created_at), q.id
-  limit least(greatest(coalesce(p_limit, 200), 1), 500);
+  limit least(greatest(coalesce(p_limit, 200), 1), 500)
+  offset greatest(coalesce(p_offset, 0), 0);
 $$;
 
 -- Flagged list: optional end of the window (the portal's "flagged on this day" link from the
@@ -159,6 +166,7 @@ grant execute on function public.list_flagged_conversations(text, timestamptz, i
 -- topics: [{labelNl, labelEn, count, conversationIds}] — labels and ids only, no customer text.
 create table public.daily_reports (
   day date primary key,
+  claim_id uuid not null default gen_random_uuid(), -- only the current claim holder may finish
   claimed_at timestamptz not null default now(),
   sent_at timestamptz,
   recipients_count int,
@@ -166,73 +174,85 @@ create table public.daily_reports (
   topics jsonb not null default '[]'::jsonb check (jsonb_typeof(topics) = 'array')
 );
 
--- True when this run may send the report for the day: nobody claimed it yet, an earlier run
--- crashed without sending (claim older than 15 minutes), or p_resend.
+-- Returns a claim token when this run may send the report for the day: nobody claimed it yet, an
+-- earlier run crashed without sending (claim older than 15 minutes; runs are bounded well below
+-- that), or p_resend. Null otherwise.
 create function public.claim_daily_report(p_day date, p_resend boolean)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_claim uuid := gen_random_uuid();
+  v_count int;
+begin
+  insert into public.daily_reports (day, claim_id) values (p_day, v_claim)
+  on conflict (day) do nothing;
+  get diagnostics v_count = row_count;
+  if v_count = 1 then
+    return v_claim;
+  end if;
+
+  update public.daily_reports
+  set claim_id = v_claim, claimed_at = now(), sent_at = null
+  where day = p_day
+    and (coalesce(p_resend, false)
+      or (sent_at is null and claimed_at < now() - interval '15 minutes'));
+  get diagnostics v_count = row_count;
+  return case when v_count = 1 then v_claim end;
+end;
+$$;
+
+-- Records the send for the claim holder only; false when the claim was lost or already finished.
+create function public.finish_daily_report(
+  p_day date,
+  p_claim_id uuid,
+  p_recipients_count int,
+  p_clustered boolean,
+  p_topics jsonb
+)
 returns boolean
 language plpgsql
 security invoker
 set search_path = ''
 as $$
 declare
-  v_claimed int;
+  v_count int;
 begin
-  insert into public.daily_reports (day) values (p_day) on conflict (day) do nothing;
-  get diagnostics v_claimed = row_count;
-  if v_claimed = 1 then
-    return true;
-  end if;
-
-  update public.daily_reports
-  set claimed_at = now(), sent_at = null
-  where day = p_day
-    and (coalesce(p_resend, false)
-      or (sent_at is null and claimed_at < now() - interval '15 minutes'));
-  get diagnostics v_claimed = row_count;
-  return v_claimed = 1;
-end;
-$$;
-
-create function public.finish_daily_report(
-  p_day date,
-  p_recipients_count int,
-  p_clustered boolean,
-  p_topics jsonb
-)
-returns void
-language sql
-security invoker
-set search_path = ''
-as $$
   update public.daily_reports
   set sent_at = now(), recipients_count = p_recipients_count, clustered = p_clustered,
       topics = p_topics
-  where day = p_day;
+  where day = p_day and claim_id = p_claim_id and sent_at is null;
+  get diagnostics v_count = row_count;
+  return v_count = 1;
+end;
 $$;
 
--- A failed send gives the day back, so the next run can retry it straight away.
-create function public.release_daily_report(p_day date)
+-- A failed send gives the day back (claim holder only), so the next run can retry straight away.
+create function public.release_daily_report(p_day date, p_claim_id uuid)
 returns void
 language sql
 security invoker
 set search_path = ''
 as $$
-  delete from public.daily_reports where day = p_day and sent_at is null;
+  delete from public.daily_reports
+  where day = p_day and claim_id = p_claim_id and sent_at is null;
 $$;
 
 revoke all on public.daily_reports from anon, authenticated;
 grant select, insert, update, delete on public.daily_reports to service_role;
 
 revoke execute on function public.daily_metrics(date, date) from public, anon, authenticated;
-revoke execute on function public.flagged_questions(timestamptz, timestamptz, int) from public, anon, authenticated;
+revoke execute on function public.flagged_questions(timestamptz, timestamptz, int, int) from public, anon, authenticated;
 revoke execute on function public.claim_daily_report(date, boolean) from public, anon, authenticated;
-revoke execute on function public.finish_daily_report(date, int, boolean, jsonb) from public, anon, authenticated;
-revoke execute on function public.release_daily_report(date) from public, anon, authenticated;
+revoke execute on function public.finish_daily_report(date, uuid, int, boolean, jsonb) from public, anon, authenticated;
+revoke execute on function public.release_daily_report(date, uuid) from public, anon, authenticated;
 grant execute on function public.daily_metrics(date, date) to service_role;
-grant execute on function public.flagged_questions(timestamptz, timestamptz, int) to service_role;
+grant execute on function public.flagged_questions(timestamptz, timestamptz, int, int) to service_role;
 grant execute on function public.claim_daily_report(date, boolean) to service_role;
-grant execute on function public.finish_daily_report(date, int, boolean, jsonb) to service_role;
-grant execute on function public.release_daily_report(date) to service_role;
+grant execute on function public.finish_daily_report(date, uuid, int, boolean, jsonb) to service_role;
+grant execute on function public.release_daily_report(date, uuid) to service_role;
 
 -- Tidy-up found on preprod: trigger functions need no execute grant for anyone (triggers run
 -- regardless), so nobody keeps the default PUBLIC grant.

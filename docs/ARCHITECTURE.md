@@ -296,9 +296,14 @@ As built (M5, product owner decisions 2026-11-13):
 
   Anonymising keeps all of these, so older numbers stay correct.
 - **Daily report** (worker `daily-report`, 07:00 Europe/Amsterdam, about yesterday):
-  - **Idempotent:** a `daily_reports` row is claimed per day, so a retried or parallel run never
-    sends twice. A failed send releases the day, and an unsent claim older than 15 minutes can be
-    taken over. `--resend` re-sends; `--day` is for local use only.
+  - **Once per day (at least once):** a `daily_reports` row is claimed per day with a token, so a
+    parallel or retried run does not send it again. Only the claim holder can record or release
+    it.
+  - **Failures:** a failed send releases the day. Once the email went out the claim is never
+    released, and recording it is retried. An unsent claim older than 15 minutes can be taken over
+    (runs are bounded far below that: Claude 60 s × 2), so only a crash between sending and
+    recording can repeat the email once.
+  - **Options:** `--resend` re-sends; `--day` is for local use only.
   - **Questions:** `flagged_questions` returns the customer question before each flagged reply,
     one row per question.
   - **Grouping:** the first 200 questions are masked, cut to 300 characters, escaped and grouped
@@ -317,7 +322,8 @@ As built (M5, product owner decisions 2026-11-13):
     data.
   - **Output:** one verdict per question, with a reason of at most 200 characters in the
     reviewer's language, without links or markup.
-  - **Failure:** any failure gives `judgement: null`, and the replay is still shown.
+  - **Failure:** any failure gives `judgement: null`, and the replay is still shown. The judge
+    has its own 8-second budget without retries, so a slow model cannot cost the replay.
   - **Audit:** the replay audit row records `judged` and the counts.
   - **Locally:** off with the fake answerer.
 - **Portal:**

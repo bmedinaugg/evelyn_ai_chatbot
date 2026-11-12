@@ -28,11 +28,22 @@ export function exampleText(text: string): string {
   return cut(flatten(defanged), MAX_EXAMPLE);
 }
 
+/** Line breaks, tabs and other C0/DEL control characters. */
+export function hasControlCharacter(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
 /** Text that may come from the model (topic labels): no links, markup or recognisable personal data. */
 export function isSafeLabel(label: string): boolean {
   return (
     label.length >= 3 &&
     label.length <= 60 &&
+    // Line breaks and other control characters could fake lines in the plain-text email.
+    !hasControlCharacter(label) &&
     !/[<>]/.test(label) &&
     !/:\/\//.test(label) &&
     !/\bwww\./i.test(label) &&

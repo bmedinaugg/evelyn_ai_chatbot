@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
-import { clusterQuestions } from '@trainmore/core';
 import {
   createServiceClient,
   createSupabaseEscalationRepository,
@@ -22,7 +21,7 @@ import {
   loadRuntimeConfig,
   loadSupabaseConfig,
 } from '@trainmore/shared';
-import { runDailyReport } from './daily-report.ts';
+import { createReportClusterer, runDailyReport } from './daily-report.ts';
 import { runFaqSync } from './faq-sync.ts';
 import { FIXTURE_FOLDER_ID, FIXTURE_PORTAL_ID, fixtureFreshdeskClient } from './fixture-source.ts';
 import { readEmailFromStdin, runDsarDelete, runRetention } from './retention.ts';
@@ -155,14 +154,15 @@ export async function runCommand(
     }
     case 'daily-report': {
       const report = loadReportConfig(env);
-      const claude = {
-        client: new Anthropic().beta.messages,
-        model: loadClaudeConfig(env).fastModel,
-      };
+      // Bounded so a run always ends well inside the 15-minute stale-claim window.
+      const cluster = createReportClusterer(
+        () => new Anthropic({ timeout: 60_000, maxRetries: 1 }).beta.messages,
+        loadClaudeConfig(env).fastModel,
+      );
       await runDailyReport(
         {
           metrics: createSupabaseMetricsRepository(db),
-          cluster: (questions) => clusterQuestions(claude, questions),
+          cluster,
           email:
             runtime.appEnv === 'local'
               ? createLocalOutbox({ appEnv: runtime.appEnv })

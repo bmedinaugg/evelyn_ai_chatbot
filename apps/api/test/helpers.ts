@@ -328,9 +328,11 @@ export function createTestApi(
       return [];
     },
     async claimReport() {
+      return 'claim-1';
+    },
+    async finishReport() {
       return true;
     },
-    async finishReport() {},
     async releaseReport() {},
     async getReport(day) {
       return day === '2026-11-12'

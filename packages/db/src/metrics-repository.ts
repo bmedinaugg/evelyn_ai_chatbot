@@ -40,18 +40,29 @@ export type DailyReport = {
 };
 
 export const MAX_METRICS_DAYS = 92;
+/** flagged_questions returns at most this many rows per call. */
+const MAX_PAGE = 500;
 
 export interface MetricsRepository {
   /** Inclusive range of `YYYY-MM-DD` days, at most 92 (refused by the database otherwise). */
   dailyMetrics(from: string, to: string): Promise<DailyMetrics[]>;
-  flaggedQuestions(from: Date, to: Date, limit: number): Promise<FlaggedQuestion[]>;
-  /** True when this run may send the day's report (see claim_daily_report). */
-  claimReport(day: string, resend: boolean): Promise<boolean>;
+  /** Up to `limit` questions, read in pages (the database returns at most 500 per call). */
+  flaggedQuestions(
+    from: Date,
+    to: Date,
+    limit: number,
+    options?: { pageSize?: number },
+  ): Promise<FlaggedQuestion[]>;
+  /** A claim token when this run may send the day's report (see claim_daily_report), else null. */
+  claimReport(day: string, resend: boolean): Promise<string | null>;
+  /** False when the claim was lost (taken over) or the report was already finished. */
   finishReport(
     day: string,
+    claimId: string,
     input: { recipientsCount: number; clustered: boolean; topics: ReportTopic[] },
-  ): Promise<void>;
-  releaseReport(day: string): Promise<void>;
+  ): Promise<boolean>;
+  /** Gives an unsent day back; only the claim holder's claim is removed. */
+  releaseReport(day: string, claimId: string): Promise<void>;
   /** Null when no report was sent for that day. */
   getReport(day: string): Promise<DailyReport | null>;
 }
@@ -111,22 +122,30 @@ export function createSupabaseMetricsRepository(client: ServiceClient): MetricsR
         }));
     },
 
-    async flaggedQuestions(from, to, limit) {
-      const { data, error } = await client.rpc('flagged_questions', {
-        p_from: from.toISOString(),
-        p_to: to.toISOString(),
-        p_limit: limit,
-      });
-      if (error) throw new DbError('flagged_questions', error.code);
-      return z
-        .array(flaggedRow)
-        .parse(data ?? [])
-        .map((row) => ({
-          conversationId: row.conversation_id,
-          messageId: row.message_id,
-          reasons: row.reasons,
-          question: row.question,
-        }));
+    async flaggedQuestions(from, to, limit, options = {}) {
+      const pageSize = Math.min(options.pageSize ?? MAX_PAGE, MAX_PAGE);
+      const all: FlaggedQuestion[] = [];
+      while (all.length < limit) {
+        const requested = Math.min(pageSize, limit - all.length);
+        const { data, error } = await client.rpc('flagged_questions', {
+          p_from: from.toISOString(),
+          p_to: to.toISOString(),
+          p_limit: requested,
+          p_offset: all.length,
+        });
+        if (error) throw new DbError('flagged_questions', error.code);
+        const page = z.array(flaggedRow).parse(data ?? []);
+        for (const row of page) {
+          all.push({
+            conversationId: row.conversation_id,
+            messageId: row.message_id,
+            reasons: row.reasons,
+            question: row.question,
+          });
+        }
+        if (page.length < requested) break;
+      }
+      return all;
     },
 
     async claimReport(day, resend) {
@@ -135,21 +154,26 @@ export function createSupabaseMetricsRepository(client: ServiceClient): MetricsR
         p_resend: resend,
       });
       if (error) throw new DbError('claim_daily_report', error.code);
-      return z.boolean().parse(data);
+      return z.string().nullable().parse(data);
     },
 
-    async finishReport(day, input) {
-      const { error } = await client.rpc('finish_daily_report', {
+    async finishReport(day, claimId, input) {
+      const { data, error } = await client.rpc('finish_daily_report', {
         p_day: day,
+        p_claim_id: claimId,
         p_recipients_count: input.recipientsCount,
         p_clustered: input.clustered,
         p_topics: input.topics,
       });
       if (error) throw new DbError('finish_daily_report', error.code);
+      return z.boolean().parse(data);
     },
 
-    async releaseReport(day) {
-      const { error } = await client.rpc('release_daily_report', { p_day: day });
+    async releaseReport(day, claimId) {
+      const { error } = await client.rpc('release_daily_report', {
+        p_day: day,
+        p_claim_id: claimId,
+      });
       if (error) throw new DbError('release_daily_report', error.code);
     },
 

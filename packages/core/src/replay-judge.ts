@@ -4,12 +4,15 @@ import { maskText } from '@trainmore/shared';
 import { z } from 'zod';
 import type { CreateClient } from './claude-answerer.ts';
 import { escapeForPrompt } from './prompt.ts';
+import { hasControlCharacter } from './report/text.ts';
 
 export const VERDICTS = ['better', 'same', 'worse'] as const;
 export type Verdict = { verdict: (typeof VERDICTS)[number]; reason: string };
 export type JudgeItem = { question: string; oldAnswer: string | null; newAnswer: string };
 
 const MAX_REASON = 200;
+/** The judge runs after the replay; its failure must never cost the replay itself. */
+export const JUDGE_TIMEOUT_MS = 8_000;
 const MAX_TEXT = 1500;
 
 const judgeOutput = z.object({
@@ -54,18 +57,21 @@ export async function judgeReplay(
     .join('\n');
 
   try {
-    const response = await opts.client.create({
-      model: opts.model,
-      max_tokens: 4000,
-      system: system(input.lang),
-      output_config: { format: JUDGE_FORMAT },
-      messages: [
-        {
-          role: 'user',
-          content: `<draft_answer>${cut(input.draftAnswer)}</draft_answer>\n<items>\n${data}\n</items>`,
-        },
-      ],
-    });
+    const response = await opts.client.create(
+      {
+        model: opts.model,
+        max_tokens: 4000,
+        system: system(input.lang),
+        output_config: { format: JUDGE_FORMAT },
+        messages: [
+          {
+            role: 'user',
+            content: `<draft_answer>${cut(input.draftAnswer)}</draft_answer>\n<items>\n${data}\n</items>`,
+          },
+        ],
+      },
+      { timeout: JUDGE_TIMEOUT_MS, maxRetries: 0 },
+    );
     if (response.stop_reason !== 'end_turn') return null;
     const text = response.content.find((block) => block.type === 'text')?.text;
     if (text === undefined) return null;
@@ -80,6 +86,7 @@ export async function judgeReplay(
 const isSafeReason = (reason: string) =>
   reason.length > 0 &&
   reason.length <= MAX_REASON &&
+  !hasControlCharacter(reason) &&
   !/[<>]/.test(reason) &&
   !/:\/\/|\bwww\./i.test(reason);
 
