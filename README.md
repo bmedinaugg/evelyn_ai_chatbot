@@ -32,3 +32,14 @@ GitHub Actions (`.github/workflows/`):
 ### Repository settings to enable manually (GitHub → Settings)
 - Code security: **Secret scanning** with **push protection**, **Dependabot alerts**.
 - Branches: protect `main`, require PRs and the status checks `check` and `db`.
+
+## Database (Supabase, local)
+Migrations and pgTAP tests live in `packages/db/supabase/`.
+```sh
+pnpm --filter @trainmore/db db:start   # needs Docker (OrbStack/Docker Desktop)
+pnpm --filter @trainmore/db db:reset   # re-apply all migrations
+pnpm --filter @trainmore/db test:db    # pgTAP: RLS and privileges
+pnpm --filter @trainmore/db db:stop
+```
+Every table created in `public` gets Row Level Security automatically and no grants for
+`anon`/`authenticated`; only the server (service role) accesses data.
