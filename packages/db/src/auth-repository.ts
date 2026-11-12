@@ -14,6 +14,7 @@ const candidateSchema = z.object({
 const verifyResultSchema = z.enum(['ok', 'invalid', 'locked', 'expired', 'not_found']);
 const stateRowSchema = z.object({
   verified_at: z.string().nullable(),
+  verified_email_hash: z.string().nullable(),
   account_candidates: z.array(candidateSchema).nullable(),
   customer_id: z.number().int().nullable(),
   studio_id: z.number().int().nullable(),
@@ -81,14 +82,18 @@ export function createSupabaseAuthRepository(client: ServiceClient): AuthReposit
     async getAuthState(conversationId): Promise<AuthState> {
       const { data, error } = await client
         .from('conversations')
-        .select('verified_at, account_candidates, customer_id, studio_id, customer_status')
+        .select(
+          'verified_at, verified_email_hash, account_candidates, customer_id, studio_id, customer_status',
+        )
         .eq('id', conversationId)
         .maybeSingle();
       if (error) throw new DbError('conversations auth select', error.code);
-      if (!data) return { verified: false, candidates: null, account: null };
+      if (!data)
+        return { verified: false, verifiedEmailHash: null, candidates: null, account: null };
       const row = stateRowSchema.parse(data);
       return {
         verified: row.verified_at !== null,
+        verifiedEmailHash: row.verified_email_hash,
         candidates: row.account_candidates,
         account:
           row.customer_id !== null && row.studio_id !== null && row.customer_status !== null

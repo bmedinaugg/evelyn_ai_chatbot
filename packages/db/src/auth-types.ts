@@ -13,6 +13,8 @@ export type VerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'not_found'
 
 export type AuthState = {
   verified: boolean;
+  /** HMAC of the email the conversation was verified with (server-side only). */
+  verifiedEmailHash: string | null;
   candidates: AccountCandidate[] | null;
   account: { customerId: number; studioId: number; status: CustomerStatus } | null;
 };

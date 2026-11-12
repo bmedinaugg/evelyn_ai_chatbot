@@ -6,6 +6,19 @@ export {
 } from './answer-message.ts';
 export { type Answer, answerSchema } from './answer-schema.ts';
 export {
+  type AccountChoice,
+  generateCode,
+  hashCode,
+  hashEmail,
+  type LoginDeps,
+  lookupAccounts,
+  type OtpConfig,
+  requestLoginCode,
+  selectAccount,
+  type VerifyOutcome,
+  verifyLoginCode,
+} from './auth/login.ts';
+export {
   type Answerer,
   type AnswererResult,
   type CreateClient,

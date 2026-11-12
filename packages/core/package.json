@@ -13,7 +13,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "1.8.0",
     "@trainmore/db": "workspace:*",
+    "@trainmore/email": "workspace:*",
     "@trainmore/i18n": "workspace:*",
+    "@trainmore/magicline": "workspace:*",
     "@trainmore/shared": "workspace:*",
     "zod": "4.6.7"
   }

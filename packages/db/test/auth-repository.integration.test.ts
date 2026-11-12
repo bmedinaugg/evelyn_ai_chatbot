@@ -110,6 +110,7 @@ describe('SupabaseAuthRepository', () => {
     const conversationId = await newConversation();
     expect(await auth.getAuthState(conversationId)).toEqual({
       verified: false,
+      verifiedEmailHash: null,
       candidates: null,
       account: null,
     });
