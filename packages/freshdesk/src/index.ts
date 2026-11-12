@@ -10,4 +10,4 @@ export {
   FreshdeskResponseError,
 } from './errors.ts';
 export { escapeHtml, htmlToText } from './html.ts';
-export type { CreateTicketInput, FreshdeskArticle } from './schemas.ts';
+export type { CreateTicketInput, FreshdeskArticle, TicketField } from './schemas.ts';

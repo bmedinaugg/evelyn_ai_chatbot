@@ -31,4 +31,20 @@ export type CreateTicketInput = {
   descriptionText: string;
   tags: string[];
   phone?: string;
+  /** Ticket type (one of the ticket_type field's choices). */
+  type?: string;
 };
+
+/** Ticket field with its choices when they are a plain list (dropdowns such as ticket_type). */
+export const ticketFieldSchema = z
+  .object({ name: z.string(), choices: z.unknown().optional() })
+  .transform(({ name, choices }) => ({
+    name,
+    choices:
+      Array.isArray(choices) && choices.every((c) => typeof c === 'string')
+        ? (choices as string[])
+        : [],
+  }));
+export type TicketField = z.output<typeof ticketFieldSchema>;
+
+export const noteSchema = z.object({ id: z.number().int() }).transform(({ id }) => ({ id }));

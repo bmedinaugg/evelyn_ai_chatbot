@@ -181,3 +181,52 @@ describe('createTicket', () => {
     ).toEqual({ id: 55 });
   });
 });
+
+describe('ticket fields, notes and types', () => {
+  it('lists ticket fields with their dropdown choices', async () => {
+    queue(200, [
+      {
+        id: 1,
+        name: 'ticket_type',
+        label_for_customers: 'Type',
+        type: 'default_ticket_type',
+        choices: ['Membership', 'Payments'],
+      },
+      {
+        id: 2,
+        name: 'status',
+        type: 'default_status',
+        choices: { '2': ['Open', 'Being processed'] },
+      },
+      { id: 3, name: 'subject', type: 'default_subject' },
+    ]);
+    expect(await client.listTicketFields()).toEqual([
+      { name: 'ticket_type', choices: ['Membership', 'Payments'] },
+      { name: 'status', choices: [] },
+      { name: 'subject', choices: [] },
+    ]);
+    expect(requests[0]?.url).toBe('https://tm.freshdesk.com/api/v2/ticket_fields');
+  });
+
+  it('adds a private note with escaped text', async () => {
+    queue(201, { id: 9, body: 'x' });
+    await client.addPrivateNote(55, 'Klant: <b>hoi</b>\nBot: hallo');
+    expect(requests[0]?.url).toBe('https://tm.freshdesk.com/api/v2/tickets/55/notes');
+    expect(await requests[0]?.json()).toEqual({
+      body: 'Klant: &lt;b&gt;hoi&lt;/b&gt;<br>Bot: hallo',
+      private: true,
+    });
+  });
+
+  it('sends the ticket type when given', async () => {
+    queue(201, { id: 56 });
+    await client.createTicket({
+      email: 'a@example.com',
+      subject: 'Q',
+      descriptionText: 'hi',
+      tags: [],
+      type: 'Payments',
+    });
+    expect(await requests[0]?.json()).toMatchObject({ type: 'Payments' });
+  });
+});
