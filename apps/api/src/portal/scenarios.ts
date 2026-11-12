@@ -1,3 +1,4 @@
+import { summarise } from '@trainmore/core';
 import { DbError, type ScenarioVersion } from '@trainmore/db';
 import { maskText } from '@trainmore/shared';
 import type { FastifyInstance } from 'fastify';
@@ -14,7 +15,11 @@ const contentSchema = z.object({
   statuses: z.array(z.enum(['MEMBER', 'PROSPECT', 'FORMER_MEMBER'])).max(3),
   articleId: z.number().int().positive().nullable(),
 });
-const replayBody = z.object({ versionId: z.number().int().positive() });
+const replayBody = z.object({
+  versionId: z.number().int().positive(),
+  /** Language of the reviewer (portal UI) for the judge's reasons; default: the conversation's. */
+  lang: z.enum(['nl', 'en']).optional(),
+});
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PUBLISH_STATUS = {
   ok: 204,
@@ -159,26 +164,43 @@ export function registerPortalScenarioRoutes(app: FastifyInstance, deps: PortalD
           article: null,
         },
       });
+      const results = replies.map((r, i) => ({
+        question: maskText(r.question),
+        oldAnswer:
+          turns[i]?.oldAnswer === null || turns[i] === undefined
+            ? null
+            : maskText(turns[i].oldAnswer ?? ''),
+        newAnswer: maskText(r.reply.text),
+        usesDraft: r.reply.scenarioVersionId === version.id,
+        outcome: r.reply.outcome,
+        action: r.reply.action,
+      }));
+      // Advisory only: the judge sees the same masked text as the reviewer and never publishes.
+      const verdicts = deps.judge
+        ? await deps.judge({
+            items: results.map((r) => ({
+              question: r.question,
+              oldAnswer: r.oldAnswer,
+              newAnswer: r.newAnswer,
+            })),
+            draftAnswer: conversation.lang === 'nl' ? version.answerNl : version.answerEn,
+            lang: body.data.lang ?? conversation.lang,
+          })
+        : null;
+      const judgement = verdicts ? { verdicts, summary: summarise(verdicts) } : null;
       await deps.repo.audit({
         actor: actorOf(agent),
         action: 'scenario.replay',
         entityType: 'conversation',
         entityId: conversation.id,
-        details: { versionId: version.id, questions: replies.length },
+        details: {
+          versionId: version.id,
+          questions: replies.length,
+          judged: judgement !== null,
+          ...judgement?.summary,
+        },
       });
-      return {
-        results: replies.map((r, i) => ({
-          question: maskText(r.question),
-          oldAnswer:
-            turns[i]?.oldAnswer === null || turns[i] === undefined
-              ? null
-              : maskText(turns[i].oldAnswer ?? ''),
-          newAnswer: maskText(r.reply.text),
-          usesDraft: r.reply.scenarioVersionId === version.id,
-          outcome: r.reply.outcome,
-          action: r.reply.action,
-        })),
-      };
+      return { results, judgement };
     },
   );
 }

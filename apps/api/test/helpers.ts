@@ -43,7 +43,12 @@ export function createTestApi(
     }[];
     magiclineDown?: boolean;
     /** Portal on, with the claims the fake Entra returns on login. */
-    portal?: { claims?: Partial<EntraClaims>; replayAvailable?: boolean };
+    portal?: {
+      claims?: Partial<EntraClaims>;
+      replayAvailable?: boolean;
+      /** Replay judge: answers 'better' for every question (default), fails, or is not configured. */
+      judge?: 'ok' | 'fail' | 'off';
+    };
     /** Extra Freshdesk tag marking non-production tickets (e.g. chatbot-preprod). */
     envTag?: string;
     /** Synced Freshdesk topics (empty: built-in defaults apply). */
@@ -472,6 +477,7 @@ export function createTestApi(
     },
   };
   const replayCalls: unknown[] = [];
+  const judgeCalls: unknown[] = [];
 
   let portalClaims = options.portal?.claims;
   const entra: EntraClient = {
@@ -523,6 +529,17 @@ export function createTestApi(
                         flags: [],
                         scenarioVersionId: input.draft.versionId,
                       },
+                    }));
+                  },
+            judge:
+              options.portal.judge === 'off'
+                ? null
+                : async (input) => {
+                    judgeCalls.push(input);
+                    if (options.portal?.judge === 'fail') return null;
+                    return input.items.map(() => ({
+                      verdict: 'better' as const,
+                      reason: 'Answers the question.',
                     }));
                   },
           },
@@ -598,6 +615,7 @@ export function createTestApi(
     entraCalls,
     scenarioVersions,
     replayCalls,
+    judgeCalls,
     /** The next portal sign-in returns these claims (a second person on the same server). */
     setPortalClaims(claims: Partial<EntraClaims>) {
       portalClaims = claims;

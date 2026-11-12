@@ -155,6 +155,69 @@ describe('portal approved answers', () => {
     );
   });
 
+  it('adds advisory verdicts from the judge, judged on masked text in the reviewer language', async () => {
+    const api = createTestApi({ portal: {} });
+    const session = await portalLogin(api);
+    const { versionId } = (
+      await call(api, 'POST', '/portal/api/scenarios', session, content)
+    ).json();
+    const res = await call(api, 'POST', `/portal/api/conversations/${CONV}/replay`, session, {
+      versionId,
+      lang: 'en',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().judgement).toEqual({
+      verdicts: [{ verdict: 'better', reason: 'Answers the question.' }],
+      summary: { better: 1, same: 0, worse: 0 },
+    });
+    expect(api.judgeCalls[0]).toMatchObject({
+      lang: 'en',
+      draftAnswer: content.answerNl,
+      items: [
+        {
+          question: 'Ik ben Sam, mail [•••] of bel [•••]',
+          oldAnswer: 'Ik kon hier geen antwoord op vinden.',
+        },
+      ],
+    });
+    expect(JSON.stringify(api.judgeCalls)).not.toContain('sam@example.com');
+    expect(api.audits).toContainEqual(
+      expect.objectContaining({
+        action: 'scenario.replay',
+        details: expect.objectContaining({ judged: true, better: 1, same: 0, worse: 0 }),
+      }),
+    );
+  });
+
+  it('still answers a replay when the judge fails or is not configured', async () => {
+    for (const judge of ['fail', 'off'] as const) {
+      const api = createTestApi({ portal: { judge } });
+      const session = await portalLogin(api);
+      const { versionId } = (
+        await call(api, 'POST', '/portal/api/scenarios', session, content)
+      ).json();
+      const res = await call(api, 'POST', `/portal/api/conversations/${CONV}/replay`, session, {
+        versionId,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().judgement).toBeNull();
+      expect(res.json().results).toHaveLength(1);
+      expect(api.audits).toContainEqual(
+        expect.objectContaining({ details: expect.objectContaining({ judged: false }) }),
+      );
+    }
+  });
+
+  it('rejects an unknown reviewer language', async () => {
+    const api = createTestApi({ portal: {} });
+    const session = await portalLogin(api);
+    const res = await call(api, 'POST', `/portal/api/conversations/${CONV}/replay`, session, {
+      versionId: 1,
+      lang: 'de',
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('refuses a replay where Magicline is not the mock, or from another origin', async () => {
     const api = createTestApi({ portal: { replayAvailable: false } });
     const session = await portalLogin(api);

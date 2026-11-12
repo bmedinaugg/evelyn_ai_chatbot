@@ -47,5 +47,12 @@ export {
   type ReplayDeps,
   replayConversation,
 } from './replay.ts';
+export {
+  type JudgeItem,
+  judgeReplay,
+  summarise,
+  VERDICTS,
+  type Verdict,
+} from './replay-judge.ts';
 export * from './report/index.ts';
 export { buildTicketNote, MAX_NOTE_MESSAGES } from './ticket-note.ts';

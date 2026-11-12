@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
-import { createClaudeAnswerer, replayConversation } from '@trainmore/core';
+import { createClaudeAnswerer, judgeReplay, replayConversation } from '@trainmore/core';
 import {
   createServiceClient,
   createSupabaseAuthRepository,
@@ -56,13 +56,12 @@ const freshdeskClient =
 if (env.FRESHDESK_FAKE === '1') logger.warn('using the local Freshdesk stand-in (no real tickets)');
 
 const useFake = runtime.appEnv === 'local' && env.CHAT_FAKE_ANSWERER === '1';
-const answerer = useFake
-  ? createFakeAnswerer()
-  : createClaudeAnswerer({
-      // Bounded so a turn finishes well before its 60 s claim can be taken over (at most ~2 x 25 s).
-      client: new Anthropic({ timeout: 25_000, maxRetries: 1 }).beta.messages,
-      model: loadClaudeConfig(env).chatModel,
-    });
+const claudeConfig = loadClaudeConfig(env);
+// Bounded so a turn finishes well before its 60 s claim can be taken over (at most ~2 x 25 s).
+const anthropic = useFake ? null : new Anthropic({ timeout: 25_000, maxRetries: 1 });
+const answerer = anthropic
+  ? createClaudeAnswerer({ client: anthropic.beta.messages, model: claudeConfig.chatModel })
+  : createFakeAnswerer();
 if (useFake) logger.warn('using the fake answerer (local smoke tests only)');
 
 // Login: codes by email (SES; printed locally), Magicline keys from Secrets Manager (env with the mock).
@@ -122,6 +121,14 @@ const app = buildApiServer({
           replay: loadConfig(env).magicline.useMock
             ? (input) =>
                 replayConversation({ faq, scenarios, answerer, capabilities, logger }, input)
+            : null,
+          // Advisory replay verdicts (fast model); off with the fake answerer (no paid calls).
+          judge: anthropic
+            ? (input) =>
+                judgeReplay(
+                  { client: anthropic.beta.messages, model: claudeConfig.fastModel },
+                  input,
+                )
             : null,
         },
       }
