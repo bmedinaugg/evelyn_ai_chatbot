@@ -112,9 +112,12 @@ export function createTestApi(
       }
       leads.push(input);
     },
-    async lastAssistantOutcome(id) {
+    async recentAssistantOutcomes(id, limit) {
       const turns = conversations.get(id)?.turns ?? [];
-      return turns.findLast((m) => m.outcome !== undefined)?.outcome ?? null;
+      return turns
+        .flatMap((m) => (m.outcome === undefined ? [] : [m.outcome]))
+        .reverse()
+        .slice(0, limit);
     },
     async listTranscript(id) {
       return (conversations.get(id)?.turns ?? []).map((m) => ({

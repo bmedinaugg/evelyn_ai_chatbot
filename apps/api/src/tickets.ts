@@ -104,12 +104,14 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
       // The ticket exists now: never fail the request (the customer would resubmit and duplicate it).
       let reason: EscalationReason = 'customer_request';
       try {
-        const [transcript, auth, lastOutcome] = await Promise.all([
+        const [transcript, auth, recent] = await Promise.all([
           deps.conversations.listTranscript(conversation.id),
           deps.login.auth.getAuthState(conversation.id),
-          deps.conversations.lastAssistantOutcome(conversation.id),
+          deps.conversations.recentAssistantOutcomes(conversation.id, 2),
         ]);
-        if (lastOutcome !== null && STUCK_OUTCOMES.has(lastOutcome)) reason = 'stuck';
+        // Same rule as the bot's stuck reply: the last two replies both failed.
+        if (recent.length === 2 && recent.every((outcome) => STUCK_OUTCOMES.has(outcome)))
+          reason = 'stuck';
         // Account context only for the email that was verified with a code in this conversation.
         const sameEmail =
           auth.verifiedEmailHash !== null &&

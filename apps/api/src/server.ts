@@ -14,6 +14,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { z } from 'zod';
 import { authorizeConversation } from './authorize.ts';
 import { newConversationToken } from './conversation-token.ts';
+import { registerFeedbackRoutes } from './feedback.ts';
 import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
 import { proxyTrust } from './proxy-trust.ts';
@@ -122,6 +123,7 @@ export function buildApiServer(deps: ApiDeps) {
               ...(result.action === 'ticket_form'
                 ? { contactUrl: deps.config.supportContactUrl }
                 : {}),
+              ...(result.messageId === null ? {} : { messageId: result.messageId }),
             },
           };
         } catch (error) {
@@ -135,6 +137,7 @@ export function buildApiServer(deps: ApiDeps) {
     registerLeadRoutes(widget, deps);
     registerLoginRoutes(widget, deps);
     registerTicketRoutes(widget, deps);
+    registerFeedbackRoutes(widget, deps);
   });
 
   return app;

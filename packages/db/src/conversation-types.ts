@@ -59,8 +59,8 @@ export interface ConversationRepository {
   releaseTurn(id: string, claimId: string): Promise<void>;
   /** Ordered (by message id) API history for replay. */
   listApiHistory(id: string): Promise<ApiHistoryEntry[]>;
-  /** Outcome of the latest assistant message, if any. */
-  lastAssistantOutcome(id: string): Promise<Outcome | null>;
+  /** Outcomes of the latest visible assistant replies, newest first (at most `limit`). */
+  recentAssistantOutcomes(id: string, limit: number): Promise<Outcome[]>;
   /** What the customer saw and typed (no tool steps), oldest first, at most the last 50 messages. */
   listTranscript(id: string): Promise<{ role: 'user' | 'assistant'; text: string }[]>;
   /**

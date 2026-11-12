@@ -95,7 +95,7 @@ export function createSupabaseConversationRepository(
         .map((row) => ({ role: row.role, content: row.api_content }));
     },
 
-    async lastAssistantOutcome(id) {
+    async recentAssistantOutcomes(id, limit) {
       const { data, error } = await client
         .from('messages')
         .select('outcome')
@@ -103,13 +103,12 @@ export function createSupabaseConversationRepository(
         .eq('role', 'assistant')
         .neq('display_text', '')
         .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(limit);
       if (error) throw new DbError('messages outcome select', error.code);
       return z
-        .enum(OUTCOMES)
-        .nullable()
-        .parse(data?.outcome ?? null);
+        .array(z.object({ outcome: z.enum(OUTCOMES) }))
+        .parse(data ?? [])
+        .map((r) => r.outcome);
     },
 
     async listTranscript(id) {

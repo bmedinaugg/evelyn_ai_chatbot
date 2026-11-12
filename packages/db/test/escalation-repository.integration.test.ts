@@ -48,10 +48,10 @@ describe('escalation repository', () => {
     ]);
   });
 
-  it('reads the last assistant outcome and the transcript as the customer saw it', async () => {
+  it('reads the recent assistant outcomes and the transcript as the customer saw it', async () => {
     const { id } = await conversations.create({ tokenHash: 'esc2', lang: 'nl' });
     created.push(id);
-    expect(await conversations.lastAssistantOutcome(id)).toBeNull();
+    expect(await conversations.recentAssistantOutcomes(id, 2)).toEqual([]);
     const claimId = (await conversations.claimTurn(id)) as string;
     await conversations.appendTurn({
       conversationId: id,
@@ -67,10 +67,22 @@ describe('escalation repository', () => {
       assistant: { displayText: 'Antwoord', apiContent: [], outcome: 'no_match' },
       flags: [],
     });
-    expect(await conversations.lastAssistantOutcome(id)).toBe('no_match');
+    expect(await conversations.recentAssistantOutcomes(id, 2)).toEqual(['no_match']);
+    const second = (await conversations.claimTurn(id)) as string;
+    await conversations.appendTurn({
+      conversationId: id,
+      claimId: second,
+      user: { displayText: 'Nog een', apiContent: 'q' },
+      assistant: { displayText: 'Hier', apiContent: [], outcome: 'answered' },
+      flags: [],
+    });
+    expect(await conversations.recentAssistantOutcomes(id, 2)).toEqual(['answered', 'no_match']);
+    expect(await conversations.recentAssistantOutcomes(id, 1)).toEqual(['answered']);
     expect(await conversations.listTranscript(id)).toEqual([
       { role: 'user', text: 'Vraag' },
       { role: 'assistant', text: 'Antwoord' },
+      { role: 'user', text: 'Nog een' },
+      { role: 'assistant', text: 'Hier' },
     ]);
   });
 });

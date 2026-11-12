@@ -58,6 +58,7 @@ describe('widget conversations', () => {
         citations: [],
         action: 'ticket_form',
         contactUrl: CONTACT_URL,
+        messageId: 1,
       },
     });
   });
@@ -86,6 +87,7 @@ describe('widget conversations', () => {
       lang: 'en',
       citations: [],
       action: 'none',
+      messageId: 1,
     });
   });
 

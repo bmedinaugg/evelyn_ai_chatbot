@@ -18,7 +18,7 @@ export type StoredTurn = {
 
 export function fakeConversations(
   record: ConversationRecord,
-  options: { loseClaim?: boolean } = {},
+  options: { loseClaim?: boolean; outcomesError?: boolean } = {},
 ) {
   const turns: StoredTurn[] = [];
   const releases: string[] = [];
@@ -70,12 +70,12 @@ export function fakeConversations(
       return true;
     },
     async recordLead() {},
-    async lastAssistantOutcome() {
-      for (let i = turns.length - 1; i >= 0; i -= 1) {
-        const outcome = turns[i]?.assistant?.outcome;
-        if (outcome) return outcome;
-      }
-      return null;
+    async recentAssistantOutcomes(_id, limit) {
+      if (options.outcomesError) throw new Error('db down');
+      return turns
+        .flatMap((turn) => (turn.assistant?.outcome ? [turn.assistant.outcome] : []))
+        .reverse()
+        .slice(0, limit);
     },
     async listTranscript() {
       return turns.flatMap((turn) => [

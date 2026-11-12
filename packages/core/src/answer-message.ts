@@ -33,6 +33,9 @@ export class ConversationBusyError extends Error {
   }
 }
 
+/** The reply plus the id of the stored assistant message (null when none was stored), for feedback. */
+export type AnswerMessageResult = Reply & { messageId: number | null };
+
 export type AnswerMessageDeps = {
   faq: FaqRepository;
   conversations: ConversationRepository;
@@ -71,7 +74,7 @@ export async function answerMessage(
     /** The account bound to this conversation (server-side), if the customer logged in. */
     account?: AccountContext | null;
   },
-): Promise<Reply> {
+): Promise<AnswerMessageResult> {
   const { conversations, logger } = deps;
   const claimId = await conversations.claimTurn(input.conversationId);
   if (!claimId) throw new ConversationBusyError();
@@ -81,7 +84,10 @@ export async function answerMessage(
     const conversation = await conversations.get(input.conversationId);
     if (!conversation) throw new Error('conversation disappeared during turn');
     if (conversation.userMessageCount >= MAX_CUSTOMER_MESSAGES) {
-      return fixedReply(input.pageLang, 'bot.conversationLimit', { outcome: 'limit' });
+      return {
+        ...fixedReply(input.pageLang, 'bot.conversationLimit', { outcome: 'limit' }),
+        messageId: null,
+      };
     }
 
     const hits = await deps.faq.search(input.text, input.pageLang, SEARCH_LIMIT);
@@ -124,7 +130,7 @@ export async function answerMessage(
               outcome: 'error',
               flags: ['error'] satisfies FlagReason[],
             });
-    const reply = await unstick(conversations, input.conversationId, finalized);
+    const reply = await unstick(deps, input.conversationId, finalized);
 
     const user: StoredMessage = { displayText: input.text, apiContent: userTurn };
     const assistant: StoredMessage | null =
@@ -136,8 +142,9 @@ export async function answerMessage(
             citations: reply.citations,
           }
         : null;
+    let messageId: number | null;
     try {
-      await conversations.appendTurn({
+      messageId = await conversations.appendTurn({
         conversationId: input.conversationId,
         claimId,
         user,
@@ -162,7 +169,7 @@ export async function answerMessage(
       },
       'message answered',
     );
-    return reply;
+    return { ...reply, messageId };
   } finally {
     if (!appended) await conversations.releaseTurn(input.conversationId, claimId);
   }
@@ -173,13 +180,20 @@ export async function answerMessage(
  * with a fixed text, and flags the conversation for review.
  */
 async function unstick(
-  conversations: ConversationRepository,
+  deps: AnswerMessageDeps,
   conversationId: string,
   reply: Reply,
 ): Promise<Reply> {
   if (!FAILED.has(reply.outcome)) return reply;
-  const previous = await conversations.lastAssistantOutcome(conversationId);
-  if (previous === null || !FAILED.has(previous)) return reply;
+  let previous: Outcome | undefined;
+  try {
+    [previous] = await deps.conversations.recentAssistantOutcomes(conversationId, 1);
+  } catch (error) {
+    // The normal hand-off reply is still correct; only the proactive offer is skipped.
+    deps.logger.warn({ err: error, conversationId }, 'stuck check failed');
+    return reply;
+  }
+  if (previous === undefined || !FAILED.has(previous)) return reply;
   return fixedReply(reply.lang, 'bot.stuck', {
     action: 'ticket_form',
     outcome: reply.outcome,

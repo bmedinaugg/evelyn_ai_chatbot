@@ -1,5 +1,6 @@
 export {
   type AnswerMessageDeps,
+  type AnswerMessageResult,
   answerMessage,
   ConversationBusyError,
   MAX_CUSTOMER_MESSAGES,
