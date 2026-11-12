@@ -9,12 +9,18 @@ const api = {
 };
 
 describe('loadClaudeConfig', () => {
-  it('defaults to Claude Sonnet 5.5', () => {
-    expect(loadClaudeConfig({})).toEqual({ chatModel: 'claude-sonnet-5-5' });
+  it('defaults to Claude Sonnet 5.5 for chat and Haiku 5.5 for fast tasks', () => {
+    expect(loadClaudeConfig({})).toEqual({
+      chatModel: 'claude-sonnet-5-5',
+      fastModel: 'claude-haiku-5-5',
+    });
   });
 
   it('rejects a non-Claude model', () => {
     expect(() => loadClaudeConfig({ CLAUDE_CHAT_MODEL: 'gpt-4o' })).toThrow(/CLAUDE_CHAT_MODEL/);
+    expect(() => loadClaudeConfig({ CLAUDE_FAST_MODEL: 'gpt-4o-mini' })).toThrow(
+      /CLAUDE_FAST_MODEL/,
+    );
   });
 });
 

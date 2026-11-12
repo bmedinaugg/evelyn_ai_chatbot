@@ -69,7 +69,7 @@ export function loadFreshdeskConfig(env: Env = process.env): FreshdeskConfig {
   };
 }
 
-export type ClaudeConfig = { chatModel: string };
+export type ClaudeConfig = { chatModel: string; fastModel: string };
 export type ApiConfig = {
   port: number;
   trustProxyHops: number;
@@ -78,19 +78,24 @@ export type ApiConfig = {
 };
 export type TurnstileConfig = { secretKey: string };
 
+const claudeModel = (fallback: string) =>
+  z
+    .string()
+    .default(fallback)
+    .refine((model) => /^claude-[a-z0-9-]+$/.test(model), {
+      message: `must be a Claude model id such as ${fallback}`,
+    });
+
 export function loadClaudeConfig(env: Env = process.env): ClaudeConfig {
   const e = parseEnv(
     z.object({
-      CLAUDE_CHAT_MODEL: z
-        .string()
-        .default('claude-sonnet-5-5')
-        .refine((model) => /^claude-[a-z0-9-]+$/.test(model), {
-          message: 'must be a Claude model id such as claude-sonnet-5-5',
-        }),
+      CLAUDE_CHAT_MODEL: claudeModel('claude-sonnet-5-5'),
+      // Clustering the daily report and judging replays (M5).
+      CLAUDE_FAST_MODEL: claudeModel('claude-haiku-5-5'),
     }),
     env,
   );
-  return { chatModel: e.CLAUDE_CHAT_MODEL };
+  return { chatModel: e.CLAUDE_CHAT_MODEL, fastModel: e.CLAUDE_FAST_MODEL };
 }
 
 const HTTPS_ORIGIN = /^https:\/\/[a-z0-9.-]+(:\d+)?$/;

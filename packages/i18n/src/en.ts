@@ -120,6 +120,28 @@ export const en = {
       body: "Your code is {code}. It is valid for {minutes} minutes.\n\nDidn't request this? You can ignore this email.",
     },
   },
+  // Daily report email for support staff (M5).
+  report: {
+    subject:
+      'Chatbot daily report {day}: {conversations} conversations, {flagged} flagged questions',
+    heading: 'Chatbot daily report – {day}',
+    conversations: 'Conversations: {count}',
+    resolved: 'Resolved by the bot: {count} ({rate})',
+    escalated: 'Handed to support: {count} ({rate})',
+    satisfaction: 'Satisfaction (thumbs): {rate} ({up} of {total})',
+    satisfactionNone: 'Satisfaction (thumbs): — (no ratings)',
+    approvedAnswers: 'Approved answers used: {count}',
+    logins: 'Logged in: {count}',
+    flags: 'Flags: {list}',
+    topicsHeading: 'Flagged questions by topic ({count})',
+    notClustered:
+      'Automatic grouping was unavailable today; the topics below are the flag reasons.',
+    noFlags: 'No flagged questions.',
+    flaggedLink: 'Review in the portal: {url}',
+    metricsLink: 'Metrics: {url}',
+    privacyNote:
+      'Example questions have email addresses, phone numbers and account numbers removed automatically, but may still contain names. Do not forward this email outside the support team.',
+  },
   lead: {
     subject: 'New membership question via website chat',
   },

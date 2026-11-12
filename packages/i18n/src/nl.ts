@@ -121,6 +121,27 @@ export const nl = {
       body: 'Je code is {code}. Deze is {minutes} minuten geldig.\n\nHeb je dit niet aangevraagd? Dan kun je deze e-mail negeren.',
     },
   },
+  // Dagrapport per e-mail voor supportmedewerkers (M5).
+  report: {
+    subject: 'Chatbot dagrapport {day}: {conversations} gesprekken, {flagged} gemarkeerde vragen',
+    heading: 'Chatbot dagrapport – {day}',
+    conversations: 'Gesprekken: {count}',
+    resolved: 'Opgelost door de bot: {count} ({rate})',
+    escalated: 'Doorgezet naar support: {count} ({rate})',
+    satisfaction: 'Tevredenheid (duimpjes): {rate} ({up} van {total})',
+    satisfactionNone: 'Tevredenheid (duimpjes): — (geen beoordelingen)',
+    approvedAnswers: 'Goedgekeurde antwoorden gebruikt: {count}',
+    logins: 'Ingelogd: {count}',
+    flags: 'Markeringen: {list}',
+    topicsHeading: 'Gemarkeerde vragen per onderwerp ({count})',
+    notClustered:
+      'Automatisch groeperen lukte vandaag niet; de onderwerpen hieronder zijn de redenen van markering.',
+    noFlags: 'Geen gemarkeerde vragen.',
+    flaggedLink: 'Bekijk in het portaal: {url}',
+    metricsLink: 'Statistieken: {url}',
+    privacyNote:
+      'Bij de voorbeeldvragen zijn e-mailadressen, telefoonnummers en rekeningnummers automatisch weggehaald, maar ze kunnen nog namen bevatten. Stuur deze e-mail niet door buiten het supportteam.',
+  },
   lead: {
     subject: 'Nieuwe lidmaatschapsvraag via websitechat',
   },
