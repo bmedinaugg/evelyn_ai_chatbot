@@ -231,6 +231,21 @@ importers:
         specifier: 2.1148.0
         version: 2.1148.0
 
+  packages/core:
+    dependencies:
+      '@trainmore/db':
+        specifier: workspace:*
+        version: link:../db
+      '@trainmore/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@trainmore/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/db:
     dependencies:
       '@supabase/supabase-js':
