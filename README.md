@@ -59,3 +59,26 @@ while we have content for it, or if it would delete articles or drop translation
 After checking Freshdesk, an intended large change runs with `sync-faq --allow-mass-change`.
 `pnpm --filter @trainmore/db test:integration` runs the repository tests against the local stack.
 `pnpm --filter @trainmore/db db:types` regenerates `packages/db/src/generated/database.types.ts`.
+
+## Chat API (local)
+`apps/api` serves the widget: `POST /widget/conversations`, `POST /widget/conversations/:id/messages`
+(bearer conversation token), `POST /widget/leads` (Turnstile + Freshdesk ticket), `GET /health`.
+Answers come from Claude Sonnet 5.5 (`CLAUDE_CHAT_MODEL`) with structured output; the server checks
+every answer (cited articles must exist, no model-written links, fixed texts for declines and
+hand-offs) before it is returned.
+
+```sh
+# Needs local Supabase with FAQ fixtures (see above) and the env keys in .env.example.
+# Smoke test without Claude spend: CHAT_FAKE_ANSWERER=1 (only honoured with APP_ENV=local).
+sh packages/db/scripts/with-local-env.sh env APP_ENV=local CHAT_FAKE_ANSWERER=1 ... pnpm --filter @trainmore/api dev
+```
+Local Turnstile: use Cloudflare's test secret `1x0000000000000000000000000000000AA` (see `docs/api/turnstile.md`).
+
+## Evals (spend money)
+`packages/evals` runs 24 bilingual questions against the synthetic FAQ fixtures with the real Claude
+API and prints pass/fail, tokens and an estimated cost (about $0.25–0.40 per run). It refuses to run
+unless `APP_ENV=local` and `EVAL_CONFIRM_SPEND=yes`, and never runs in CI.
+```sh
+sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
+  EVAL_CONFIRM_SPEND=yes ANTHROPIC_API_KEY=... pnpm --filter @trainmore/evals eval
+```

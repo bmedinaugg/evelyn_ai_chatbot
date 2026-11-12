@@ -324,6 +324,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M1b ✅ 2026-11-11: conversations (append-only, one turn in flight), Sonnet 5.5 answering with structured output and check-then-show guardrails, widget API, lead form (Turnstile → Freshdesk), bilingual evals (first paid run pending).
 - M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE
