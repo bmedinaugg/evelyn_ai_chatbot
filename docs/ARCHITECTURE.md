@@ -205,6 +205,11 @@ Tables:
 Access:
 - **RLS enabled on every table.** Policies deny `anon` and `authenticated`. Only the server
   (service role) reads and writes. The widget never talks to Supabase.
+- Enforced in the baseline migration: an event trigger enables RLS on every new `public` table, and
+  `postgres` grants nothing to `anon`/`authenticated` by default. Supabase's `supabase_admin` role
+  still has default grants that `postgres` cannot change, so pgTAP tests fail if any object in
+  `public` is granted to `anon`/`authenticated`. Rule: only create objects through migrations; never
+  install extensions into `public` from the dashboard.
 - Emails are stored as an HMAC hash where lookup is enough (OTP, sessions, DSAR). Plain email is
   stored only on escalation records, and only as long as needed.
 
