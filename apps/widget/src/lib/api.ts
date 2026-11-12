@@ -5,7 +5,7 @@ const replySchema = z.object({
   text: z.string(),
   lang: z.enum(['nl', 'en']),
   citations: z.array(z.object({ articleId: z.number(), title: z.string(), url: z.string() })),
-  action: z.enum(['none', 'lead_form', 'contact']),
+  action: z.enum(['none', 'lead_form', 'contact', 'login']),
   contactUrl: z.string().optional(),
 });
 export type ApiReply = z.infer<typeof replySchema>;
@@ -23,7 +23,24 @@ export type LeadInput = {
   conversationId?: string;
 };
 
+const accountSchema = z.object({
+  index: z.number().int(),
+  studioName: z.string(),
+  status: z.enum(['MEMBER', 'PROSPECT', 'FORMER_MEMBER']),
+  maskedNumber: z.string(),
+});
+export type AccountChoice = z.infer<typeof accountSchema>;
+const verifySchema = z.object({
+  accounts: z.array(accountSchema),
+  selected: z.number().int().nullable(),
+});
+export type LoginResult = z.infer<typeof verifySchema>;
+
+const LOGIN_ERRORS = ['invalid_code', 'locked', 'expired'] as const;
+
 export type WidgetApiErrorKind =
+  | (typeof LOGIN_ERRORS)[number]
+  | 'lookup_failed'
   | 'busy'
   | 'rate_limited'
   | 'not_found'
@@ -46,18 +63,23 @@ async function errorKind(response: Response): Promise<WidgetApiErrorKind> {
   if (response.status === 409) return 'busy';
   if (response.status === 429) return 'rate_limited';
   if (response.status === 404) return 'not_found';
+  const body: unknown = await response.json().catch(() => undefined);
+  const code = z.object({ error: z.string() }).safeParse(body);
+  const error = code.success ? code.data.error : '';
+  if (response.status === 503 && error === 'lookup_failed') return 'lookup_failed';
   if (response.status === 400) {
-    const body: unknown = await response.json().catch(() => undefined);
-    const code = z.object({ error: z.string() }).safeParse(body);
-    return code.success && code.data.error === 'verification_failed'
-      ? 'verification_failed'
-      : 'invalid';
+    if (error === 'verification_failed') return 'verification_failed';
+    return LOGIN_ERRORS.find((kind) => kind === error) ?? 'invalid';
   }
   return 'server';
 }
 
 /** Longer than the API's own Claude timeout (2 x 25 s) so real answers still arrive. */
 const DEFAULT_TIMEOUT_MS = 60_000;
+
+function loginPath(session: Session, step: 'request' | 'verify' | 'lookup' | 'select'): string {
+  return `/widget/conversations/${encodeURIComponent(session.conversationId)}/login/${step}`;
+}
 
 export function createWidgetApi(opts: {
   baseUrl: string;
@@ -106,6 +128,34 @@ export function createWidgetApi(opts: {
         session.token,
       );
       return reply;
+    },
+    async requestLoginCode(
+      session: Session,
+      email: string,
+      lang: Lang,
+      turnstileToken: string,
+    ): Promise<void> {
+      await post(
+        loginPath(session, 'request'),
+        { email, lang, turnstileToken },
+        z.object({ ok: z.literal(true) }),
+        session.token,
+      );
+    },
+    verifyLoginCode(session: Session, email: string, code: string): Promise<LoginResult> {
+      return post(loginPath(session, 'verify'), { email, code }, verifySchema, session.token);
+    },
+    lookupAccounts(session: Session, email: string): Promise<LoginResult> {
+      return post(loginPath(session, 'lookup'), { email }, verifySchema, session.token);
+    },
+    async selectAccount(session: Session, index: number): Promise<AccountChoice> {
+      const { account } = await post(
+        loginPath(session, 'select'),
+        { index },
+        z.object({ account: accountSchema }),
+        session.token,
+      );
+      return account;
     },
     async submitLead(input: LeadInput): Promise<void> {
       await post('/widget/leads', input, z.object({ ok: z.literal(true) }));

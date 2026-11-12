@@ -9,17 +9,27 @@ type Reply = {
   text: string;
   lang: 'nl' | 'en';
   citations: { articleId: number; title: string; url: string }[];
-  action: 'none' | 'lead_form' | 'contact';
+  action: 'none' | 'lead_form' | 'contact' | 'login';
   contactUrl?: string;
 };
 
 export type MockApi = { requests: { path: string; body: unknown }[] };
 
 /** Mocks the M1b API. `replies` are returned in order for message requests (a number = HTTP error status). */
+export type MockAccount = {
+  index: number;
+  studioName: string;
+  status: 'MEMBER' | 'PROSPECT' | 'FORMER_MEMBER';
+  maskedNumber: string;
+};
+
 export async function mockApi(
   page: Page,
   replies: (Reply | number)[],
   leadStatus = 201,
+  accounts: MockAccount[] = [
+    { index: 0, studioName: 'TrainMore Amsterdam', status: 'MEMBER', maskedNumber: '•••004' },
+  ],
 ): Promise<MockApi> {
   const api: MockApi = { requests: [] };
   let conversations = 0;
@@ -48,6 +58,22 @@ export async function mockApi(
       if (typeof next === 'number')
         return route.fulfill({ status: next, headers: cors, json: { error: 'x' } });
       return route.fulfill({ status: 200, headers: cors, json: { reply: next } });
+    }
+    if (path.endsWith('/login/request'))
+      return route.fulfill({ status: 202, headers: cors, json: { ok: true } });
+    if (path.endsWith('/login/verify')) {
+      const { code } = request.postDataJSON() as { code: string };
+      return code === '123456'
+        ? route.fulfill({
+            status: 200,
+            headers: cors,
+            json: { accounts, selected: accounts.length === 1 ? 0 : null },
+          })
+        : route.fulfill({ status: 400, headers: cors, json: { error: 'invalid_code' } });
+    }
+    if (path.endsWith('/login/select')) {
+      const { index } = request.postDataJSON() as { index: number };
+      return route.fulfill({ status: 200, headers: cors, json: { account: accounts[index] } });
     }
     if (path === '/widget/leads') {
       return route.fulfill({

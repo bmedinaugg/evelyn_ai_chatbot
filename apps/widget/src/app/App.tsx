@@ -5,6 +5,7 @@ import { chatReducer, initialChatState, type Notice } from '../lib/chat-state.ts
 import { CLOSE_MESSAGE } from '../loader-helpers.ts';
 import { ConsentNotice } from './ConsentNotice.tsx';
 import { LeadForm } from './LeadForm.tsx';
+import { LoginFlow } from './LoginFlow.tsx';
 import { MessageList } from './MessageList.tsx';
 import { loadStored, saveStored } from './session.ts';
 
@@ -122,6 +123,7 @@ export function App(props: {
             messages={state.messages}
             sending={state.phase === 'sending'}
             onOpenLeadForm={() => dispatch({ type: 'lead_form_opened' })}
+            onOpenLogin={() => dispatch({ type: 'login_opened' })}
           />
           {state.notice && (
             <p class="tm-notice" role="status">
@@ -136,6 +138,23 @@ export function App(props: {
               conversationId={stored.current.session?.conversationId}
               onSubmitted={() => dispatch({ type: 'lead_submitted' })}
               onCancel={() => dispatch({ type: 'lead_form_closed' })}
+            />
+          )}
+          {state.loginForm === 'open' && (
+            <LoginFlow
+              lang={lang}
+              api={api}
+              siteKey={props.turnstileSiteKey}
+              ensureSession={ensureSession}
+              onLoggedIn={(account) =>
+                dispatch({
+                  type: 'logged_in',
+                  note: account
+                    ? t(lang, 'widget.login.loggedIn', { club: account.studioName })
+                    : t(lang, 'widget.login.noAccount'),
+                })
+              }
+              onCancel={() => dispatch({ type: 'login_closed' })}
             />
           )}
           {state.leadForm === 'submitted' && (

@@ -3,6 +3,7 @@ import type { ReplyAction } from './types.ts';
 
 export type ChatMessage =
   | { id: number; role: 'user'; text: string }
+  | { id: number; role: 'note'; text: string }
   | {
       id: number;
       role: 'bot';
@@ -19,6 +20,7 @@ export type ChatState = {
   messages: ChatMessage[];
   notice: Notice | null;
   leadForm: 'closed' | 'open' | 'submitted';
+  loginForm: 'closed' | 'open';
   nextId: number;
 };
 
@@ -30,6 +32,9 @@ export type ChatEvent =
   | { type: 'lead_form_opened' }
   | { type: 'lead_form_closed' }
   | { type: 'lead_submitted' }
+  | { type: 'login_opened' }
+  | { type: 'login_closed' }
+  | { type: 'logged_in'; note: string }
   | { type: 'new_chat' };
 
 export function initialChatState(consentGiven: boolean): ChatState {
@@ -38,6 +43,7 @@ export function initialChatState(consentGiven: boolean): ChatState {
     messages: [],
     notice: null,
     leadForm: 'closed',
+    loginForm: 'closed',
     nextId: 1,
   };
 }
@@ -82,6 +88,17 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, leadForm: 'closed' };
     case 'lead_submitted':
       return { ...state, leadForm: 'submitted' };
+    case 'login_opened':
+      return { ...state, loginForm: 'open' };
+    case 'login_closed':
+      return { ...state, loginForm: 'closed' };
+    case 'logged_in':
+      return {
+        ...state,
+        loginForm: 'closed',
+        messages: [...state.messages, { id: state.nextId, role: 'note', text: event.note }],
+        nextId: state.nextId + 1,
+      };
     case 'new_chat':
       return { ...initialChatState(true), nextId: state.nextId };
   }

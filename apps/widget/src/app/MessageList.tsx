@@ -9,6 +9,7 @@ export function MessageList(props: {
   messages: ChatMessage[];
   sending: boolean;
   onOpenLeadForm: () => void;
+  onOpenLogin: () => void;
 }) {
   const log = useRef<HTMLDivElement>(null);
   // Keep the newest message (or the typing indicator) in view.
@@ -21,6 +22,10 @@ export function MessageList(props: {
       {props.messages.map((message) =>
         message.role === 'user' ? (
           <p key={message.id} class="tm-bubble tm-bubble--user">
+            {message.text}
+          </p>
+        ) : message.role === 'note' ? (
+          <p key={message.id} class="tm-note" role="status">
             {message.text}
           </p>
         ) : (
@@ -59,6 +64,15 @@ export function MessageList(props: {
                 onClick={props.onOpenLeadForm}
               >
                 {t(props.lang, 'widget.lead.title')}
+              </button>
+            )}
+            {message.action === 'login' && (
+              <button
+                type="button"
+                class="tm-button tm-button--primary"
+                onClick={props.onOpenLogin}
+              >
+                {t(props.lang, 'widget.login.title')}
               </button>
             )}
           </div>
