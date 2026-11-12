@@ -36,6 +36,8 @@ export type StoredMessage = {
   apiContent: unknown;
   outcome?: Outcome;
   citations?: Citation[];
+  /** The approved answer (scenario version) this reply showed word for word. */
+  scenarioVersionId?: number;
 };
 
 export type ConversationRecord = {
