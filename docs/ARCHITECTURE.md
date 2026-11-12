@@ -229,6 +229,9 @@ Behaviour per status:
 
 ### 3.6 Improvement loop
 1. **Flag** conversations on no retrieval match, low confidence, thumbs-down, or escalation.
+   Thumbs up/down (M3b): offered under every stored bot reply; one rating per reply, changeable;
+   a thumbs down adds the flag `thumbs_down` once. `POST /widget/conversations/:id/feedback`
+   (bearer token) only accepts replies of that conversation.
 2. **Daily report** email (SES) to the agent group: counts and topic clusters of flagged
    questions, with links to the portal.
 3. **Review** in the portal, personal data masked by default. An agent writes a **scenario**:
@@ -266,11 +269,32 @@ Access:
 - Emails are stored as an HMAC hash where lookup is enough (OTP, sessions, DSAR). Plain emails are
   not stored: ticket forms send them straight to Freshdesk.
 
-Retention (proposal, to confirm with the DPO):
-- transcripts 90 days, then anonymised
-- OTP challenges purged after 24 hours
-- audit log 2 years
-- DSAR deletion by email hash
+Retention (product owner 2026-11-12; DPO confirmation still open). Worker `retention`, daily:
+- **Transcripts:** 90 days after the last activity the conversation is anonymised:
+  - texts and API content (incl. tool data) are emptied
+  - email hash, account binding and token are removed
+  - **kept for reporting:** outcomes, citations, flags, feedback, escalations, leads, club and status
+- **Login codes:** purged after 24 hours.
+- **Account bindings:** cleared 24 hours after login. Customer id, candidates and the verified
+  state are removed, so the account needs a new code. The verified email hash stays until
+  anonymising, so deletion requests still find the conversation.
+- **Audit log:** 2 years (M4).
+- **Batching:** anonymising runs in batches (500, at most 200 per run) with `skip locked`. Logs
+  carry counts only.
+
+Deletion requests (DSAR), until the portal (M4) has a button: an operator runs `worker dsar-delete`
+in an interactive session on the worker task (ECS Exec) and **types** the address when asked.
+The address must never be on a command line: ECS RunTask overrides land in CloudTrail, shell
+history and process lists. `--email` is accepted only with `APP_ENV=local`.
+- **How it works:** the email is hashed with `OTP_HMAC_SECRET`, exactly as at login.
+- **What it deletes:** every conversation where that email ever logged in (also when someone else
+  logged in later on the same device; `conversation_logins` remembers each login), with its
+  messages, flags, feedback and login codes. Escalations and leads keep a null link, and they hold no personal data.
+- **Output:** counts only.
+- **Limits:**
+  - Conversations where the customer never logged in can't be linked to an email; they are
+    anonymised at 90 days.
+  - The Freshdesk ticket is deleted in Freshdesk by the agent.
 
 ## 5. Security and GDPR
 (In addition to the non-negotiable rules in `CLAUDE.md`.)
@@ -371,6 +395,7 @@ Each milestone ends with tests passing and a preprod deploy.
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
 **M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M3b ✅ 2026-11-12: thumbs up/down feedback, retention job (90-day anonymising, 24 h login codes and bindings), `dsar-delete`, one-command local stack (`pnpm dev:local`, local Freshdesk stand-in), `docs/TESTING.md`. WAF, load test and schedules come with the first preprod deploy.
 - M3a ✅ 2026-11-12: general ticket form (prefilled, synced topics, Turnstile), Freshdesk ticket + private transcript note, `escalations` record, stuck detection, daily `sync-ticket-topics` worker job.
 - M2b ✅ 2026-11-12: account answers via read-only Claude tools for the bound account (memberships, balance, upcoming payments, recent visits, class bookings), status gating, `capability_flags`, tool steps stored append-only, logged-in eval cases. Paid eval run pending.
 - M2a ✅ 2026-11-12: login with emailed one-time code (hashed, single use, 5 attempts, 3 codes per email per 15 min, no enumeration), cross-studio account lookup, server-side account binding with picker, SES and Secrets Manager adapters, widget login screens.
@@ -436,7 +461,7 @@ Each milestone ends with tests passing and a preprod deploy.
   `nl`/`en` language codes on our instance (see `docs/api/freshdesk.md`).
 - ★ (M1) Permission to add a script tag and CSP changes in the Freshdesk portal layout.
 - (M1) Approve Voyage AI as a sub-processor, or start with full-text-only retrieval.
-- (M3) Retention periods and consent text with the DPO.
+- (M3) Retention periods (implemented as above) and consent text: confirm with the DPO.
 - (M3) Confirm with support which Freshdesk field holds the topics (`FRESHDESK_TOPIC_FIELD`,
   default `ticket_type`) and its values; until the first sync, tickets carry no `type`.
 - (M3) Add the EventBridge schedules for `sync-faq` and `sync-ticket-topics` to the CDK app.

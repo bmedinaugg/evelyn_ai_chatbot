@@ -266,6 +266,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@trainmore/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@trainmore/db':
         specifier: workspace:*
         version: link:../../packages/db

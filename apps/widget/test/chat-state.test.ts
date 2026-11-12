@@ -55,6 +55,19 @@ describe('chatReducer', () => {
     expect(chatReducer(withForm, { type: 'lead_form_closed' }).leadForm).toBe('closed');
   });
 
+  it('remembers the rating of a reply and lets it change', () => {
+    let state = chatReducer(ready(), { type: 'send_started', text: 'q' });
+    state = chatReducer(state, { type: 'send_succeeded', reply: { ...reply, messageId: 7 } });
+    const bot = state.messages.at(-1);
+    if (bot?.role !== 'bot') throw new Error('no bot message');
+    expect(bot.messageId).toBe(7);
+    state = chatReducer(state, { type: 'feedback_given', id: bot.id, rating: 'up' });
+    state = chatReducer(state, { type: 'feedback_given', id: bot.id, rating: 'down' });
+    expect(state.messages.at(-1)).toMatchObject({ rating: 'down' });
+    state = chatReducer(state, { type: 'feedback_given', id: bot.id, rating: undefined });
+    expect(state.messages.at(-1)).not.toHaveProperty('rating');
+  });
+
   it('opens and completes the ticket form', () => {
     const withForm = chatReducer(ready(), { type: 'ticket_form_opened' });
     expect(withForm.ticketForm).toBe('open');

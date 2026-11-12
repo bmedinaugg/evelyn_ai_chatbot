@@ -11,7 +11,7 @@ import {
   createSupabaseFaqRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
-import { createFreshdeskClient } from '@trainmore/freshdesk';
+import { createFreshdeskClient, createLocalFreshdesk } from '@trainmore/freshdesk';
 import {
   createMagiclineClient,
   createSecretsManagerKeyResolver,
@@ -41,7 +41,15 @@ const runtime = loadRuntimeConfig(env);
 const api = loadApiConfig(env);
 const logger = createLogger({ name: 'api', level: runtime.logLevel });
 const db = createServiceClient(loadSupabaseConfig(env));
-const freshdesk = loadFreshdeskConfig(env);
+// FRESHDESK_FAKE=1 prints tickets locally instead of sending them (refuses outside APP_ENV=local).
+const freshdeskClient =
+  env.FRESHDESK_FAKE === '1'
+    ? createLocalFreshdesk({ appEnv: runtime.appEnv })
+    : (() => {
+        const freshdesk = loadFreshdeskConfig(env);
+        return createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey });
+      })();
+if (env.FRESHDESK_FAKE === '1') logger.warn('using the local Freshdesk stand-in (no real tickets)');
 
 const useFake = runtime.appEnv === 'local' && env.CHAT_FAKE_ANSWERER === '1';
 const answerer = useFake
@@ -98,7 +106,7 @@ const app = buildApiServer({
   faq: createSupabaseFaqRepository(db),
   escalations: createSupabaseEscalationRepository(db),
   answerer,
-  freshdesk: createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey }),
+  freshdesk: freshdeskClient,
   verifyTurnstile: createTurnstileVerifier({ secretKey: loadTurnstileConfig(env).secretKey }),
   config: {
     allowedOrigins: api.allowedOrigins,

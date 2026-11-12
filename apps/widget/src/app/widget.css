@@ -4,6 +4,7 @@
   --tm-black: #000000;
   --tm-white: #ffffff;
   --tm-grey-light: #cacaca;
+  --tm-grey-mid: #626262;
   --tm-grey-dark: #2c2c2c;
 }
 
@@ -278,4 +279,31 @@ input[readonly] {
   text-transform: none;
   text-align: left;
   line-height: 1.3;
+}
+
+.tm-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tm-thumb {
+  display: inline-flex;
+  padding: 6px;
+  border: 1px solid var(--tm-grey-mid);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-grey-light);
+  cursor: pointer;
+}
+
+.tm-thumb[aria-pressed="true"] {
+  border-color: var(--tm-red);
+  color: var(--tm-red);
+}
+
+.tm-feedback__thanks {
+  color: var(--tm-grey-light);
+  font-size: 12px;
 }

@@ -18,10 +18,11 @@ export type StoredTurn = {
 
 export function fakeConversations(
   record: ConversationRecord,
-  options: { loseClaim?: boolean } = {},
+  options: { loseClaim?: boolean; outcomesError?: boolean } = {},
 ) {
   const turns: StoredTurn[] = [];
   const releases: string[] = [];
+  const feedback: { messageId: number; rating: 'up' | 'down' }[] = [];
   let claimed = false;
   const repo: ConversationRepository = {
     async create() {
@@ -59,14 +60,22 @@ export function fakeConversations(
         flags: input.flags,
       });
       claimed = false;
+      // Assistant reply ids are the turn number (1-based) in this fake.
+      return input.assistant ? turns.length : null;
+    },
+    async recordFeedback(_conversationId, messageId, rating) {
+      const turn = turns[messageId - 1];
+      if (!turn?.assistant) return false;
+      feedback.push({ messageId, rating });
+      return true;
     },
     async recordLead() {},
-    async lastAssistantOutcome() {
-      for (let i = turns.length - 1; i >= 0; i -= 1) {
-        const outcome = turns[i]?.assistant?.outcome;
-        if (outcome) return outcome;
-      }
-      return null;
+    async recentAssistantOutcomes(_id, limit) {
+      if (options.outcomesError) throw new Error('db down');
+      return turns
+        .flatMap((turn) => (turn.assistant?.outcome ? [turn.assistant.outcome] : []))
+        .reverse()
+        .slice(0, limit);
     },
     async listTranscript() {
       return turns.flatMap((turn) => [
@@ -77,7 +86,14 @@ export function fakeConversations(
       ]);
     },
   };
-  return { repo, turns, releases, isClaimed: () => claimed, claim: () => (claimed = true) };
+  return {
+    repo,
+    turns,
+    releases,
+    feedback,
+    isClaimed: () => claimed,
+    claim: () => (claimed = true),
+  };
 }
 
 export function fakeFaq(hits: FaqSearchHit[]): FaqRepository {

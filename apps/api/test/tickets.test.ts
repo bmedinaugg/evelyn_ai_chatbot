@@ -213,7 +213,7 @@ describe('POST /widget/conversations/:id/tickets', () => {
     expect(api.notes[1]?.text).not.toContain('Club 1001');
   });
 
-  it('records a stuck escalation after the bot could not help', async () => {
+  it('records a stuck escalation after two failed replies in a row', async () => {
     const api = createTestApi({
       answer: {
         kind: 'answer',
@@ -232,7 +232,14 @@ describe('POST /widget/conversations/:id/tickets', () => {
     });
     const conv = await start(api);
     await say(api, conv, 'Vraag');
+    await say(api, conv, 'Nog een vraag');
     await submit(api, conv);
     expect(api.escalations[0]?.reason).toBe('stuck');
+
+    // One failed reply is not "stuck" (the bot's own rule needs two in a row).
+    const once = await start(api);
+    await say(api, once, 'Vraag');
+    await submit(api, once);
+    expect(api.escalations[1]?.reason).toBe('customer_request');
   });
 });

@@ -10,6 +10,7 @@ export {
   FreshdeskResponseError,
 } from './errors.ts';
 export { escapeHtml, htmlToText } from './html.ts';
+export { createLocalFreshdesk } from './local.ts';
 export {
   type CreateTicketInput,
   FOLDER_VISIBILITY_ALL_USERS,

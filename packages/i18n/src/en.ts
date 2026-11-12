@@ -89,10 +89,16 @@ export const en = {
       unavailable:
         'The verification could not load. Please try again later or contact our support team.',
     },
+    feedback: {
+      helpful: 'Helpful',
+      notHelpful: 'Not helpful',
+      thanks: 'Thanks for your feedback.',
+    },
     ticket: {
       title: 'Contact support',
       topic: 'Topic',
       chooseTopic: 'Choose a topic',
+      loadingTopics: 'Loading topics…',
       email: 'Email address',
       name: 'Name (optional)',
       subject: 'Subject',

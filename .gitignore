@@ -10,3 +10,4 @@ supabase/.temp
 dist
 test-results
 playwright-report
+.dev-local/

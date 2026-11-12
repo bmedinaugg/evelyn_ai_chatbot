@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@trainmore/core": "workspace:*",
     "@trainmore/db": "workspace:*",
     "@trainmore/freshdesk": "workspace:*",
     "@trainmore/i18n": "workspace:*",

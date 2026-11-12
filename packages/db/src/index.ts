@@ -33,3 +33,7 @@ export type {
   FaqTranslation,
 } from './faq-types.ts';
 export type { Database } from './generated/database.types.ts';
+export {
+  createSupabaseRetentionRepository,
+  type RetentionRepository,
+} from './retention-repository.ts';

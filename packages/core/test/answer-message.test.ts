@@ -74,6 +74,30 @@ describe('answerMessage', () => {
     expect(conv.isClaimed()).toBe(false);
   });
 
+  it('returns the stored reply id for feedback (none without a stored reply)', async () => {
+    const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+    const reply = await answerMessage(
+      {
+        faq: fakeFaq([cancelNl]),
+        conversations: conv.repo,
+        answerer: recordingAnswerer(answered).answerer,
+        logger,
+      },
+      { conversationId: ID, text: 'Hoe zeg ik op?', pageLang: 'nl' },
+    );
+    expect(reply.messageId).toBe(1);
+    const refused = await answerMessage(
+      {
+        faq: fakeFaq([]),
+        conversations: conv.repo,
+        answerer: recordingAnswerer({ kind: 'refusal' }).answerer,
+        logger,
+      },
+      { conversationId: ID, text: 'x', pageLang: 'nl' },
+    );
+    expect(refused.messageId).toBeNull();
+  });
+
   it('refuses a second turn while one is in flight', async () => {
     const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
     conv.claim();
@@ -137,6 +161,17 @@ describe('answerMessage', () => {
       expect(second.flags).toContain('needs_human');
       expect(conv.turns[1]?.assistant?.displayText).toBe(second.text);
       expect(conv.turns[1]?.flags).toContain('needs_human');
+    });
+
+    it('falls back to the normal reply when the stuck check cannot read the history', async () => {
+      const conv = fakeConversations(
+        { id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 },
+        { outcomesError: true },
+      );
+      const reply = await ask(conv, noMatch);
+      expect(reply).toMatchObject({ outcome: 'no_match', action: 'ticket_form' });
+      expect(conv.turns).toHaveLength(1);
+      expect(logOutput).toContain('stuck check failed');
     });
 
     it('does not trigger when the previous reply was answered', async () => {

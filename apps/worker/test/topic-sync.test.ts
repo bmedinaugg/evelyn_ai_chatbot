@@ -42,7 +42,8 @@ describe('runTopicSync', () => {
       field: 'ticket_type',
       logger,
     });
-    expect(replaced).toEqual([['Membership', 'Payments']]);
+    // Freshdesk values are kept exactly (they are sent back as the ticket type).
+    expect(replaced).toEqual([[' Membership ', 'Payments']]);
     expect(result).toEqual({ topics: 2 });
   });
 

@@ -150,6 +150,41 @@ describe('SupabaseConversationRepository', () => {
     expect(await repo.listApiHistory(id)).toEqual([{ role: 'user', content: 'x' }]);
   });
 
+  it('appendTurn returns the reply id, which only this conversation can rate', async () => {
+    const id = await newConversation();
+    const claim = await repo.claimTurn(id);
+    if (!claim) throw new Error('no claim');
+    const messageId = await repo.appendTurn({
+      conversationId: id,
+      claimId: claim,
+      user: { displayText: 'Vraag', apiContent: 'q' },
+      assistant: { displayText: 'Antwoord', apiContent: [], outcome: 'answered', citations: [] },
+      flags: [],
+    });
+    expect(typeof messageId).toBe('number');
+    if (messageId === null) throw new Error('no message id');
+    expect(await repo.recordFeedback(id, messageId, 'down')).toBe(true);
+    const other = await newConversation();
+    expect(await repo.recordFeedback(other, messageId, 'up')).toBe(false);
+    const { data } = await client.from('flags').select('reason').eq('conversation_id', id);
+    expect(data?.map((f) => f.reason)).toEqual(['thumbs_down']);
+  });
+
+  it('appendTurn without a reply returns null', async () => {
+    const id = await newConversation();
+    const claim = await repo.claimTurn(id);
+    if (!claim) throw new Error('no claim');
+    expect(
+      await repo.appendTurn({
+        conversationId: id,
+        claimId: claim,
+        user: { displayText: 'Vraag', apiContent: 'q' },
+        assistant: null,
+        flags: ['refusal'],
+      }),
+    ).toBeNull();
+  });
+
   it('recordLead stores no personal data', async () => {
     const id = await newConversation();
     await repo.recordLead({ conversationId: id, freshdeskTicketId: 990055, lang: 'en' });

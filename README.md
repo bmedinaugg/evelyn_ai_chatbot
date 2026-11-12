@@ -14,6 +14,10 @@ pnpm install
 cp .env.example .env   # fill in values; never commit .env
 ```
 
+## Try it locally
+`pnpm dev:local` starts the whole chatbot (database, mock Magicline, API, widget and a demo
+help-portal page) with one command; see `docs/TESTING.md` for the click-through checklist.
+
 ## Commands
 | Command | What it does |
 |---|---|

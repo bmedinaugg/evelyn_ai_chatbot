@@ -75,7 +75,16 @@ export function TicketForm(props: {
   }
 
   return (
-    <form class="tm-lead" aria-labelledby="tm-ticket-title" onSubmit={submit}>
+    <form
+      class="tm-lead"
+      aria-labelledby="tm-ticket-title"
+      aria-describedby={
+        status === 'invalid' || status === 'verification_failed' || status === 'error'
+          ? 'tm-ticket-error'
+          : undefined
+      }
+      onSubmit={submit}
+    >
       <h2 id="tm-ticket-title">{t(lang, 'widget.ticket.title')}</h2>
       {topics === 'failed' ? (
         <p class="tm-notice" role="alert">
@@ -86,7 +95,12 @@ export function TicketForm(props: {
           {/* Explicit labels: a wrapping label would add the options to the field's name. */}
           <label for="tm-ticket-topic">{t(lang, 'widget.ticket.topic')}</label>
           <select id="tm-ticket-topic" name="topic" required disabled={topics === null}>
-            <option value="">{t(lang, 'widget.ticket.chooseTopic')}</option>
+            <option value="">
+              {t(
+                lang,
+                topics === null ? 'widget.ticket.loadingTopics' : 'widget.ticket.chooseTopic',
+              )}
+            </option>
             {(topics ?? []).map((topic) => (
               <option key={topic.value} value={topic.value}>
                 {topic.label}
@@ -141,17 +155,17 @@ export function TicketForm(props: {
         </p>
       )}
       {status === 'invalid' && (
-        <p class="tm-notice" role="alert">
+        <p id="tm-ticket-error" class="tm-notice" role="alert">
           {t(lang, 'widget.ticket.invalid')}
         </p>
       )}
       {status === 'verification_failed' && (
-        <p class="tm-notice" role="alert">
+        <p id="tm-ticket-error" class="tm-notice" role="alert">
           {t(lang, 'widget.ticket.verificationFailed')}
         </p>
       )}
       {status === 'error' && (
-        <p class="tm-notice" role="alert">
+        <p id="tm-ticket-error" class="tm-notice" role="alert">
           {t(lang, 'widget.ticket.error')}
         </p>
       )}

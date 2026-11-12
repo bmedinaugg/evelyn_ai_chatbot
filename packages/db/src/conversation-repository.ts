@@ -95,7 +95,7 @@ export function createSupabaseConversationRepository(
         .map((row) => ({ role: row.role, content: row.api_content }));
     },
 
-    async lastAssistantOutcome(id) {
+    async recentAssistantOutcomes(id, limit) {
       const { data, error } = await client
         .from('messages')
         .select('outcome')
@@ -103,13 +103,12 @@ export function createSupabaseConversationRepository(
         .eq('role', 'assistant')
         .neq('display_text', '')
         .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(limit);
       if (error) throw new DbError('messages outcome select', error.code);
       return z
-        .enum(OUTCOMES)
-        .nullable()
-        .parse(data?.outcome ?? null);
+        .array(z.object({ outcome: z.enum(OUTCOMES) }))
+        .parse(data ?? [])
+        .map((r) => r.outcome);
     },
 
     async listTranscript(id) {
@@ -129,7 +128,7 @@ export function createSupabaseConversationRepository(
     },
 
     async appendTurn(input) {
-      const { error } = await client.rpc('append_chat_turn', {
+      const { data, error } = await client.rpc('append_chat_turn', {
         p_conversation_id: input.conversationId,
         p_claim_id: input.claimId,
         p_user: toJson(input.user),
@@ -144,6 +143,17 @@ export function createSupabaseConversationRepository(
       });
       if (error?.code === 'TM001') throw new ClaimLostError();
       if (error) throw new DbError('append_chat_turn', error.code);
+      return typeof data === 'number' ? data : null;
+    },
+
+    async recordFeedback(conversationId, messageId, rating) {
+      const { data, error } = await client.rpc('record_feedback', {
+        p_conversation_id: conversationId,
+        p_message_id: messageId,
+        p_rating: rating,
+      });
+      if (error) throw new DbError('record_feedback', error.code);
+      return data === true;
     },
 
     async recordLead(input) {
