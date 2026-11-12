@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import {
   type Answerer,
+  type AnswerMessageDeps,
   answerMessage,
   ConversationBusyError,
   type LoginDeps,
@@ -19,6 +20,8 @@ import { proxyTrust } from './proxy-trust.ts';
 
 export type ApiDeps = {
   login: LoginDeps;
+  /** Account tools for logged-in customers (bound account). */
+  capabilities?: AnswerMessageDeps['capabilities'];
   conversations: ConversationRepository;
   faq: FaqRepository;
   answerer: Answerer;
@@ -99,12 +102,13 @@ export function buildApiServer(deps: ApiDeps) {
               conversations: deps.conversations,
               answerer: deps.answerer,
               logger: deps.logger,
+              ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
             },
             {
               conversationId: conversation.id,
               text: body.data.text,
               pageLang: body.data.pageLang,
-              loggedIn: (await deps.login.auth.getAuthState(conversation.id)).account !== null,
+              account: (await deps.login.auth.getAuthState(conversation.id)).account,
             },
           );
           return {

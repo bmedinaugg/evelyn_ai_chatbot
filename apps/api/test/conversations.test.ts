@@ -75,6 +75,8 @@ describe('widget conversations', () => {
           needsHuman: false,
         },
         assistantContent: [],
+        steps: [],
+        toolsUsed: [],
       },
     });
     const { body } = await start(api);

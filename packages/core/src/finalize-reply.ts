@@ -35,8 +35,10 @@ export function sanitizeAnswerText(text: string): string {
 export function finalizeReply(input: {
   answer: Answer;
   hits: FaqSearchHit[];
-  /** Logged-in customer with a bound account (M2a); account tools come in M2b. */
+  /** Logged-in customer with a bound account. */
   loggedIn?: boolean;
+  /** Account tools that ran successfully this turn: account answers must come from their data. */
+  accountToolsUsed?: number;
 }): Reply {
   const { answer, hits } = input;
   const lang = answer.language;
@@ -68,9 +70,12 @@ export function finalizeReply(input: {
     case 'off_topic':
       return fixed('bot.offTopic', 'none', 'declined', []);
     case 'account_question':
-      return input.loggedIn
-        ? fixed('bot.accountQuestion', 'contact', 'unsupported', ['account_question'])
-        : fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
+      if (!input.loggedIn)
+        return fixed('bot.loginNeeded', 'login', 'unsupported', ['account_question']);
+      // Only show the model's text when it is based on account data loaded this turn.
+      return (input.accountToolsUsed ?? 0) > 0 && text
+        ? { text, lang, citations: [], action: 'none', outcome: 'answered', flags: [] }
+        : fixed('bot.accountQuestion', 'contact', 'unsupported', ['account_question']);
     case 'wants_human':
       return fixed('bot.wantsHuman', 'contact', 'handoff', ['wants_human']);
     case 'greeting':

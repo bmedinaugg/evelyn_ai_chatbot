@@ -7,7 +7,14 @@ import {
 } from '@trainmore/db';
 import { type Lang, t } from '@trainmore/i18n';
 import type { Logger } from '@trainmore/shared';
-import type { Answerer, AnswererResult } from './claude-answerer.ts';
+import {
+  type AccountContext,
+  availableCapabilities,
+  type CapabilityDeps,
+  runCapability,
+  toolDefinitions,
+} from './capabilities/catalogue.ts';
+import type { Answerer, AnswererResult, AnswererTools } from './claude-answerer.ts';
 import { finalizeReply, type Reply } from './finalize-reply.ts';
 import { buildUserTurn } from './prompt.ts';
 
@@ -26,6 +33,8 @@ export type AnswerMessageDeps = {
   conversations: ConversationRepository;
   answerer: Answerer;
   logger: Logger;
+  /** Account tools (needs a bound account to be offered). */
+  capabilities?: { deps: CapabilityDeps; disabled(): Promise<ReadonlySet<string>> };
 };
 
 function fixedReply(
@@ -50,7 +59,13 @@ function fixedReply(
  */
 export async function answerMessage(
   deps: AnswerMessageDeps,
-  input: { conversationId: string; text: string; pageLang: Lang; loggedIn?: boolean },
+  input: {
+    conversationId: string;
+    text: string;
+    pageLang: Lang;
+    /** The account bound to this conversation (server-side), if the customer logged in. */
+    account?: AccountContext | null;
+  },
 ): Promise<Reply> {
   const { conversations, logger } = deps;
   const claimId = await conversations.claimTurn(input.conversationId);
@@ -71,11 +86,14 @@ export async function answerMessage(
       pageLang: input.pageLang,
     });
 
+    const tools = await accountTools(deps, input.account ?? null, input.conversationId);
+
     let result: AnswererResult | { kind: 'error' };
     try {
       result = await deps.answerer({
         history: await conversations.listApiHistory(input.conversationId),
         userTurn,
+        ...(tools ? { tools } : {}),
       });
     } catch (error) {
       logger.error({ err: error, conversationId: input.conversationId }, 'answerer failed');
@@ -84,7 +102,12 @@ export async function answerMessage(
 
     const reply: Reply =
       result.kind === 'answer'
-        ? finalizeReply({ answer: result.answer, hits, loggedIn: input.loggedIn ?? false })
+        ? finalizeReply({
+            answer: result.answer,
+            hits,
+            loggedIn: Boolean(input.account),
+            accountToolsUsed: result.toolsUsed.length,
+          })
         : result.kind === 'refusal'
           ? fixedReply(input.pageLang, 'bot.noMatch', {
               action: 'contact',
@@ -111,6 +134,8 @@ export async function answerMessage(
         conversationId: input.conversationId,
         claimId,
         user,
+        // Tool steps are only stored together with the final answer they led to.
+        ...(result.kind === 'answer' ? { steps: result.steps } : {}),
         assistant,
         flags: reply.flags,
       });
@@ -134,4 +159,26 @@ export async function answerMessage(
   } finally {
     if (!appended) await conversations.releaseTurn(input.conversationId, claimId);
   }
+}
+
+/** Tools for the bound account: by membership status, minus switched-off ones. Ids come from the server. */
+async function accountTools(
+  deps: AnswerMessageDeps,
+  account: AccountContext | null,
+  conversationId: string,
+): Promise<AnswererTools | undefined> {
+  if (!account || !deps.capabilities) return undefined;
+  const { capabilities, logger } = deps;
+  const disabled = await capabilities.disabled();
+  const available = availableCapabilities(account.status, disabled);
+  if (available.length === 0) return undefined;
+  return {
+    definitions: toolDefinitions(available),
+    async execute(name) {
+      const result = await runCapability(name, account, capabilities.deps, disabled);
+      // Tool name and outcome only: never the account data.
+      logger.info({ conversationId, tool: name, ok: result.ok }, 'account tool');
+      return result;
+    },
+  };
 }

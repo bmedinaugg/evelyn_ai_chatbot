@@ -11,6 +11,7 @@ import {
 
 export type StoredTurn = {
   user: StoredMessage;
+  steps?: ApiHistoryEntry[];
   assistant: StoredMessage | null;
   flags: FlagReason[];
 };
@@ -50,7 +51,12 @@ export function fakeConversations(
     },
     async appendTurn(input) {
       if (options.loseClaim) throw new ClaimLostError();
-      turns.push({ user: input.user, assistant: input.assistant, flags: input.flags });
+      turns.push({
+        user: input.user,
+        steps: input.steps ?? [],
+        assistant: input.assistant,
+        flags: input.flags,
+      });
       claimed = false;
     },
     async recordLead() {},

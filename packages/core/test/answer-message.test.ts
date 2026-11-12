@@ -43,6 +43,8 @@ const answered: AnswererResult = {
   kind: 'answer',
   answer,
   assistantContent: [{ type: 'text', text: JSON.stringify(answer) }],
+  steps: [],
+  toolsUsed: [],
 };
 
 beforeEach(() => {
@@ -162,5 +164,73 @@ describe('answerMessage', () => {
     );
     expect(logOutput).toContain('outcome');
     expect(logOutput).not.toContain('geheime vraag');
+  });
+});
+
+describe('answerMessage with a bound account', () => {
+  const account = { customerId: 4, studioId: 1001, status: 'MEMBER' as const };
+
+  it('offers account tools, runs them for the bound account and stores the steps', async () => {
+    const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+    const ran: { name: string; customerId: number }[] = [];
+    const answerer: Answerer = async ({ tools }) => {
+      expect(tools?.definitions.map((d) => d.name)).toContain('get_memberships');
+      const result = await tools?.execute('get_memberships');
+      expect(result).toEqual({ ok: true, data: [{ rateName: 'Flex' }] });
+      return {
+        kind: 'answer',
+        answer: {
+          ...answer,
+          intent: 'account_question',
+          answer: 'Je hebt Flex.',
+          citedArticleIds: [],
+        },
+        assistantContent: [{ type: 'text', text: '{}' }],
+        steps: [
+          {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 't1', name: 'get_memberships', input: {} }],
+          },
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'x' }] },
+        ],
+        toolsUsed: ['get_memberships'],
+      };
+    };
+    const reply = await answerMessage(
+      {
+        faq: fakeFaq([]),
+        conversations: conv.repo,
+        answerer,
+        logger,
+        capabilities: {
+          deps: {
+            studioClient: async () =>
+              ({
+                getContracts: async (customerId: number) => {
+                  ran.push({ name: 'get_memberships', customerId });
+                  return [{ rateName: 'Flex' }];
+                },
+              }) as never,
+            crossStudioClient: async () => ({}) as never,
+            today: () => new Date('2026-11-12'),
+          },
+          disabled: async () => new Set(),
+        },
+      },
+      { conversationId: ID, text: 'Welk abonnement heb ik?', pageLang: 'nl', account },
+    );
+    expect(reply).toMatchObject({ outcome: 'answered', text: 'Je hebt Flex.' });
+    expect(ran).toEqual([{ name: 'get_memberships', customerId: 4 }]);
+    expect(conv.turns[0]?.steps).toHaveLength(2);
+  });
+
+  it('offers no tools without a bound account', async () => {
+    const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+    const { answerer, calls } = recordingAnswerer(answered);
+    await answerMessage(
+      { faq: fakeFaq([]), conversations: conv.repo, answerer, logger },
+      { conversationId: ID, text: 'x', pageLang: 'nl' },
+    );
+    expect(calls[0]?.tools).toBeUndefined();
   });
 });

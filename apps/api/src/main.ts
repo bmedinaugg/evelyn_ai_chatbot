@@ -5,12 +5,14 @@ import { createClaudeAnswerer } from '@trainmore/core';
 import {
   createServiceClient,
   createSupabaseAuthRepository,
+  createSupabaseCapabilityFlagRepository,
   createSupabaseConversationRepository,
   createSupabaseFaqRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
 import { createFreshdeskClient } from '@trainmore/freshdesk';
 import {
+  createMagiclineClient,
   createSecretsManagerKeyResolver,
   createStaticKeyResolver,
   parseKeyMap,
@@ -74,8 +76,23 @@ const login = {
   logger,
 };
 
+// Account tools: per-club key for the customer's own data, cross-studio key for class bookings.
+const magiclineBaseUrl = loadConfig(env).magicline.baseUrl;
+const flags = createSupabaseCapabilityFlagRepository(db);
+const capabilities = {
+  deps: {
+    studioClient: async (studioId: number) =>
+      createMagiclineClient({ baseUrl: magiclineBaseUrl, apiKey: await keys.studioKey(studioId) }),
+    crossStudioClient: async () =>
+      createMagiclineClient({ baseUrl: magiclineBaseUrl, apiKey: await keys.crossStudioKey() }),
+    today: () => new Date(),
+  },
+  disabled: () => flags.disabledCapabilities(),
+};
+
 const app = buildApiServer({
   login,
+  capabilities,
   conversations: createSupabaseConversationRepository(db),
   faq: createSupabaseFaqRepository(db),
   answerer,
