@@ -33,6 +33,26 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"conversation_logins": {
+                  Row: {
+                    "conversation_id": string,"email_hash": string,"verified_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "conversation_id": string,"email_hash": string,"verified_at"?: string
+                  }
+                  Update: {
+                    "conversation_id"?: string,"email_hash"?: string,"verified_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "conversation_logins_conversation_id_fkey"
+      columns: ["conversation_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"conversations": {
                   Row: {
                     "account_candidates": Json | null,"anonymised_at": string | null,"created_at": string,"customer_id": number | null,"customer_status": string | null,"id": string,"lang": string,"last_message_at": string | null,"studio_id": number | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number,"verified_at": string | null,"verified_email_hash": string | null

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseArgs } from '../src/cli.ts';
+import { parseArgs, runCommand } from '../src/cli.ts';
 
 describe('parseArgs', () => {
   it('parses a command', () => {
@@ -27,7 +27,8 @@ describe('parseArgs', () => {
       allowMassChange: false,
       email: 'a@example.com',
     });
-    expect(parseArgs(['dsar-delete'])).toBeUndefined();
+    // Without --email the address is read from the terminal (never on the command line in AWS).
+    expect(parseArgs(['dsar-delete'])).toEqual({ command: 'dsar-delete', allowMassChange: false });
     expect(parseArgs(['dsar-delete', '--email'])).toBeUndefined();
     expect(parseArgs(['sync-faq', '--email', 'a@example.com'])).toBeUndefined();
   });
@@ -36,5 +37,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['drop-everything'])).toBeUndefined();
     expect(parseArgs(['sync-faq', '--force'])).toBeUndefined();
     expect(parseArgs([])).toBeUndefined();
+  });
+
+  it('accepts --email only locally (it would end up in AWS records and shell history)', async () => {
+    await expect(
+      runCommand(
+        'dsar-delete',
+        { NODE_ENV: 'production', APP_ENV: 'preprod', AWS_REGION: 'eu-west-1' },
+        { allowMassChange: false, email: 'a@example.com' },
+      ),
+    ).rejects.toThrow(/--email only works with APP_ENV=local/);
   });
 });

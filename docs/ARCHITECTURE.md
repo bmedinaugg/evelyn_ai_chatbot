@@ -275,17 +275,21 @@ Retention (product owner 2026-11-12; DPO confirmation still open). Worker `reten
   - email hash, account binding and token are removed
   - **kept for reporting:** outcomes, citations, flags, feedback, escalations, leads, club and status
 - **Login codes:** purged after 24 hours.
-- **Account bindings:** cleared 24 hours after login (customer id and candidates). The verified
-  email hash stays until anonymising, so deletion requests still find the conversation.
+- **Account bindings:** cleared 24 hours after login. Customer id, candidates and the verified
+  state are removed, so the account needs a new code. The verified email hash stays until
+  anonymising, so deletion requests still find the conversation.
 - **Audit log:** 2 years (M4).
 - **Batching:** anonymising runs in batches (500, at most 200 per run) with `skip locked`. Logs
   carry counts only.
 
-Deletion requests (DSAR), until the portal (M4) has a button: an operator runs
-`worker dsar-delete --email <address>` (ECS RunTask in preprod/prod).
+Deletion requests (DSAR), until the portal (M4) has a button: an operator runs `worker dsar-delete`
+in an interactive session on the worker task (ECS Exec) and **types** the address when asked.
+The address must never be on a command line: ECS RunTask overrides land in CloudTrail, shell
+history and process lists. `--email` is accepted only with `APP_ENV=local`.
 - **How it works:** the email is hashed with `OTP_HMAC_SECRET`, exactly as at login.
-- **What it deletes:** every conversation verified with that email, with its messages, flags,
-  feedback and login codes. Escalations and leads keep a null link, and they hold no personal data.
+- **What it deletes:** every conversation where that email ever logged in (also when someone else
+  logged in later on the same device; `conversation_logins` remembers each login), with its
+  messages, flags, feedback and login codes. Escalations and leads keep a null link, and they hold no personal data.
 - **Output:** counts only.
 - **Limits:**
   - Conversations where the customer never logged in can't be linked to an email; they are

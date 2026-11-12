@@ -60,3 +60,15 @@ export async function runDsarDelete(deps: {
   deps.logger.info(result, 'deletion request processed');
   return result;
 }
+
+/** First line of a stream (the operator types the address; it never appears in a command line). */
+export async function readEmailFromStdin(input: AsyncIterable<unknown>): Promise<string> {
+  let text = '';
+  for await (const chunk of input) {
+    text += String(chunk);
+    const newline = text.indexOf('\n');
+    if (newline >= 0) return text.slice(0, newline).trim();
+    if (text.length > 1000) break;
+  }
+  return text.trim();
+}

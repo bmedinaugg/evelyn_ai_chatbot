@@ -15,7 +15,7 @@ import {
 } from '@trainmore/shared';
 import { runFaqSync } from './faq-sync.ts';
 import { FIXTURE_FOLDER_ID, FIXTURE_PORTAL_ID, fixtureFreshdeskClient } from './fixture-source.ts';
-import { runDsarDelete, runRetention } from './retention.ts';
+import { readEmailFromStdin, runDsarDelete, runRetention } from './retention.ts';
 import { runTopicSync } from './topic-sync.ts';
 
 export const COMMANDS = [
@@ -41,6 +41,7 @@ export function parseArgs(argv: string[]): ({ command: Command } & CommandOption
   const [command, ...flags] = argv;
   if (!isCommand(command)) return undefined;
   if (command === 'dsar-delete') {
+    if (flags.length === 0) return { command, allowMassChange: false };
     const [flag, email, ...rest] = flags;
     if (flag !== '--email' || !email || rest.length > 0) return undefined;
     return { command, allowMassChange: false, email };
@@ -58,6 +59,10 @@ export async function runCommand(
   const runtime = loadRuntimeConfig(env);
   if (command === 'seed-faq-fixtures' && runtime.appEnv !== 'local') {
     throw new Error('seed-faq-fixtures only runs with APP_ENV=local');
+  }
+  // On servers the address is typed in (stdin): a command-line value ends up in AWS records.
+  if (command === 'dsar-delete' && options.email !== undefined && runtime.appEnv !== 'local') {
+    throw new Error('dsar-delete --email only works with APP_ENV=local; type the address instead');
   }
   const logger = createLogger({ name: `worker:${command}`, level: runtime.logLevel });
   const db = createServiceClient(loadSupabaseConfig(env));
@@ -97,10 +102,14 @@ export async function runCommand(
       return;
     }
     case 'dsar-delete': {
-      if (!options.email) throw new Error('dsar-delete needs --email');
+      let email = options.email;
+      if (email === undefined) {
+        process.stderr.write('Email address of the person to delete: ');
+        email = await readEmailFromStdin(process.stdin);
+      }
       const result = await runDsarDelete({
         repo: createSupabaseRetentionRepository(db),
-        email: options.email,
+        email,
         secret: loadOtpConfig(env).secret,
         logger,
       });

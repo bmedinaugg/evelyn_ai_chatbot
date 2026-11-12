@@ -93,3 +93,13 @@ describe('runDsarDelete', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('readEmailFromStdin', () => {
+  it('reads the first line', async () => {
+    const { Readable } = await import('node:stream');
+    const { readEmailFromStdin } = await import('../src/retention.ts');
+    expect(await readEmailFromStdin(Readable.from(['sam@example.com\nrest']))).toBe(
+      'sam@example.com',
+    );
+  });
+});
