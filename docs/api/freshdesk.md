@@ -26,6 +26,8 @@ https://developers.freshdesk.com/api/#solutions and our live instance before rel
 - Add note: `POST /api/v2/tickets/{id}/notes`, with `body` (HTML), `private` (default true). Used for the transcript.
 - Ticket fields: `GET /api/v2/ticket_fields` (`choices`, `label_for_customers`,
   `required_for_customers`, `displayed_to_customers`). Used to fill the general form's topic list.
+  - **(unverified)** Whether `POST /tickets` rejects a `type` that is not one of the `ticket_type`
+    choices (expected: 400 validation error). The API only sends synced values as `type`.
 - Ticket forms: `GET /api/v2/ticket-forms`, `GET /api/v2/ticket-forms/{id}` (only needed for
   the later "mirror each Freshdesk form" option).
 - Contacts: `POST /api/v2/contacts` (409 on duplicate email);
