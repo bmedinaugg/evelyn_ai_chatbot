@@ -10,6 +10,8 @@ export type Expectation = {
   replyLang?: Lang;
   /** Checked against the reply text and the cited titles/urls. */
   mustNotMatch?: RegExp[];
+  /** Each must appear in the reply text. */
+  mustMatch?: RegExp[];
 };
 
 /** Returns one message per failed expectation (empty = pass). */
@@ -34,6 +36,9 @@ export function checkReply(reply: Reply, expect: Expectation): string[] {
   const visible = [reply.text, ...reply.citations.flatMap((c) => [c.title, c.url])].join('\n');
   for (const pattern of expect.mustNotMatch ?? []) {
     if (pattern.test(visible)) failures.push(`reply matches forbidden ${pattern}`);
+  }
+  for (const pattern of expect.mustMatch ?? []) {
+    if (!pattern.test(reply.text)) failures.push(`reply lacks ${pattern}`);
   }
   return failures;
 }

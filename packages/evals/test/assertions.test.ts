@@ -41,6 +41,11 @@ describe('checkReply', () => {
     expect(checkReply({ ...reply, citations: [] }, { citesNone: true })).toEqual([]);
   });
 
+  it('mustMatch requires each pattern in the reply text', () => {
+    expect(checkReply(reply, { mustMatch: [/opzeggen/, /app/] })).toEqual([]);
+    expect(checkReply(reply, { mustMatch: [/2027/] })).toHaveLength(1);
+  });
+
   it('mustNotMatch also checks citation titles and urls', () => {
     expect(checkReply(reply, { mustNotMatch: [/x\/900101/] })).toHaveLength(1);
   });
