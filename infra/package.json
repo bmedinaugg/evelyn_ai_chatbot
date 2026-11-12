@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "synth": "cdk synth --quiet",
-    "synth:ci": "cdk synth --quiet -c emailFrom=ci@example.com"
+    "synth:ci": "cdk synth --quiet -c emailFrom=ci@example.com -c imageTag=ci -c widgetDistPath=test/fixtures/widget-dist"
   },
   "dependencies": {
     "aws-cdk-lib": "2.276.0",
