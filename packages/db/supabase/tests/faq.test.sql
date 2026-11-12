@@ -2,6 +2,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(14);
 
+-- Isolate from locally seeded articles; the transaction is rolled back at the end.
+delete from public.faq_articles;
+
 insert into public.faq_articles
   (id, folder_id, title_nl, body_nl, url_nl, title_en, body_en, url_en, content_hash, freshdesk_updated_at, deleted_at)
 values

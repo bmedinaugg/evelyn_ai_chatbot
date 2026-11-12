@@ -319,7 +319,8 @@ Each milestone ends with tests passing and a preprod deploy.
   - Database denies `anon`/`authenticated` by both grants and RLS
   - pnpm's supply-chain release-age check stays on: new dependencies must be at least a day old
 
-**M1: FAQ bot (anonymous)**
+**M1: FAQ bot (anonymous)**: delivered as M1a/M1b/M1c
+- M1a ✅ 2026-11-11: Freshdesk client, FAQ sync (safe deletes), `faq_articles` + nl/en full-text `search_faq`, synthetic fixtures. Live Freshdesk Solutions check still open (needs credentials).
 - daily FAQ sync, hybrid retrieval
 - orchestrator with guardrails, SSE
 - widget with consent notice, language detection, citations with NL/EN URLs

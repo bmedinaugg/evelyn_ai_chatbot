@@ -11,7 +11,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "test:db": "supabase test db",
-    "db:types": "supabase gen types typescript --local --schema public > src/generated/database.types.ts",
+    "db:types": "supabase gen types typescript --schema public > src/generated/database.types.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:integration": "sh scripts/with-local-env.sh vitest run --config vitest.integration.config.ts"

@@ -40,8 +40,19 @@ jobs:
         working-directory: packages/db
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: supabase/setup-cli@v3
         with:
           version: 3.1.0
-      - run: supabase db start
+      - name: Start Supabase (database, auth, REST)
+        run: supabase start -x studio,imgproxy,inbucket,mailpit,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor
       - run: supabase test db
+      - name: Generated database types are up to date
+        run: supabase gen types typescript --schema public | diff - src/generated/database.types.ts
+      - name: Integration tests
+        run: pnpm test:integration

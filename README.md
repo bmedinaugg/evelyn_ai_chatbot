@@ -43,3 +43,17 @@ pnpm --filter @trainmore/db db:stop
 ```
 Every table created in `public` gets Row Level Security automatically and no grants for
 `anon`/`authenticated`; only the server (service role) accesses data.
+
+## FAQ knowledge base (local)
+FAQ articles come from Freshdesk Solutions folders and are stored in Supabase (`faq_articles`).
+```sh
+pnpm --filter @trainmore/db db:start
+# Synthetic bilingual fixtures (APP_ENV=local only; replaces whatever FAQ set is active locally):
+sh packages/db/scripts/with-local-env.sh env NODE_ENV=development APP_ENV=local AWS_REGION=eu-west-1 \
+  pnpm --filter @trainmore/worker exec tsx src/main.ts seed-faq-fixtures
+# Real sync (needs FRESHDESK_DOMAIN, FRESHDESK_API_KEY, FRESHDESK_FAQ_FOLDER_IDS, FRESHDESK_PORTAL_URL):
+pnpm --filter @trainmore/worker sync-faq
+```
+The sync deletes nothing if any Freshdesk request fails or Freshdesk suddenly returns no articles.
+`pnpm --filter @trainmore/db test:integration` runs the repository tests against the local stack.
+`pnpm --filter @trainmore/db db:types` regenerates `packages/db/src/generated/database.types.ts`.
