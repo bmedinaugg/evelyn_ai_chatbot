@@ -348,7 +348,7 @@ isOneToOne: false
                            },
 "search_scenarios":
 { Args: { "max_results"?: number,"preferred_lang": string,"query": string }; Returns: {
-              "answer_en": string,"answer_nl": string,"article_id": number,"rank": number,"scenario_id": string,"statuses": (string)[],"triggers": (string)[],"version_id": number
+              "answer_en": string,"answer_nl": string,"article_id": number,"article_title": string,"article_url": string,"rank": number,"scenario_id": string,"statuses": (string)[],"triggers": (string)[],"version_id": number
             }[]
                            },
 "set_account_candidates":

@@ -58,6 +58,7 @@ export type EvalDeps = {
   /** For cases with loginAs: login against the mock Magicline (codes captured, never emailed). */
   login?: Omit<LoginDeps, 'email'>;
   capabilities?: AnswerMessageDeps['capabilities'];
+  scenarios?: AnswerMessageDeps['scenarios'];
 };
 
 export async function logIn(
@@ -115,6 +116,7 @@ export async function runEvals(deps: EvalDeps, cases: EvalCase[]): Promise<EvalR
           answerer,
           logger: deps.logger,
           ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
+          ...(deps.scenarios ? { scenarios: deps.scenarios } : {}),
         },
         { conversationId: id, text, pageLang: evalCase.pageLang, account },
       );

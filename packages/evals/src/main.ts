@@ -6,6 +6,7 @@ import {
   createSupabaseCapabilityFlagRepository,
   createSupabaseConversationRepository,
   createSupabaseFaqRepository,
+  createSupabaseScenarioRepository,
 } from '@trainmore/db';
 import { createMagiclineClient, createStaticKeyResolver, parseKeyMap } from '@trainmore/magicline';
 import {
@@ -19,6 +20,7 @@ import {
 import { CASES } from './cases.ts';
 import { estimateUsd, runEvals } from './run-evals.ts';
 import { isLocalMagicline } from './safety.ts';
+import { EVAL_SCENARIOS } from './scenarios.ts';
 
 const PASS_RATE_REQUIRED = 0.9;
 
@@ -52,9 +54,23 @@ const magicline = (apiKey: string) =>
   createMagiclineClient({ baseUrl: magiclineConfig.baseUrl, apiKey });
 const flags = createSupabaseCapabilityFlagRepository(db);
 const model = loadClaudeConfig(env).chatModel;
+// Synthetic approved answers, published with four eyes (two eval actors), archived after the run.
+const scenarios = createSupabaseScenarioRepository(db);
+const author = { oid: 'eval-author', name: 'Eval author' };
+const approver = { oid: 'eval-approver', name: 'Eval approver' };
+const evalScenarioIds: string[] = [];
+for (const content of Object.values(EVAL_SCENARIOS)) {
+  const created = await scenarios.create(content, author);
+  evalScenarioIds.push(created.scenarioId);
+  if ((await scenarios.publish(created.versionId, approver)) !== 'ok') {
+    throw new Error('could not publish an eval scenario');
+  }
+}
+
 const results = await runEvals(
   {
     faq: createSupabaseFaqRepository(db),
+    scenarios,
     conversations: createSupabaseConversationRepository(db),
     client: new Anthropic().beta.messages,
     model,
@@ -88,6 +104,8 @@ const results = await runEvals(
   },
   CASES,
 );
+
+for (const id of evalScenarioIds) await scenarios.archive(id, approver);
 
 const rows = results.map((r) => ({
   case: r.id,

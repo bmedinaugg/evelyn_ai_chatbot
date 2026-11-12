@@ -15,6 +15,7 @@ const answer: Answer = {
   citedArticleIds: [900101],
   confidence: 'high',
   needsHuman: false,
+  approvedAnswerId: null,
 };
 
 let logOutput: string;
@@ -96,6 +97,67 @@ describe('answerMessage', () => {
       { conversationId: ID, text: 'x', pageLang: 'nl' },
     );
     expect(refused.messageId).toBeNull();
+  });
+
+  describe('approved answers', () => {
+    const freeze = {
+      versionId: 41,
+      scenarioId: '00000000-0000-4000-8000-0000000000aa',
+      triggers: ['Kan ik bevriezen bij zwangerschap?'],
+      answerNl: 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+      answerEn: 'Yes, during pregnancy you can freeze for up to 6 months.',
+      statuses: [],
+      articleId: null,
+      article: null,
+    };
+    const picksApproved: AnswererResult = {
+      kind: 'answer',
+      answer: { ...answer, approvedAnswerId: 41, answer: 'model text', citedArticleIds: [] },
+      assistantContent: [{ type: 'text', text: '{}' }],
+      steps: [],
+      toolsUsed: [],
+    };
+
+    it('offers approved answers to Claude, shows the approved text and stores its version', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      const { answerer, calls } = recordingAnswerer(picksApproved);
+      const reply = await answerMessage(
+        {
+          faq: fakeFaq([]),
+          conversations: conv.repo,
+          answerer,
+          logger,
+          scenarios: { search: async () => [freeze] },
+        },
+        { conversationId: ID, text: 'Kan ik bevriezen als ik zwanger ben?', pageLang: 'nl' },
+      );
+      expect(calls[0]?.userTurn).toContain('<approved_answer id="41">');
+      expect(reply.text).toBe('Ja, bij zwangerschap kun je tot 6 maanden bevriezen.');
+      expect(conv.turns[0]?.assistant).toMatchObject({
+        displayText: 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.',
+        scenarioVersionId: 41,
+      });
+    });
+
+    it('keeps answering when approved answers cannot be searched', async () => {
+      const conv = fakeConversations({ id: ID, tokenHash: 'h', lang: 'nl', userMessageCount: 0 });
+      const reply = await answerMessage(
+        {
+          faq: fakeFaq([cancelNl]),
+          conversations: conv.repo,
+          answerer: recordingAnswerer(answered).answerer,
+          logger,
+          scenarios: {
+            search: async () => {
+              throw new Error('db down');
+            },
+          },
+        },
+        { conversationId: ID, text: 'Hoe zeg ik op?', pageLang: 'nl' },
+      );
+      expect(reply.outcome).toBe('answered');
+      expect(logOutput).toContain('approved answers unavailable');
+    });
   });
 
   it('refuses a second turn while one is in flight', async () => {

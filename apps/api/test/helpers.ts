@@ -167,6 +167,7 @@ export function createTestApi(
         citedArticleIds: [],
         confidence: 'high',
         needsHuman: true,
+        approvedAnswerId: null,
       },
       assistantContent: [],
       steps: [],

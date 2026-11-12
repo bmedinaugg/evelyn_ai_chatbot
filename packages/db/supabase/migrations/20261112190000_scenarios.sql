@@ -199,7 +199,7 @@ $$;
 create function public.search_scenarios(query text, preferred_lang text, max_results int default 3)
 returns table (
   version_id bigint, scenario_id uuid, triggers text[], answer_nl text, answer_en text,
-  statuses text[], article_id bigint, rank real
+  statuses text[], article_id bigint, article_title text, article_url text, rank real
 )
 language plpgsql
 stable
@@ -242,10 +242,17 @@ begin
       group by m.id, m.cfg
     ) x group by x.id
   )
+  -- The linked article (if still active), in the asked language when it has one.
   select l.id, l.scenario_id,
     case when preferred_lang = 'nl' then l.triggers_nl else l.triggers_en end,
-    l.answer_nl, l.answer_en, l.statuses, l.article_id, s.score::real
-  from scored s join live l on l.id = s.id
+    l.answer_nl, l.answer_en, l.statuses,
+    a.id,
+    case when preferred_lang = 'nl' then coalesce(a.title_nl, a.title_en) else coalesce(a.title_en, a.title_nl) end,
+    case when preferred_lang = 'nl' then coalesce(a.url_nl, a.url_en) else coalesce(a.url_en, a.url_nl) end,
+    s.score::real
+  from scored s
+  join live l on l.id = s.id
+  left join public.faq_articles a on a.id = l.article_id and a.deleted_at is null
   order by s.score desc, l.id
   limit least(greatest(coalesce(max_results, 3), 1), 5);
 end;

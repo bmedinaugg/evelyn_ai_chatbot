@@ -26,6 +26,8 @@ export type ApiDeps = {
   login: LoginDeps;
   /** Account tools for logged-in customers (bound account). */
   capabilities?: AnswerMessageDeps['capabilities'];
+  /** Published approved answers (scenarios). */
+  scenarios?: AnswerMessageDeps['scenarios'];
   conversations: ConversationRepository;
   faq: FaqRepository;
   answerer: Answerer;
@@ -116,6 +118,7 @@ export function buildApiServer(deps: ApiDeps) {
               answerer: deps.answerer,
               logger: deps.logger,
               ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
+              ...(deps.scenarios ? { scenarios: deps.scenarios } : {}),
             },
             {
               conversationId: conversation.id,

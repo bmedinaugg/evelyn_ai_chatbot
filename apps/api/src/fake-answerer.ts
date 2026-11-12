@@ -29,6 +29,7 @@ export function createFakeAnswerer(): Answerer {
         citedArticleIds: [] as number[],
         confidence: 'high',
         needsHuman: false,
+        approvedAnswerId: null,
       } as const;
       return {
         kind: 'answer',
@@ -58,6 +59,7 @@ export function createFakeAnswerer(): Answerer {
       citedArticleIds: firstId ? [Number(firstId)] : [],
       confidence: firstId ? 'high' : 'low',
       needsHuman: false,
+      approvedAnswerId: null,
     } as const;
     return {
       kind: 'answer',

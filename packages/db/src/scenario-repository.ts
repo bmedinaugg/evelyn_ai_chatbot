@@ -48,6 +48,8 @@ export type ScenarioHit = {
   answerEn: string;
   statuses: CustomerStatus[];
   articleId: number | null;
+  /** The linked help article when it is still active, in the asked language. */
+  article: { title: string; url: string } | null;
 };
 
 export interface ScenarioRepository {
@@ -243,6 +245,8 @@ export function createSupabaseScenarioRepository(client: ServiceClient): Scenari
             answer_en: z.string(),
             statuses: statusesSchema,
             article_id: z.number().nullable(),
+            article_title: z.string().nullable(),
+            article_url: z.string().nullable(),
           }),
         )
         .parse(data ?? [])
@@ -254,6 +258,10 @@ export function createSupabaseScenarioRepository(client: ServiceClient): Scenari
           answerEn: row.answer_en,
           statuses: row.statuses,
           articleId: row.article_id,
+          article:
+            row.article_title && row.article_url
+              ? { title: row.article_title, url: row.article_url }
+              : null,
         }));
     },
   };

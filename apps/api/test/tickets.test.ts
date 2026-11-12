@@ -231,6 +231,7 @@ describe('POST /widget/conversations/:id/tickets', () => {
           citedArticleIds: [],
           confidence: 'low',
           needsHuman: false,
+          approvedAnswerId: null,
         },
         assistantContent: [],
         steps: [],

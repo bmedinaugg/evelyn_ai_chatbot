@@ -10,6 +10,7 @@ import {
   createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
   createSupabasePortalRepository,
+  createSupabaseScenarioRepository,
 } from '@trainmore/db';
 import { createLocalOutbox, createSesEmailSender } from '@trainmore/email';
 import { createFreshdeskClient, createLocalFreshdesk } from '@trainmore/freshdesk';
@@ -120,6 +121,7 @@ const app = buildApiServer({
   capabilities,
   conversations: createSupabaseConversationRepository(db),
   faq: createSupabaseFaqRepository(db),
+  scenarios: createSupabaseScenarioRepository(db),
   escalations: createSupabaseEscalationRepository(db),
   answerer,
   freshdesk: freshdeskClient,

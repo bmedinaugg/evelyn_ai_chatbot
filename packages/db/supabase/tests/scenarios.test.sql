@@ -34,9 +34,9 @@ select is((select action from public.audit_log order by id desc limit 1), 'scena
 
 -- Search finds published versions by rare words, in either language.
 select results_eq(
-  $$select version_id, answer_nl, statuses, article_id from public.search_scenarios('bevriezen zwangerschap', 'nl', 3)$$,
-  $$select (select version_id from ids), 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.'::text, array['MEMBER']::text[], 7::bigint$$,
-  'published scenario is found'
+  $$select version_id, answer_nl, statuses, article_id, article_title, article_url from public.search_scenarios('bevriezen zwangerschap', 'nl', 3)$$,
+  $$select (select version_id from ids), 'Ja, bij zwangerschap kun je tot 6 maanden bevriezen.'::text, array['MEMBER']::text[], 7::bigint, 'Bevriezen'::text, 'https://portal.test/nl/7'::text$$,
+  'published scenario is found, with its linked article in the asked language'
 );
 select is((select count(*)::int from public.search_scenarios('pregnancy freeze', 'en', 3)), 1, 'English triggers work too');
 
