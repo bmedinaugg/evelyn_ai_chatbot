@@ -1,5 +1,9 @@
 export { createSupabaseAuthRepository } from './auth-repository.ts';
 export type { AccountCandidate, AuthRepository, AuthState, VerifyResult } from './auth-types.ts';
+export {
+  type CapabilityFlagRepository,
+  createSupabaseCapabilityFlagRepository,
+} from './capability-flags.ts';
 export { createServiceClient, DbError, type ServiceClient } from './client.ts';
 export { createSupabaseConversationRepository } from './conversation-repository.ts';
 export {

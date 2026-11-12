@@ -19,6 +19,15 @@ export {
   verifyLoginCode,
 } from './auth/login.ts';
 export {
+  type AccountContext,
+  availableCapabilities,
+  CAPABILITIES,
+  type Capability,
+  type CapabilityDeps,
+  runCapability,
+  toolDefinitions,
+} from './capabilities/catalogue.ts';
+export {
   type Answerer,
   type AnswererResult,
   type CreateClient,

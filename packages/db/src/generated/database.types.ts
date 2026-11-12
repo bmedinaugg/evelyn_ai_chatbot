@@ -19,6 +19,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"capability_flags": {
+                  Row: {
+                    "enabled": boolean,"name": string,"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "enabled"?: boolean,"name": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "enabled"?: boolean,"name"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"conversations": {
                   Row: {
                     "account_candidates": Json | null,"created_at": string,"customer_id": number | null,"customer_status": string | null,"id": string,"lang": string,"last_message_at": string | null,"studio_id": number | null,"token_hash": string,"turn_claim_id": string | null,"turn_claimed_at": string | null,"user_message_count": number,"verified_at": string | null,"verified_email_hash": string | null
