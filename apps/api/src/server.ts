@@ -18,6 +18,7 @@ import { registerFeedbackRoutes } from './feedback.ts';
 import { registerLeadRoutes } from './leads.ts';
 import { registerLoginRoutes } from './login-routes.ts';
 import { type PortalDeps, portalOrigin, registerPortalAuthRoutes } from './portal/auth.ts';
+import { registerPortalReviewRoutes } from './portal/review.ts';
 import { proxyTrust } from './proxy-trust.ts';
 import { registerTicketRoutes } from './tickets.ts';
 
@@ -150,7 +151,12 @@ export function buildApiServer(deps: ApiDeps) {
   });
 
   const { portal } = deps;
-  if (portal) app.register(async (scope) => registerPortalAuthRoutes(scope, portal));
+  if (portal) {
+    app.register(async (scope) => {
+      registerPortalAuthRoutes(scope, portal);
+      registerPortalReviewRoutes(scope, portal);
+    });
+  }
 
   return app;
 }

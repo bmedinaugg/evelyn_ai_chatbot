@@ -486,3 +486,25 @@ export function createTestApi(
 }
 
 export type { Reply };
+
+/** Signs in through the fake Entra (claims from createTestApi({ portal })); returns the session cookie value. */
+export async function portalLogin(api: ReturnType<typeof createTestApi>): Promise<string> {
+  const start = await api.app.inject({ method: 'GET', url: '/portal/auth/login' });
+  const loginCookie = [start.headers['set-cookie'] ?? []]
+    .flat()
+    .find((c) => c.startsWith('tm_portal_login='))
+    ?.split(';')[0];
+  const state = new URL(start.headers.location as string).searchParams.get('state') ?? '';
+  const callback = await api.app.inject({
+    method: 'GET',
+    url: `/portal/auth/callback?code=c&state=${encodeURIComponent(state)}`,
+    headers: { cookie: loginCookie ?? '' },
+  });
+  const session = [callback.headers['set-cookie'] ?? []]
+    .flat()
+    .find((c) => c.startsWith('tm_portal='))
+    ?.split(';')[0]
+    ?.slice('tm_portal='.length);
+  if (!session) throw new Error(`portal login failed: ${callback.statusCode}`);
+  return session;
+}
