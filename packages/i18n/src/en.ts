@@ -123,6 +123,8 @@ export const en = {
     topic: 'Topic: {topic}',
     account: 'Account: {status}, {club} (verified by email code)',
     notLoggedIn: 'Account: not logged in',
+    otherEmail:
+      'Account: logged in with a different, verified email address. Do not share account details with this requester.',
     customer: 'Customer',
     bot: 'Chatbot',
     // Labels of the built-in ticket form topics (Freshdesk ticket types).

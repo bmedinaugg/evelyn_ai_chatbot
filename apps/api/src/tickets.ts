@@ -126,9 +126,11 @@ export function registerTicketRoutes(app: FastifyInstance, deps: ApiDeps): void 
           transcript,
           topic: body.topic,
           account:
-            auth.account && candidate
-              ? { status: auth.account.status, clubName: candidate.studioName }
-              : null,
+            auth.verified && !sameEmail
+              ? 'other_email'
+              : auth.account && candidate
+                ? { status: auth.account.status, clubName: candidate.studioName }
+                : null,
         });
         await deps.freshdesk.addPrivateNote(ticketId, note);
       } catch (error) {

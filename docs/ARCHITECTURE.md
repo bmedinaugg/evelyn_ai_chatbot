@@ -199,7 +199,9 @@ Behaviour per status:
 - **Private note:** the transcript of display texts only (what the customer saw and typed; never
   tool data or API content), last 50 messages, one line each, HTML-escaped. Account context is
   only status and club name, and only when the form email matches the email verified with a code
-  in this conversation (compared by HMAC); no customer id or number.
+  in this conversation (compared by HMAC); no customer id or number. When the customer verified a different
+  email than the form's, the note says so and tells agents not to share account details with the
+  requester (the transcript may contain that account's answers).
 - **Stuck detection:** a second failed reply in a row (`no_match` or `invalid_citation`) in the
   same conversation gets the fixed text `bot.stuck`, the `ticket_form` action and the flag
   `needs_human`. The escalation reason is `stuck` when the last reply failed, otherwise
@@ -212,6 +214,9 @@ Behaviour per status:
 - Same safety as the FAQ sync: Freshdesk down, the field missing or no choices → nothing changes and
   the job fails (non-zero exit) so the scheduler alerts.
 - Until the first successful sync, the API offers the four built-in topics.
+- Labels: the four built-in topics have nl/en labels. Any other synced choice is shown as Freshdesk
+  names it, in both languages (known limitation; ask support to keep type names bilingual or add
+  nl/en labels for new types in `packages/i18n`).
 - Schedule (EventBridge Scheduler → ECS RunTask, daily at night, next to `sync-faq`): to be added
   with the worker task definition in the CDK app; neither job is scheduled in `infra/` yet.
 

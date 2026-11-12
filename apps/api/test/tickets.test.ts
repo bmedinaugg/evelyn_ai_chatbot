@@ -206,7 +206,11 @@ describe('POST /widget/conversations/:id/tickets', () => {
     const other = await start(api);
     await login(api, other, 'sam@example.com');
     await submit(api, other, { ...form, email: 'someone.else@example.com' });
-    expect(api.notes[1]?.text).toContain('Account: niet ingelogd');
+    expect(api.notes[1]?.text).toContain(
+      'Account: ingelogd met een ander, geverifieerd e-mailadres. Deel geen accountgegevens met deze aanvrager.',
+    );
+    expect(api.notes[1]?.text).not.toContain('niet ingelogd');
+    expect(api.notes[1]?.text).not.toContain('Club 1001');
   });
 
   it('records a stuck escalation after the bot could not help', async () => {

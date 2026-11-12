@@ -11,17 +11,24 @@ const MAX_MESSAGE_CHARS = 2000;
 export function buildTicketNote(input: {
   lang: Lang;
   transcript: { role: 'user' | 'assistant'; text: string }[];
-  account: { status: CustomerStatus; clubName: string } | null;
+  /**
+   * Verified account of this conversation; 'other_email' when the customer verified a different
+   * email than the form's (the transcript may hold that account's data: agents are warned).
+   */
+  account: { status: CustomerStatus; clubName: string } | 'other_email' | null;
   /** Topic chosen in the form (also the ticket type once topics are synced). */
   topic: string;
 }): string {
   const { lang } = input;
-  const accountLine = input.account
-    ? t(lang, 'ticket.account', {
-        status: t(lang, `widget.status.${input.account.status}`),
-        club: input.account.clubName,
-      })
-    : t(lang, 'ticket.notLoggedIn');
+  const accountLine =
+    input.account === 'other_email'
+      ? t(lang, 'ticket.otherEmail')
+      : input.account
+        ? t(lang, 'ticket.account', {
+            status: t(lang, `widget.status.${input.account.status}`),
+            club: input.account.clubName,
+          })
+        : t(lang, 'ticket.notLoggedIn');
   const messages = input.transcript.slice(-MAX_NOTE_MESSAGES).map((message) => {
     const speaker = t(lang, message.role === 'user' ? 'ticket.customer' : 'ticket.bot');
     // One line per message, so a message cannot pose as another speaker.

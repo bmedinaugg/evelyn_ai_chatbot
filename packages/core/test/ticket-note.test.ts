@@ -42,6 +42,18 @@ describe('buildTicketNote', () => {
     );
   });
 
+  it('warns when the form email is not the verified one', () => {
+    const note = buildTicketNote({
+      lang: 'en',
+      transcript: [],
+      account: 'other_email',
+      topic: 'x',
+    });
+    expect(note.split('\n')[2]).toBe(
+      'Account: logged in with a different, verified email address. Do not share account details with this requester.',
+    );
+  });
+
   it('keeps only the latest messages and caps long ones', () => {
     const transcript = Array.from({ length: MAX_NOTE_MESSAGES + 5 }, (_, i) => ({
       role: 'user' as const,

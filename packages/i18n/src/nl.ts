@@ -123,6 +123,8 @@ export const nl = {
     topic: 'Onderwerp: {topic}',
     account: 'Account: {status}, {club} (geverifieerd via e-mailcode)',
     notLoggedIn: 'Account: niet ingelogd',
+    otherEmail:
+      'Account: ingelogd met een ander, geverifieerd e-mailadres. Deel geen accountgegevens met deze aanvrager.',
     customer: 'Klant',
     bot: 'Chatbot',
     topics: {
