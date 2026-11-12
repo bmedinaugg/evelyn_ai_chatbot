@@ -35,6 +35,8 @@ export type ApiDeps = {
     supportContactUrl: string;
     /** Proxies in front of the API (CloudFront + ALB = 2); 0 when exposed directly. */
     trustProxyHops: number;
+    /** Extra Freshdesk tag on tickets and leads outside production, e.g. `chatbot-preprod`. */
+    envTag?: string;
   };
   logger: Logger;
 };

@@ -5,7 +5,8 @@ import type { ServiceConfig } from './service-stack.ts';
  * Freshdesk ids were read from the live account on 2026-11-12 (docs/api/freshdesk.md).
  */
 export const PREPROD_CONFIG: ServiceConfig = {
-  portalOrigins: ['https://www.support.trainmore.com'],
+  // The help portal, plus the local demo page for testing preprod before the portal embeds it.
+  portalOrigins: ['https://www.support.trainmore.com', 'http://127.0.0.1:8090'],
   supportContactUrl: 'https://www.support.trainmore.com/nl/support/tickets/new',
   freshdesk: {
     domain: 'urbangymgroup.freshdesk.com',

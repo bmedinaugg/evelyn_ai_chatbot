@@ -1,0 +1,90 @@
+name: Deploy preprod
+
+# Manual only. AWS access through GitHub OIDC (no stored AWS keys); see docs/DEPLOY.md.
+on:
+  workflow_dispatch:
+    inputs:
+      foundation_only:
+        description: First run only - create ECR, secrets and SES identity, then stop
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: deploy-preprod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    environment: preprod
+    env:
+      AWS_REGION: eu-west-1
+      IMAGE_TAG: ${{ github.sha }}
+      CDK_CONTEXT: >-
+        -c emailFrom=${{ vars.EMAIL_FROM }}
+        -c imageTag=${{ github.sha }}
+        -c widgetDistPath=../apps/widget/dist
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test
+
+      - name: Build the widget (same origin as the API)
+        run: pnpm --filter @trainmore/widget build
+        env:
+          VITE_API_BASE_URL: ""
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          VITE_PRIVACY_URL: ${{ vars.PRIVACY_URL }}
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Foundation (network, ECR, secrets, SES identity)
+        working-directory: infra
+        run: pnpm exec cdk deploy TrainmoreChatbot-preprod --require-approval never $CDK_CONTEXT
+
+      - if: ${{ !inputs.foundation_only }}
+        uses: supabase/setup-cli@v3
+        with:
+          version: 3.1.0
+      - name: Database migrations
+        if: ${{ !inputs.foundation_only }}
+        working-directory: packages/db
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - if: ${{ !inputs.foundation_only }}
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Image already pushed? (tags are immutable)
+        if: ${{ !inputs.foundation_only }}
+        id: image
+        run: |
+          if aws ecr describe-images --repository-name trainmore-chatbot-preprod \
+               --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: ${{ !inputs.foundation_only }}
+        uses: docker/setup-buildx-action@v4
+      - if: ${{ !inputs.foundation_only && steps.image.outputs.exists != 'true' }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/trainmore-chatbot-preprod:${{ github.sha }}
+
+      - name: WAF, service and worker schedules
+        if: ${{ !inputs.foundation_only }}
+        working-directory: infra
+        run: pnpm exec cdk deploy --all --require-approval never $CDK_CONTEXT

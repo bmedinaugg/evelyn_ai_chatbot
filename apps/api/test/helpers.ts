@@ -32,6 +32,8 @@ export function createTestApi(
       customerNumber: string | null;
     }[];
     magiclineDown?: boolean;
+    /** Extra Freshdesk tag marking non-production tickets (e.g. chatbot-preprod). */
+    envTag?: string;
     /** Synced Freshdesk topics (empty: built-in defaults apply). */
     topics?: string[];
     topicsError?: boolean;
@@ -320,6 +322,7 @@ export function createTestApi(
       allowedOrigins: [ORIGIN],
       supportContactUrl: CONTACT_URL,
       trustProxyHops: options.trustProxyHops ?? 0,
+      ...(options.envTag ? { envTag: options.envTag } : {}),
     },
     logger: createLogger({
       name: 'api-test',
