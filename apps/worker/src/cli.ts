@@ -3,7 +3,7 @@ import {
   createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
 } from '@trainmore/db';
-import { createFreshdeskClient } from '@trainmore/freshdesk';
+import { createFreshdeskClient, createLocalFreshdesk } from '@trainmore/freshdesk';
 import {
   createLogger,
   type Env,
@@ -72,6 +72,15 @@ export async function runCommand(
       return;
     }
     case 'sync-ticket-topics': {
+      if (env.FRESHDESK_FAKE === '1') {
+        await runTopicSync({
+          freshdesk: createLocalFreshdesk({ appEnv: runtime.appEnv }),
+          repo: createSupabaseEscalationRepository(db),
+          field: 'ticket_type',
+          logger,
+        });
+        return;
+      }
       const freshdesk = loadFreshdeskConfig(env);
       await runTopicSync({
         freshdesk: createFreshdeskClient({ domain: freshdesk.domain, apiKey: freshdesk.apiKey }),
