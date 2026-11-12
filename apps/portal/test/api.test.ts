@@ -84,10 +84,55 @@ describe('createPortalApi', () => {
             action: 'none',
           },
         ],
+        judgement: {
+          verdicts: [{ verdict: 'better', reason: 'Beantwoordt de vraag.' }],
+          summary: { better: 1, same: 0, worse: 0 },
+        },
       }),
     );
-    const replay = await api.replay('c1', 9);
+    const replay = await api.replay('c1', 9, 'nl');
     expect(replay.results[0]?.usesDraft).toBe(true);
+    expect(replay.judgement?.summary.better).toBe(1);
     expect(requests[1]?.url).toBe('https://portal.test/portal/api/conversations/c1/replay');
+    expect(await requests[1]?.json()).toEqual({ versionId: 9, lang: 'nl' });
+  });
+
+  it('reads metrics for a range, a report day, and flagged conversations of one day', async () => {
+    const day = {
+      day: '2026-11-12',
+      conversations: 10,
+      resolved: 6,
+      escalations: 1,
+      thumbsUp: 2,
+      thumbsDown: 1,
+      approvedAnswers: 1,
+      logins: 3,
+      flags: { no_match: 2 },
+    };
+    const { day: _d, ...totals } = day;
+    responses.push(json(200, { from: '2026-11-12', to: '2026-11-12', days: [day], totals }));
+    expect((await api.metrics('2026-11-12', '2026-11-12')).totals.resolved).toBe(6);
+    expect(requests[0]?.url).toBe(
+      'https://portal.test/portal/api/metrics?from=2026-11-12&to=2026-11-12',
+    );
+
+    responses.push(
+      json(200, {
+        day: '2026-11-12',
+        sentAt: null,
+        recipientsCount: 2,
+        clustered: true,
+        topics: [{ labelNl: 'Sauna', labelEn: 'Sauna', count: 2, conversationIds: [] }],
+      }),
+      json(404, { error: 'not_found' }),
+    );
+    expect((await api.report('2026-11-12'))?.topics).toHaveLength(1);
+    expect(await api.report('2026-11-11')).toBeNull();
+
+    responses.push(json(200, { conversations: [], pageSize: 50 }));
+    await api.flagged({ day: '2026-11-12', days: 7, page: 0 });
+    expect(requests[3]?.url).toBe(
+      'https://portal.test/portal/api/flagged?days=7&page=0&day=2026-11-12',
+    );
   });
 });

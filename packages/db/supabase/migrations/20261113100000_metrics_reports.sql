@@ -99,6 +99,62 @@ as $$
   limit least(greatest(coalesce(p_limit, 200), 1), 500);
 $$;
 
+-- Flagged list: optional end of the window (the portal's "flagged on this day" link from the
+-- report). Replaces the M4a function; p_until null keeps the old behaviour.
+drop function public.list_flagged_conversations(text, timestamptz, int, int);
+create function public.list_flagged_conversations(
+  p_reason text,
+  p_since timestamptz,
+  p_limit int,
+  p_offset int,
+  p_until timestamptz default null
+)
+returns table (
+  conversation_id uuid,
+  lang text,
+  last_flag_at timestamptz,
+  user_message_count int,
+  reasons text[],
+  escalated boolean,
+  logged_in boolean
+)
+language plpgsql
+stable
+security invoker
+set search_path = ''
+as $$
+begin
+  if p_reason is not null and p_reason not in ('no_match', 'low_confidence', 'invalid_citation',
+      'needs_human', 'wants_human', 'account_question', 'refusal', 'error', 'thumbs_down') then
+    raise exception 'unknown flag reason' using errcode = '22023';
+  end if;
+
+  return query
+  select
+    c.id,
+    c.lang,
+    max(f.created_at),
+    c.user_message_count,
+    array_agg(distinct f.reason order by f.reason),
+    exists (select 1 from public.escalations e where e.conversation_id = c.id),
+    c.verified_email_hash is not null
+  from public.conversations c
+  join public.flags f on f.conversation_id = c.id
+  where c.anonymised_at is null
+    and f.created_at >= p_since
+    and (p_until is null or f.created_at < p_until)
+    and (p_reason is null or exists (
+      select 1 from public.flags f2 where f2.conversation_id = c.id and f2.reason = p_reason
+    ))
+  group by c.id
+  order by max(f.created_at) desc, c.id
+  limit least(greatest(coalesce(p_limit, 50), 1), 200)
+  offset greatest(coalesce(p_offset, 0), 0);
+end;
+$$;
+revoke execute on function public.list_flagged_conversations(text, timestamptz, int, int, timestamptz) from public, anon, authenticated;
+grant execute on function public.list_flagged_conversations(text, timestamptz, int, int, timestamptz) to service_role;
+
 -- Daily report runs --------------------------------------------------------------------------
 -- topics: [{labelNl, labelEn, count, conversationIds}] — labels and ids only, no customer text.
 create table public.daily_reports (

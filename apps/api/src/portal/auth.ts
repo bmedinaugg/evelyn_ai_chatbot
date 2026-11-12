@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { JudgeItem, Reply, Verdict } from '@trainmore/core';
 import {
   type CustomerStatus,
+  type MetricsRepository,
   PORTAL_ROLES,
   type PortalRepository,
   type PortalRole,
@@ -36,6 +37,7 @@ export type PortalDeps = {
   entra: EntraClient;
   repo: PortalRepository;
   scenarios: ScenarioRepository;
+  metrics: MetricsRepository;
   /** Null where Magicline is not the mock (production): replay is refused there. */
   replay: ReplayRunner | null;
   /** Null when no judge is configured: replays are then shown without verdicts. */

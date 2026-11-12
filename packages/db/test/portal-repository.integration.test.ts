@@ -87,6 +87,13 @@ describe('portal repository', () => {
       escalated: false,
       loggedIn: false,
     });
+    const ended = await portal.listFlagged({
+      since: new Date(Date.now() - 60_000),
+      until: new Date(Date.now() - 30_000),
+      limit: 50,
+      offset: 0,
+    });
+    expect(ended.find((row) => row.conversationId === id)).toBeUndefined();
 
     await client.from('conversations').update({ customer_status: 'MEMBER' }).eq('id', id);
     const detail = await portal.conversationDetail(id);

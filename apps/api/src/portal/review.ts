@@ -1,6 +1,6 @@
 import { CAPABILITIES } from '@trainmore/core';
 import { type ConversationDetail, FLAG_REASONS } from '@trainmore/db';
-import { maskText } from '@trainmore/shared';
+import { amsterdamDayBounds, isDay, maskText } from '@trainmore/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { isFromPortal, type PortalDeps, requireAgent } from './auth.ts';
@@ -9,6 +9,8 @@ const flaggedQuery = z.object({
   reason: z.enum(FLAG_REASONS).optional(),
   days: z.coerce.number().int().min(1).max(90).default(7),
   page: z.coerce.number().int().min(0).max(1000).default(0),
+  /** One Amsterdam calendar day (link from the daily report); overrides `days`. */
+  day: z.string().refine(isDay).optional(),
 });
 const PAGE_SIZE = 50;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,9 +27,12 @@ export function registerPortalReviewRoutes(app: FastifyInstance, deps: PortalDep
     if (!agent) return reply;
     const query = flaggedQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: 'invalid_request' });
+    const window = query.data.day
+      ? (({ start, end }) => ({ since: start, until: end }))(amsterdamDayBounds(query.data.day))
+      : { since: new Date(Date.now() - query.data.days * 24 * 60 * 60 * 1000) };
     const conversations = await deps.repo.listFlagged({
       ...(query.data.reason ? { reason: query.data.reason } : {}),
-      since: new Date(Date.now() - query.data.days * 24 * 60 * 60 * 1000),
+      ...window,
       limit: PAGE_SIZE,
       offset: query.data.page * PAGE_SIZE,
     });

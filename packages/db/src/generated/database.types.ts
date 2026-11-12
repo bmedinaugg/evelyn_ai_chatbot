@@ -352,7 +352,7 @@ isOneToOne: false
             }[]
                            },
 "list_flagged_conversations":
-{ Args: { "p_limit": number,"p_offset": number,"p_reason": string,"p_since": string }; Returns: {
+{ Args: { "p_limit": number,"p_offset": number,"p_reason": string,"p_since": string,"p_until"?: string }; Returns: {
               "conversation_id": string,"escalated": boolean,"lang": string,"last_flag_at": string,"logged_in": boolean,"reasons": (string)[],"user_message_count": number
             }[]
                            },

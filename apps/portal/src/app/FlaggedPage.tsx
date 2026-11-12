@@ -16,8 +16,10 @@ export const formatDate = (lang: Lang, iso: string) =>
     timeZone: 'Europe/Amsterdam',
   }).format(new Date(iso));
 
-export function FlaggedPage(props: { api: PortalApi; lang: Lang }) {
+/** `day`: only the conversations flagged on that Amsterdam day (link from the daily report). */
+export function FlaggedPage(props: { api: PortalApi; lang: Lang; day?: string | null }) {
   const { api, lang } = props;
+  const day = props.day ?? null;
   const [reason, setReason] = useState<FlagReason | ''>('');
   const [days, setDays] = useState<number>(7);
   const [page, setPage] = useState(0);
@@ -26,13 +28,24 @@ export function FlaggedPage(props: { api: PortalApi; lang: Lang }) {
   useEffect(() => {
     setData('loading');
     api
-      .flagged({ ...(reason ? { reason } : {}), days, page })
+      .flagged({ ...(reason ? { reason } : {}), days, page, ...(day ? { day } : {}) })
       .then(setData, () => setData('error'));
-  }, [api, reason, days, page]);
+  }, [api, reason, days, page, day]);
 
   return (
     <section>
       <h1>{t(lang, 'portal.nav.flagged')}</h1>
+      {day && (
+        <p class="tm-notice">
+          {t(lang, 'portal.flagged.onDay', {
+            day: new Intl.DateTimeFormat(lang === 'nl' ? 'nl-NL' : 'en-GB', {
+              dateStyle: 'long',
+              timeZone: 'UTC',
+            }).format(new Date(`${day}T00:00:00Z`)),
+          })}{' '}
+          <a href="#/flagged">{t(lang, 'portal.flagged.allPeriods')}</a>
+        </p>
+      )}
       <div class="tm-filters">
         <label>
           <span class="tm-visually-hidden">{t(lang, 'portal.flagged.reasons')}</span>
@@ -51,7 +64,7 @@ export function FlaggedPage(props: { api: PortalApi; lang: Lang }) {
             ))}
           </select>
         </label>
-        <label>
+        <label hidden={day !== null}>
           <span class="tm-visually-hidden">{t(lang, 'portal.flagged.lastFlag')}</span>
           <select
             value={String(days)}

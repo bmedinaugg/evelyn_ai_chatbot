@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(24);
 
 delete from public.conversations;
 delete from public.daily_reports;
@@ -113,6 +113,17 @@ select is(
 select is(
   (select count(*)::int from public.flagged_questions('2026-10-20 00:00Z', '2026-10-21 00:00Z', 100)),
   0, 'nothing outside the window'
+);
+
+-- Flagged list for one day ([since, until)) ---------------------------------------------------
+select results_eq(
+  $$select conversation_id::text from public.list_flagged_conversations(null, '2026-10-24 22:00Z', 50, 0, '2026-10-25 23:00Z')$$,
+  $$values ('00000000-0000-4000-8000-0000000000a3'), ('00000000-0000-4000-8000-0000000000a2')$$,
+  'flagged list limited to a day (anonymised left out)'
+);
+select is(
+  (select count(*)::int from public.list_flagged_conversations(null, '2026-10-25 23:00Z', 50, 0, '2026-10-26 23:00Z')),
+  0, 'nothing flagged the next day'
 );
 
 -- Daily reports: claim, finish, release, resend ------------------------------------------------

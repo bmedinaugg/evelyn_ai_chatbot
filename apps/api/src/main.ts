@@ -9,6 +9,7 @@ import {
   createSupabaseConversationRepository,
   createSupabaseEscalationRepository,
   createSupabaseFaqRepository,
+  createSupabaseMetricsRepository,
   createSupabasePortalRepository,
   createSupabaseScenarioRepository,
 } from '@trainmore/db';
@@ -117,6 +118,7 @@ const app = buildApiServer({
           entra: createEntraClient(portalConfig),
           repo: createSupabasePortalRepository(db),
           scenarios,
+          metrics: createSupabaseMetricsRepository(db),
           // Replay answers account questions as synthetic profiles: only against the mock Magicline.
           replay: loadConfig(env).magicline.useMock
             ? (input) =>

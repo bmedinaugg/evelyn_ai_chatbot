@@ -6,6 +6,7 @@ import { CapabilitiesPage } from './CapabilitiesPage.tsx';
 import { ConversationPage } from './ConversationPage.tsx';
 import { FlaggedPage } from './FlaggedPage.tsx';
 import { LimitationsPage } from './LimitationsPage.tsx';
+import { MetricsPage } from './MetricsPage.tsx';
 import { ScenarioEditor } from './ScenarioEditor.tsx';
 import { ScenarioPage } from './ScenarioPage.tsx';
 import { ScenariosPage } from './ScenariosPage.tsx';
@@ -13,7 +14,8 @@ import { ScenariosPage } from './ScenariosPage.tsx';
 type Auth = 'loading' | 'signed_out' | 'forbidden' | 'error' | Me;
 
 type Route =
-  | { page: 'flagged' }
+  | { page: 'flagged'; day: string | null }
+  | { page: 'metrics' }
   | { page: 'conversation'; id: string }
   | { page: 'capabilities' }
   | { page: 'limitations' }
@@ -39,7 +41,10 @@ function parseRoute(hash: string): Route {
   if (hash === '#/scenarios') return { page: 'scenarios' };
   if (hash === '#/capabilities') return { page: 'capabilities' };
   if (hash === '#/limitations') return { page: 'limitations' };
-  return { page: 'flagged' };
+  if (hash === '#/metrics') return { page: 'metrics' };
+  // From the daily report: conversations flagged on one Amsterdam day.
+  const day = /^#\/flagged\?day=(\d{4}-\d{2}-\d{2})$/.exec(hash);
+  return { page: 'flagged', day: day?.[1] ?? null };
 }
 
 export function App(props: {
@@ -94,6 +99,9 @@ export function App(props: {
         <nav aria-label={t(lang, 'portal.title')}>
           <a href="#/flagged" aria-current={route.page === 'flagged' ? 'page' : undefined}>
             {t(lang, 'portal.nav.flagged')}
+          </a>
+          <a href="#/metrics" aria-current={route.page === 'metrics' ? 'page' : undefined}>
+            {t(lang, 'portal.nav.metrics')}
           </a>
           <a href="#/scenarios" aria-current={route.page.includes('scenario') ? 'page' : undefined}>
             {t(lang, 'portal.nav.scenarios')}
@@ -171,7 +179,8 @@ export function App(props: {
         isApprover={auth.roles.some((r) => r === 'approver' || r === 'admin')}
       />
     );
-  else content = <FlaggedPage api={api} lang={lang} />;
+  else if (route.page === 'metrics') content = <MetricsPage api={api} lang={lang} />;
+  else content = <FlaggedPage api={api} lang={lang} day={route.day} />;
 
   return (
     <>
