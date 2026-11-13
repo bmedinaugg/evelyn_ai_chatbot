@@ -63,10 +63,32 @@ describe('FoundationStack (preprod)', () => {
     });
   });
 
-  it('has the SES sender identity', () => {
+  it("verifies the sender's whole domain with Easy DKIM (our domains enforce strict DMARC)", () => {
+    template.resourceCountIs('AWS::SES::EmailIdentity', 1);
     template.hasResourceProperties('AWS::SES::EmailIdentity', {
-      EmailIdentity: 'chat@example.com',
+      EmailIdentity: 'example.com',
+      DkimAttributes: Match.absent(),
+      DkimSigningAttributes: Match.absent(),
     });
+  });
+
+  it('outputs the 3 DKIM CNAME records to add to DNS', () => {
+    const outputs = template.toJSON().Outputs ?? {};
+    for (const n of [1, 2, 3]) expect(outputs).toHaveProperty(`DkimRecord${n}`);
+  });
+
+  it('keeps the full sender address for the apps', () => {
+    const stack = new FoundationStack(new App(), 'A', {
+      envName: 'preprod',
+      emailFrom: 'AI@example.org',
+    });
+    expect(stack.emailFrom).toBe('AI@example.org');
+  });
+
+  it('refuses a sender without a domain', () => {
+    expect(
+      () => new FoundationStack(new App(), 'B', { envName: 'preprod', emailFrom: 'no-domain' }),
+    ).toThrow(/emailFrom/);
   });
 
   it('never outputs secret values', () => {

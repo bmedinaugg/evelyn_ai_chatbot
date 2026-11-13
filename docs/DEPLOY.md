@@ -6,7 +6,7 @@ deployed:
 
 | Stack | Region | Contents |
 |---|---|---|
-| `TrainmoreChatbot-preprod` | eu-west-1 | network, ECS cluster, ECR, encrypted logs, secrets, SES sender |
+| `TrainmoreChatbot-preprod` | eu-west-1 | network, ECS cluster, ECR, encrypted logs, secrets, SES sender domain (DKIM) |
 | `TrainmoreChatbot-preprod-service` | eu-west-1 | CloudFront (widget + API on one domain), S3, internal ALB, API on Fargate with mock Magicline (on demand, see below) |
 | `TrainmoreChatbot-preprod-worker` | eu-west-1 | nightly FAQ sync (02:00), topic sync (02:15), retention (03:00), Amsterdam time |
 | `TrainmoreChatbot-preprod-waf` | us-east-1 | optional (`PREPROD_WAF=true`): WAF for CloudFront (managed rules, per-IP rate limit) |
@@ -91,7 +91,7 @@ Settings → Environments → **preprod**. A required reviewer is optional: it a
 | Kind | Name | Value |
 |---|---|---|
 | Variable | `AWS_DEPLOY_ROLE_ARN` | ARN of the role from step 2 |
-| Variable | `EMAIL_FROM` | sender of login codes, e.g. `chatbot-preprod@trainmore.nl` |
+| Variable | `EMAIL_FROM` | sender of login codes and the daily report, now `AI@urbangymgroup.com` (its whole domain is verified in SES, see below) |
 | Variable | `TURNSTILE_SITE_KEY` | Turnstile site key (public) |
 | Variable | `PRIVACY_URL` | privacy statement URL shown in the consent notice |
 | Variable | `DAILY_REPORT_RECIPIENTS` | optional: comma-separated support addresses (no spaces, at most 50) for the 07:00 daily report; the report is only scheduled with the portal on and this set |
@@ -117,10 +117,18 @@ Settings → Environments → **preprod**. A required reviewer is optional: it a
    ```
    - `trainmore-chatbot/preprod/otp-hmac-secret` is already generated. Never change it: login
      codes and deletion requests depend on it.
-   - **SES:** click the verification link sent to `EMAIL_FROM`. While SES is in sandbox mode, also
-     verify each tester's address (SES → Identities), because login codes only reach verified
-     addresses. The preprod task role may send to any verified identity of the account, as the
-     sandbox requires; prod sends from its identity only.
+   - **SES sender domain (DKIM):** our domains (urbangymgroup.com, trainmore.nl, trainmore.com)
+     publish DMARC `p=reject` with strict alignment, so receivers reject mail that is not signed
+     by the sender's own domain. The stack therefore verifies the **domain** of `EMAIL_FROM` with
+     Easy DKIM. Its outputs `DkimRecord1`–`3` (CloudFormation → `TrainmoreChatbot-preprod` →
+     Outputs) are three CNAME records: whoever manages that domain's DNS adds them. SES shows the
+     domain as verified within about an hour after that; until then no email can be sent.
+   - **SES production access:** a new account is in the SES sandbox and only delivers to verified
+     addresses (any address of the verified domain counts). For customers, request production
+     access: SES → Account dashboard → **Request production access** (transactional; login codes
+     and an internal daily report; bounces and complaints are handled by SES suppression). AWS
+     usually answers within a day. The preprod task role may send to any verified identity of the
+     account, as the sandbox requires; prod sends from its identity only.
 3. **Full deploy.** Run the workflow again without the tick. It does the following:
    1. runs the tests
    2. builds the widget
@@ -204,7 +212,7 @@ same commit reuses its image.
 ## Daily report
 - **Schedule:** 07:00 Europe/Amsterdam, about the previous day. The report task is the only worker
   with the Claude key (topic grouping) and SES permission.
-- **SES sandbox (preprod):** every recipient address must be verified in SES first. Each person
+- **SES sandbox (preprod):** until production access is granted, every recipient outside the sender's verified domain must be verified in SES first. Each person
   clicks the link in the verification email.
 - **Send again** (for example after a failed run): run the report task once with the command
   override `node apps/worker/src/main.ts daily-report --resend`. That reports yesterday again.

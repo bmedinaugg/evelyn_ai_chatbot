@@ -10,6 +10,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Scale | Medium: ~30–150 clubs, ~500–5,000 chats/day | Product owner |
 | Compute | AWS ECS Fargate (ARM/Graviton) | Product owner |
 | Environments | **Preprod only for now**; production built after preprod is tested and signed off | Product owner |
+| Email sender | `AI@urbangymgroup.com` for now (login codes, daily report); its **domain is verified in SES with Easy DKIM**, because our domains enforce DMARC `p=reject` with strict alignment. A TrainMore address (`noreply@trainmore.nl`) is kept as the option for later | Product owner (2026-11-13) |
 | Preprod cost | Light testing only: the API runs **on demand** (workflow "Preprod on/off", automatic switch-off at 20:00 Amsterdam time) and the **WAF is off** unless `PREPROD_WAF=true`; production keeps an always-on API and the WAF | Product owner (2026-11-12) |
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
@@ -486,6 +487,7 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 Each milestone ends with tests passing and a preprod deploy.
 
 **Progress (newest first)**
+- SES sender domain ✅ 2026-11-13: the sender's domain is verified with Easy DKIM (DMARC `p=reject` on our domains); DKIM records as stack outputs.
 - Preprod cost ✅ 2026-11-12: API on demand ("Preprod on/off" workflow, automatic switch-off at 20:00 Amsterdam time, deploys keep the state), WAF optional (`PREPROD_WAF`); about $55 → $25/month.
 - M5 ✅ 2026-11-13: daily report and metrics.
   - **Report:** a 07:00 email about yesterday with Haiku topic grouping (masked; falls back to
@@ -595,4 +597,7 @@ Each milestone ends with tests passing and a preprod deploy.
   Turnstile keys, SES sender: see `docs/DEPLOY.md` "One-time setup".
 - (preprod) Freshdesk automation: route tickets tagged `chatbot-preprod` to a test group.
 - (M4) Entra app registration and group names.
+- (preprod) DNS: add the 3 SES DKIM CNAME records for urbangymgroup.com; request SES production
+  access. Later: consider `noreply@trainmore.nl` as the sender (TrainMore customers may not
+  recognise "urbangymgroup"); same DKIM setup for that domain.
 - Exact club count and expected volume (brief still says [X]).
