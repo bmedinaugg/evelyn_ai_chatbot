@@ -31,6 +31,8 @@ export type ServiceConfig = {
   chatModel: string;
   /** Fast model for the daily report clustering and the replay judge. */
   fastModel: string;
+  /** Mock Magicline: `alias=profile` emails so testers can log in with a mailbox they can read. */
+  mockEmailAliases?: string;
 };
 
 export type ServiceStackProps = StackProps & {
@@ -247,6 +249,7 @@ export class ServiceStack extends Stack {
         NODE_ENV: 'production',
         PORT: String(MOCK_PORT),
         MOCK_MAGICLINE_KEYS,
+        ...(config.mockEmailAliases ? { MOCK_EMAIL_ALIASES: config.mockEmailAliases } : {}),
       },
     });
     api.addContainerDependencies({

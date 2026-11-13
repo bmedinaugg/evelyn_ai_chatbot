@@ -34,6 +34,17 @@ Test logins (mock Magicline):
 | `former@example.com` | former member with debt |
 | `prospect@example.com` | prospect |
 
+**On preprod** codes go out by real email, so log in with a plus-address of the AI mailbox
+instead (the mock maps it to a synthetic profile, `MOCK_EMAIL_ALIASES` in
+`infra/lib/preprod-config.ts`; the codes arrive in the `AI@urbangymgroup.com` mailbox):
+
+| Log in with | Same as |
+|---|---|
+| `AI+member@urbangymgroup.com` | `member.single@example.com` |
+| `AI+multi@urbangymgroup.com` | `multi@example.com` (account picker) |
+
+Needs the urbangymgroup.com domain verified in SES (DKIM records, `docs/DEPLOY.md`).
+
 ## Click-through checklist (do each in Dutch and in English)
 1. **Consent:** the chat asks for consent before the first message; no request is made before that.
 2. **FAQ answer:** "Hoe zeg ik mijn lidmaatschap op?" / "How do I cancel my membership?" → answer
