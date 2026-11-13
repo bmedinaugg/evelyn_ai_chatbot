@@ -37,17 +37,20 @@ export function hasControlCharacter(text: string): boolean {
   return false;
 }
 
-/** Text that may come from the model (topic labels): no links, markup or recognisable personal data. */
-export function isSafeLabel(label: string): boolean {
+/** Text that may come from the model: no links, markup or recognisable personal data. */
+export function isSafeModelText(text: string): boolean {
   return (
-    label.length >= 3 &&
-    label.length <= 60 &&
     // Line breaks and other control characters could fake lines in the plain-text email.
-    !hasControlCharacter(label) &&
-    !/[<>]/.test(label) &&
-    !/:\/\//.test(label) &&
-    !/\bwww\./i.test(label) &&
-    !new RegExp(DOMAIN.source, 'i').test(label) &&
-    maskText(label) === label
+    !hasControlCharacter(text) &&
+    !/[<>]/.test(text) &&
+    !/:\/\//.test(text) &&
+    !/\bwww\./i.test(text) &&
+    !new RegExp(DOMAIN.source, 'i').test(text) &&
+    maskText(text) === text
   );
+}
+
+/** A topic label from the model: 3 to 60 characters of safe text. */
+export function isSafeLabel(label: string): boolean {
+  return label.length >= 3 && label.length <= 60 && isSafeModelText(label);
 }

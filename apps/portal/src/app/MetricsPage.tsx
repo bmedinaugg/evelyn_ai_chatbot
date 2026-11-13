@@ -33,7 +33,7 @@ export function MetricsPage(props: { api: PortalApi; lang: Lang }) {
   const { api, lang } = props;
   const [days, setDays] = useState<number>(7);
   const [data, setData] = useState<Metrics | 'loading' | 'error'>('loading');
-  const [report, setReport] = useState<Report | null | 'loading'>('loading');
+  const [report, setReport] = useState<Report | null | 'loading' | 'error'>('loading');
   const yesterday = shiftDay(amsterdamToday(), -1);
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export function MetricsPage(props: { api: PortalApi; lang: Lang }) {
   }, [api, days]);
 
   useEffect(() => {
-    api.report(yesterday).then(setReport, () => setReport(null));
+    // Null means no report was sent that day; a failed request is a different message.
+    api.report(yesterday).then(setReport, () => setReport('error'));
   }, [api, yesterday]);
 
   return (
@@ -186,8 +187,14 @@ function DayTable(props: { lang: Lang; days: DayMetrics[] }) {
           <th scope="col">{t(lang, 'portal.metrics.conversations')}</th>
           <th scope="col">{t(lang, 'portal.metrics.resolved')}</th>
           <th scope="col">{t(lang, 'portal.metrics.escalated')}</th>
-          <th scope="col">👍</th>
-          <th scope="col">👎</th>
+          <th scope="col">
+            <span aria-hidden="true">👍</span>
+            <span class="tm-visually-hidden">{t(lang, 'portal.metrics.thumbsUp')}</span>
+          </th>
+          <th scope="col">
+            <span aria-hidden="true">👎</span>
+            <span class="tm-visually-hidden">{t(lang, 'portal.metrics.thumbsDown')}</span>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -206,14 +213,16 @@ function DayTable(props: { lang: Lang; days: DayMetrics[] }) {
   );
 }
 
-function Topics(props: { lang: Lang; day: string; report: Report | null | 'loading' }) {
+function Topics(props: { lang: Lang; day: string; report: Report | null | 'loading' | 'error' }) {
   const { lang, day, report } = props;
   const shown = formatDay(lang, day);
   if (report === 'loading') return null;
   return (
     <section class="tm-card" aria-labelledby="tm-topics-title">
       <h2 id="tm-topics-title">{t(lang, 'portal.metrics.topicsTitle', { day: shown })}</h2>
-      {report === null ? (
+      {report === 'error' ? (
+        <p role="alert">{t(lang, 'portal.error')}</p>
+      ) : report === null ? (
         <p>{t(lang, 'portal.metrics.topicsNone', { day: shown })}</p>
       ) : (
         <>

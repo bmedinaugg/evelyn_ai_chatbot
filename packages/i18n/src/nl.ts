@@ -230,6 +230,7 @@ export const nl = {
         same: 'Gelijk',
         worse: 'Slechter',
         unavailable: 'De automatische tweede mening is niet beschikbaar voor deze test.',
+        reasonHidden: '(toelichting verborgen: die bevatte een link, persoonsgegevens of opmaak)',
       },
     },
     metrics: {
@@ -246,6 +247,8 @@ export const nl = {
       chartTitle: 'Gesprekken per dag',
       barLabel: '{day}: {count} gesprekken, {resolved} opgelost',
       day: 'Dag',
+      thumbsUp: 'Duim omhoog',
+      thumbsDown: 'Duim omlaag',
       topicsTitle: 'Onderwerpen in het rapport van {day}',
       topicsNone: 'Er is geen rapport verstuurd voor {day}.',
       notClustered: 'Gegroepeerd op reden van markering (automatisch groeperen lukte niet).',

@@ -28,7 +28,7 @@ export const SCENARIO = '00000000-0000-4000-8000-00000000000a';
 export async function mockPortal(
   page: Page,
   me: { name: string; roles: string[] } | 401 | 403,
-  options: { replayAvailable?: boolean } = {},
+  options: { replayAvailable?: boolean; report?: 'missing' | 'error' } = {},
 ): Promise<MockPortal> {
   const api: MockPortal = { requests: [] };
   const capabilities = [
@@ -252,6 +252,9 @@ export async function mockPortal(
       });
     }
     if (path.startsWith('/portal/api/reports/')) {
+      if (options.report === 'missing')
+        return route.fulfill({ status: 404, json: { error: 'not_found' } });
+      if (options.report === 'error') return route.fulfill({ status: 500, json: {} });
       return route.fulfill({
         json: {
           day: path.split('/').at(-1),

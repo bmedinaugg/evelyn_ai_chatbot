@@ -1,3 +1,4 @@
+import { t } from '@trainmore/i18n';
 import { describe, expect, it } from 'vitest';
 import type { CreateClient } from '../src/claude-answerer.ts';
 import { JUDGE_TIMEOUT_MS, judgeReplay, summarise } from '../src/replay-judge.ts';
@@ -75,26 +76,33 @@ describe('judgeReplay', () => {
       'an unknown verdict',
       { verdicts: [good.verdicts[0], { ...good.verdicts[1], verdict: 'great' }] },
     ],
-    [
-      'a link in a reason',
-      { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: 'Zie https://x.io' }] },
-    ],
-    [
-      'markup in a reason',
-      { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: '<b>ok</b>' }] },
-    ],
-    [
-      'a too long reason',
-      { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: 'x'.repeat(201) }] },
-    ],
-    [
-      'a line break in a reason',
-      { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason: 'ok\nURGENT' }] },
-    ],
   ])('returns null for %s', async (_name, output) => {
     expect(
       await judgeReplay({ client: fakeClient(reply(output)).client, model: 'm' }, input),
     ).toBeNull();
+  });
+
+  it.each([
+    ['a link', 'Zie https://x.io'],
+    ['a bare domain', 'Kijk op trainmore.nl voor meer'],
+    ['www', 'Kijk op www.trainmore'],
+    ['an email address', 'Mail jan@example.com'],
+    ['a phone number', 'Bel 0612345678 voor info'],
+    ['markup', '<b>ok</b>'],
+    ['a line break', 'ok\nURGENT'],
+    ['an overlong text', 'x'.repeat(201)],
+    ['an empty text', ''],
+  ])('keeps the verdict but hides a reason with %s', async (_name, reason) => {
+    const output = { verdicts: [good.verdicts[0], { ...good.verdicts[1], reason }] };
+    const client = fakeClient(reply(output)).client;
+    expect(await judgeReplay({ client, model: 'm' }, input)).toEqual([
+      { verdict: 'better', reason: 'Het nieuwe antwoord beantwoordt de vraag.' },
+      { verdict: 'same', reason: t('nl', 'portal.replay.judge.reasonHidden') },
+    ]);
+    expect(await judgeReplay({ client, model: 'm' }, { ...input, lang: 'en' })).toContainEqual({
+      verdict: 'same',
+      reason: t('en', 'portal.replay.judge.reasonHidden'),
+    });
   });
 
   it('returns null on a refusal or an API error, and skips an empty replay', async () => {
