@@ -416,6 +416,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/loadtest:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/magicline:
     dependencies:
       '@aws-sdk/client-secrets-manager':
