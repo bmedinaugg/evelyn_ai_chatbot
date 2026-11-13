@@ -103,5 +103,6 @@ Against preprod (costs money, ask first):
    ```
 3. Switch preprod off again afterwards (or let it switch off at 20:00).
 
-Cost: every answered question is a paid Claude call, roughly 1–2 cents each; the run above asks at
-most 5 × 2 × 3 = 30 questions. More than 50 visitors needs `--allow-high-concurrency`.
+Cost: every answered question is a paid Claude call. The cost per question has not been measured
+yet (estimates range from about $0.002 to 2 cents); the run above asks at most 5 × 2 × 3 = 30
+questions, so well under $1 either way. Check the Anthropic console after the first run. More than 50 visitors needs `--allow-high-concurrency`.
