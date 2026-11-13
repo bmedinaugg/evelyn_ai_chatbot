@@ -147,13 +147,6 @@ export class FoundationStack extends Stack {
     this.emailIdentity = new ses.EmailIdentity(this, 'SenderDomain', {
       identity: ses.Identity.domain(domain),
     });
-    // Phase 1 of 2 (2026-11-13): the service and worker stacks still import the old address
-    // identity, and CloudFormation cannot drop an export in use. Keep it (same logical id, same
-    // export name) for one deploy while they move to the domain; phase 2 removes these lines.
-    const legacyAddress = new ses.EmailIdentity(this, 'EmailIdentity', {
-      identity: ses.Identity.email(props.emailFrom),
-    });
-    this.exportValue(legacyAddress.emailIdentityName);
     this.emailIdentity.dkimRecords.forEach((record, i) => {
       new CfnOutput(this, `DkimRecord${i + 1}`, {
         description: `DNS: CNAME record ${i + 1} of 3 for ${domain} (SES Easy DKIM)`,
