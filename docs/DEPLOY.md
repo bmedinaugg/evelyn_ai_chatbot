@@ -247,6 +247,9 @@ override (those land in CloudTrail). The cluster does not log interactive sessio
 
 Delete the person's tickets in Freshdesk separately (ARCHITECTURE §4).
 
+The metrics are computed live, so a deletion can lower the numbers of past days on the portal's
+Metrics page (their escalations stay counted). Daily reports already sent are not changed.
+
 ## Not automated yet
 - **Load test:** needs this deployed target first (switch it on before the test).
 - **Custom domains and HTTPS between CloudFront and the load balancer:** M6.

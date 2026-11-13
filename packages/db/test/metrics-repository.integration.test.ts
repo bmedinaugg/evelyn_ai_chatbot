@@ -136,4 +136,20 @@ describe('metrics repository', () => {
     await metrics.releaseReport(DAY, claim ?? '');
     expect(await metrics.claimReport(DAY, false)).toEqual(expect.any(String));
   });
+
+  it('keeps the earlier report when a resend is released', async () => {
+    await client.from('daily_reports').delete().eq('day', DAY);
+    const topics = [{ labelNl: 'Sauna', labelEn: 'Sauna', count: 1, conversationIds: [] }];
+    const first = await metrics.claimReport(DAY, false);
+    await metrics.finishReport(DAY, first ?? '', { recipientsCount: 2, clustered: true, topics });
+    const sent = await metrics.getReport(DAY);
+
+    const resend = await metrics.claimReport(DAY, true);
+    expect(resend).toEqual(expect.any(String));
+    expect(await metrics.getReport(DAY)).toBeNull();
+    await metrics.releaseReport(DAY, resend ?? '');
+
+    expect(await metrics.getReport(DAY)).toEqual(sent);
+    expect(await metrics.claimReport(DAY, false)).toBeNull();
+  });
 });

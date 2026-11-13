@@ -61,7 +61,10 @@ export interface MetricsRepository {
     claimId: string,
     input: { recipientsCount: number; clustered: boolean; topics: ReportTopic[] },
   ): Promise<boolean>;
-  /** Gives an unsent day back; only the claim holder's claim is removed. */
+  /**
+   * Gives an unsent day back (claim holder only): a resent day gets its earlier send back, a day
+   * never sent is removed.
+   */
   releaseReport(day: string, claimId: string): Promise<void>;
   /** Null when no report was sent for that day. */
   getReport(day: string): Promise<DailyReport | null>;
