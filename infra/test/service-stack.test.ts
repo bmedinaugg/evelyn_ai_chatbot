@@ -20,6 +20,7 @@ const PREPROD_TEST_CONFIG = {
   },
   chatModel: 'claude-sonnet-5-5',
   fastModel: 'claude-haiku-5-5',
+  mockEmailAliases: 'ai+member@example.org=member.single@example.com',
 };
 let template: Template;
 let portalTemplate: Template;
@@ -178,6 +179,17 @@ describe('ServiceStack (preprod)', () => {
       CLAUDE_FAST_MODEL: 'claude-haiku-5-5',
       // The sender address, not the SES (domain) identity.
       EMAIL_FROM: 'chat@example.com',
+    });
+  });
+
+  it('gives the mock Magicline the test-login aliases', () => {
+    const { def } = apiContainer();
+    const mock = def.Properties.ContainerDefinitions.find(
+      (c: { Name: string }) => c.Name === 'mock-magicline',
+    );
+    expect(mock.Environment).toContainEqual({
+      Name: 'MOCK_EMAIL_ALIASES',
+      Value: 'ai+member@example.org=member.single@example.com',
     });
   });
 

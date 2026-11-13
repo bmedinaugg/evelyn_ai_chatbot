@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { profiles } from '../fixtures/profiles.ts';
-import { buildMockServer, parseMockKeys } from '../src/server.ts';
+import { buildMockServer, parseEmailAliases, parseMockKeys } from '../src/server.ts';
 
 const keys = { crossStudio: 'cross-key', studios: { 1001: 'key-1001', 1002: 'key-1002' } };
 let server: ReturnType<typeof buildMockServer>;
@@ -104,5 +104,45 @@ describe('parseMockKeys', () => {
     expect(() => parseMockKeys('1001')).toThrow();
     expect(() => parseMockKeys('1001:b')).toThrow(/cross/);
     expect(() => parseMockKeys('cross:a,abc:b')).toThrow();
+  });
+});
+
+describe('email aliases (preprod test logins with a real mailbox)', () => {
+  const aliased = (email: string) =>
+    buildMockServer({
+      keys,
+      profiles,
+      emailAliases: parseEmailAliases(
+        'AI+member@urbangymgroup.example=member.single@example.com, ai+multi@urbangymgroup.example=multi@example.com',
+      ),
+    }).inject({
+      method: 'POST',
+      url: '/v1/cross-studio/customers/search',
+      headers: { 'x-api-key': 'cross-key' },
+      payload: { email },
+    });
+
+  it('finds the synthetic profile for an alias, case-insensitively', async () => {
+    const one = await aliased('ai+member@URBANGYMGROUP.example');
+    expect(one.json().map((c: { id: number }) => c.id)).toEqual([1]);
+    const multi = await aliased('AI+multi@urbangymgroup.example');
+    expect(multi.json().map((c: { id: number }) => c.id)).toEqual([4, 5]);
+  });
+
+  it('leaves other addresses unchanged', async () => {
+    expect((await aliased('former@example.com')).json().map((c: { id: number }) => c.id)).toEqual([
+      3,
+    ]);
+    expect((await aliased('someone@urbangymgroup.example')).json()).toEqual([]);
+  });
+
+  it('has no aliases unless configured', async () => {
+    expect((await search('ai+member@urbangymgroup.example', 'cross-key')).json()).toEqual([]);
+  });
+
+  it('rejects malformed alias lists', () => {
+    expect(() => parseEmailAliases('no-equals-sign')).toThrow(/alias/i);
+    expect(() => parseEmailAliases('a@x.example=not-an-email')).toThrow(/alias/i);
+    expect(parseEmailAliases('')).toEqual({});
   });
 });

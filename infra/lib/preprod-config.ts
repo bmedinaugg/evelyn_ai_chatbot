@@ -17,6 +17,9 @@ export const PREPROD_CONFIG: ServiceConfig = {
       '103000654097,103000640461,103000640462,103000640466,103000640469,103000640468,103000640467,103000640465,103000640464,103000654099',
     topicField: 'ticket_type',
   },
+  // Test logins: plus-addresses of the AI mailbox (codes can reach them) find synthetic profiles.
+  mockEmailAliases:
+    'ai+member@urbangymgroup.com=member.single@example.com,ai+multi@urbangymgroup.com=multi@example.com',
   chatModel: 'claude-sonnet-5-5',
   fastModel: 'claude-haiku-5-5',
 };

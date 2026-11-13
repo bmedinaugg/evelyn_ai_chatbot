@@ -18,6 +18,8 @@ export type MockServerOptions = {
   profiles: Customer[];
   studios?: components['schemas']['StudioInformation'][];
   logger?: FastifyBaseLogger;
+  /** Lower-cased alias -> profile email: lets testers log in with a mailbox they can read. */
+  emailAliases?: Record<string, string>;
 };
 
 const searchBodySchema = z.object({ email: z.string().trim().min(1) });
@@ -45,6 +47,29 @@ export function parseMockKeys(raw: string): MockKeys {
   return { crossStudio, studios };
 }
 
+const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
+
+/**
+ * Parses `alias@domain=profile@example.com,...` (preprod: plus-addresses of a test mailbox mapped
+ * to synthetic profiles, so the profiles themselves stay on example.com).
+ */
+export function parseEmailAliases(raw: string): Record<string, string> {
+  const aliases: Record<string, string> = {};
+  for (const entry of raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    const [alias, target, extra] = entry.split('=');
+    const a = emailSchema.safeParse(alias);
+    const t = emailSchema.safeParse(target);
+    if (extra !== undefined || !a.success || !t.success) {
+      throw new Error('Malformed email alias entry (expected alias@domain=profile@domain)');
+    }
+    aliases[a.data] = t.data;
+  }
+  return aliases;
+}
+
 export function buildMockServer(opts: MockServerOptions): FastifyInstance {
   const app = Fastify(opts.logger ? { loggerInstance: opts.logger } : { logger: false });
 
@@ -59,7 +84,8 @@ export function buildMockServer(opts: MockServerOptions): FastifyInstance {
     const body = searchBodySchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ message: 'email is required' });
     // Assumption: case-insensitive exact match (real Magicline behaviour unverified).
-    const email = body.data.email.toLowerCase();
+    const given = body.data.email.toLowerCase();
+    const email = opts.emailAliases?.[given] ?? given;
     return opts.profiles.filter((customer) => customer.email?.toLowerCase() === email);
   });
 
