@@ -22,15 +22,13 @@ jobs:
     env:
       AWS_REGION: eu-west-1
       IMAGE_TAG: ${{ github.sha }}
-      CDK_CONTEXT: >-
-        -c emailFrom=${{ vars.EMAIL_FROM }}
-        -c imageTag=${{ github.sha }}
-        -c widgetDistPath=../apps/widget/dist
-        -c portal=${{ vars.PORTAL_ENABLED == 'true' && 'on' || 'off' }}
-        -c portalDistPath=../apps/portal/dist
-        -c reportRecipients=${{ vars.DAILY_REPORT_RECIPIENTS }}
-        -c reportLang=${{ vars.DAILY_REPORT_LANG || 'nl' }}
-        -c waf=${{ vars.PREPROD_WAF == 'true' && 'on' || 'off' }}
+      # CDK context values go through the environment and are passed quoted (see the deploy
+      # steps), so an empty or unusual value can neither break the command nor add arguments.
+      CTX_EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      CTX_PORTAL: ${{ vars.PORTAL_ENABLED == 'true' && 'on' || 'off' }}
+      CTX_REPORT_RECIPIENTS: ${{ vars.DAILY_REPORT_RECIPIENTS }}
+      CTX_REPORT_LANG: ${{ vars.DAILY_REPORT_LANG || 'nl' }}
+      CTX_WAF: ${{ vars.PREPROD_WAF == 'true' && 'on' || 'off' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -58,7 +56,19 @@ jobs:
 
       - name: Foundation (network, ECR, secrets, SES identity)
         working-directory: infra
-        run: pnpm exec cdk deploy TrainmoreChatbot-preprod --require-approval never $CDK_CONTEXT
+        shell: bash
+        run: |
+          cdk_context=(
+            -c "emailFrom=$CTX_EMAIL_FROM"
+            -c "imageTag=$IMAGE_TAG"
+            -c widgetDistPath=../apps/widget/dist
+            -c "portal=$CTX_PORTAL"
+            -c portalDistPath=../apps/portal/dist
+            -c "reportRecipients=$CTX_REPORT_RECIPIENTS"
+            -c "reportLang=$CTX_REPORT_LANG"
+            -c "waf=$CTX_WAF"
+          )
+          pnpm exec cdk deploy TrainmoreChatbot-preprod --require-approval never "${cdk_context[@]}"
 
       - if: ${{ !inputs.foundation_only }}
         uses: supabase/setup-cli@v3
@@ -95,4 +105,16 @@ jobs:
       - name: Service, worker schedules (and WAF when PREPROD_WAF is true)
         if: ${{ !inputs.foundation_only }}
         working-directory: infra
-        run: pnpm exec cdk deploy --all --require-approval never $CDK_CONTEXT
+        shell: bash
+        run: |
+          cdk_context=(
+            -c "emailFrom=$CTX_EMAIL_FROM"
+            -c "imageTag=$IMAGE_TAG"
+            -c widgetDistPath=../apps/widget/dist
+            -c "portal=$CTX_PORTAL"
+            -c portalDistPath=../apps/portal/dist
+            -c "reportRecipients=$CTX_REPORT_RECIPIENTS"
+            -c "reportLang=$CTX_REPORT_LANG"
+            -c "waf=$CTX_WAF"
+          )
+          pnpm exec cdk deploy --all --require-approval never "${cdk_context[@]}"

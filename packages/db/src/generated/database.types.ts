@@ -69,14 +69,14 @@ isOneToOne: false
                   ]
                 },"daily_reports": {
                   Row: {
-                    "claim_id": string,"claimed_at": string,"clustered": boolean | null,"day": string,"recipients_count": number | null,"sent_at": string | null,"topics": NonNullable<Json>
+                    "claim_id": string,"claimed_at": string,"clustered": boolean | null,"day": string,"previous_send": Json | null,"recipients_count": number | null,"sent_at": string | null,"topics": NonNullable<Json>
                   }
                   ComputedFields: never
                   Insert: {
-                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day": string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day": string,"previous_send"?: Json | null,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
                   }
                   Update: {
-                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day"?: string,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
+                    "claim_id"?: string,"claimed_at"?: string,"clustered"?: boolean | null,"day"?: string,"previous_send"?: Json | null,"recipients_count"?: number | null,"sent_at"?: string | null,"topics"?: NonNullable<Json>
                   }
                   Relationships: [
                     

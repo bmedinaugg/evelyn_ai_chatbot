@@ -301,13 +301,17 @@ As built (M5, product owner decisions 2026-11-13):
   - **logins:** conversations where the customer picked an account;
   - **rates** are shown as "—" when the base is 0, never 0 %.
 
-  Anonymising keeps all of these, so older numbers stay correct.
+  Anonymising keeps all of these, so older numbers stay correct. A deletion request
+  (`dsar-delete`) does not: it deletes the person's conversations with their messages, flags and
+  👍/👎, so conversations, resolved, feedback, flags, approved answers and logins of past days can
+  go down. Their escalations stay counted (only the link to the conversation is cleared).
 - **Daily report** (worker `daily-report`, 07:00 Europe/Amsterdam, about yesterday):
   - **Once per day (at least once):** a `daily_reports` row is claimed per day with a token, so a
     parallel or retried run does not send it again. Only the claim holder can record or release
     it.
   - **Failures:** a failed send releases the day. Once the email went out the claim is never
-    released, and recording it is retried. An unsent claim older than 15 minutes can be taken over
+    released, and recording it is retried. A `--resend` claim keeps the earlier send in
+    `previous_send`; if the resend fails, releasing restores that record instead of deleting it. An unsent claim older than 15 minutes can be taken over
     (runs are bounded far below that: Claude 60 s × 2), so only a crash between sending and
     recording can repeat the email once.
   - **Options:** `--resend` re-sends; `--day` is for local use only.
