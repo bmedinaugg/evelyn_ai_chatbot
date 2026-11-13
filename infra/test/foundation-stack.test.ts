@@ -86,8 +86,11 @@ describe('FoundationStack (preprod)', () => {
     template.hasResourceProperties('AWS::KMS::Key', { EnableKeyRotation: true });
   });
 
-  it('ECS cluster exists', () => {
+  it('ECS cluster exists, with a fixed name (the on/off workflow addresses it)', () => {
     template.resourceCountIs('AWS::ECS::Cluster', 1);
+    template.hasResourceProperties('AWS::ECS::Cluster', {
+      ClusterName: 'trainmore-chatbot-preprod',
+    });
   });
 
   it('tags resources with project and env', () => {

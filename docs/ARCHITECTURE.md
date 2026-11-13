@@ -10,6 +10,7 @@ Requirements: `docs/PROJECT_BRIEF.md`. API references: `docs/api/`.
 | Scale | Medium: ~30–150 clubs, ~500–5,000 chats/day | Product owner |
 | Compute | AWS ECS Fargate (ARM/Graviton) | Product owner |
 | Environments | **Preprod only for now**; production built after preprod is tested and signed off | Product owner |
+| Preprod cost | Light testing only: the API runs **on demand** (workflow "Preprod on/off", automatic switch-off at 20:00 Amsterdam time) and the **WAF is off** unless `PREPROD_WAF=true`; production keeps an always-on API and the WAF | Product owner (2026-11-12) |
 | Widget host | Freshdesk help portal `https://www.support.trainmore.com` (nl/en) | Product owner |
 | Portal auth | Microsoft Entra ID SSO; roles are Entra **app roles** (agent, approver, admin) assigned to Entra groups | Product owner (Entra first, 2026-11-12) |
 | Portal UI | Preact (same as the widget), served under `/portal/` on the widget's CloudFront domain | Product owner (2026-11-12) |
@@ -88,17 +89,22 @@ Prod preferably goes in a separate AWS account. Preprod (M3c, `docs/DEPLOY.md`):
 - **Network:** tasks have a public IP for outbound calls only; inbound traffic comes only from
   the ALB.
 - **Deploys:** GitHub Actions with OIDC; no AWS keys are stored.
+- **On demand:** the API scales between 0 and 1 task. The "Preprod on/off" workflow sets both
+  bounds; an Application Auto Scaling schedule sets them to 0 every day at 20:00 Amsterdam time.
+  The template has no task count, so deploys keep the current state.
+- **No WAF by default:** the app's own rate limits, Turnstile, the API being off most of the time
+  and a spend limit on the Anthropic key cover light testing (`PREPROD_WAF=true` adds it back).
 
 ### Estimated AWS cost (eu-west-1, excluding Claude and Voyage usage; verify in the AWS calculator)
-| Item | Preprod (now) | Prod (later) |
+| Item | Preprod (now, on demand) | Prod (later) |
 |---|---|---|
-| Fargate ARM 0.5 vCPU / 1 GB | 1 task ≈ $14 | 2 tasks ≈ $29 |
+| Fargate ARM 0.5 vCPU / 1 GB | only while on, ≈ $1 for ~40 h | 2 tasks ≈ $29 |
 | ALB (internal) + CloudFront (VPC origin, free tier) | ≈ $19 | ≈ $19–25 |
-| WAF (web ACL + 4 rules + requests) | ≈ $10 | ≈ $12 |
-| Logs, KMS, 4 secrets | ≈ $6 | ≈ $8 |
-| Worker runs (3 short tasks per night) | < $1 | < $1 |
-| Outbound network | public subnet + public IP ≈ $4 (no NAT) | NAT gateway ≈ $35, or keep public subnet |
-| **Total** | **≈ $55/month** | **≈ $70–110/month** |
+| WAF (web ACL + 4 rules + requests) | off ($0; ≈ $10 with `PREPROD_WAF`) | ≈ $12 |
+| Logs, KMS, 6 secrets | ≈ $5 | ≈ $8 |
+| Worker runs (short tasks per night) | < $1 | < $1 |
+| Outbound network | public IP only while on, < $1 (no NAT) | NAT gateway ≈ $35, or keep public subnet |
+| **Total** | **≈ $25/month** (plus Supabase ≈ $10 on the Pro plan) | **≈ $70–110/month** |
 
 ## 3. Key flows
 
@@ -393,7 +399,7 @@ history and process lists. `--email` is accepted only with `APP_ENV=local`.
     the portal page, calls the API)
   - strict CSP; no external fonts or scripts except Cloudflare Turnstile, loaded only with the lead
     form (Google Fonts would send visitor IPs to Google)
-  - WAF with managed rules + rate-based rules
+  - WAF with managed rules + rate-based rules (production; optional in preprod, see §2)
 - **Client IP behind proxies:** the API trusts `TRUST_PROXY_HOPS` (2 = CloudFront + ALB) only when
   the direct peer is a private VPC address. The ALB security group must accept only CloudFront's
   managed prefix list, otherwise a client could reach the ALB directly and spoof `X-Forwarded-For`.
@@ -480,6 +486,7 @@ docs/              ARCHITECTURE.md, PROJECT_BRIEF.md, api/
 Each milestone ends with tests passing and a preprod deploy.
 
 **Progress (newest first)**
+- Preprod cost ✅ 2026-11-12: API on demand ("Preprod on/off" workflow, automatic switch-off at 20:00 Amsterdam time, deploys keep the state), WAF optional (`PREPROD_WAF`); about $55 → $25/month.
 - M5 ✅ 2026-11-13: daily report and metrics.
   - **Report:** a 07:00 email about yesterday with Haiku topic grouping (masked; falls back to
     flag reasons), masked examples, and one send per day.

@@ -1,0 +1,59 @@
+name: Preprod on/off
+
+# Switches the preprod API on or off (it also switches off by itself every day at 20:00
+# Amsterdam time). The widget files stay online; while off, sending a message shows an error.
+# Nightly worker jobs run either way. See docs/DEPLOY.md "Switching preprod on and off".
+on:
+  workflow_dispatch:
+    inputs:
+      power:
+        description: Switch the preprod API
+        type: choice
+        # Quoted: unquoted on/off are YAML booleans.
+        options: ['on', 'off']
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: preprod-power
+
+jobs:
+  power:
+    runs-on: ubuntu-24.04-arm
+    environment: preprod
+    env:
+      AWS_REGION: eu-west-1
+      CLUSTER: trainmore-chatbot-preprod
+      SERVICE: api
+      COUNT: ${{ inputs.power == 'on' && '1' || '0' }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      # Both bounds, so auto scaling moves the task count there now and keeps it until the
+      # evening switch-off (or the next run of this workflow).
+      - name: Set the API task count
+        run: |
+          aws application-autoscaling register-scalable-target --service-namespace ecs \
+            --scalable-dimension ecs:service:DesiredCount \
+            --resource-id "service/$CLUSTER/$SERVICE" \
+            --min-capacity "$COUNT" --max-capacity "$COUNT"
+
+      - name: Wait until the API is ready
+        if: ${{ inputs.power == 'on' }}
+        run: |
+          for _ in $(seq 1 24); do
+            desired=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+              --query 'services[0].desiredCount' --output text)
+            [ "$desired" = "1" ] && break
+            sleep 5
+          done
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          echo "Preprod API is on until 20:00 Amsterdam time." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: ${{ inputs.power == 'off' }}
+        run: echo "Preprod API is off." >> "$GITHUB_STEP_SUMMARY"

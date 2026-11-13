@@ -30,6 +30,7 @@ jobs:
         -c portalDistPath=../apps/portal/dist
         -c reportRecipients=${{ vars.DAILY_REPORT_RECIPIENTS }}
         -c reportLang=${{ vars.DAILY_REPORT_LANG || 'nl' }}
+        -c waf=${{ vars.PREPROD_WAF == 'true' && 'on' || 'off' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -91,7 +92,7 @@ jobs:
           push: true
           tags: ${{ steps.ecr.outputs.registry }}/trainmore-chatbot-preprod:${{ github.sha }}
 
-      - name: WAF, service and worker schedules
+      - name: Service, worker schedules (and WAF when PREPROD_WAF is true)
         if: ${{ !inputs.foundation_only }}
         working-directory: infra
         run: pnpm exec cdk deploy --all --require-approval never $CDK_CONTEXT

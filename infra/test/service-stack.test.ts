@@ -49,6 +49,7 @@ beforeAll(() => {
     widgetDistPath: dist,
     config: PREPROD_TEST_CONFIG,
     webAclArn: 'arn:aws:wafv2:us-east-1:111111111111:global/webacl/test/abc',
+    onDemand: { stopHour: 20 },
   });
   template = Template.fromStack(service);
 
@@ -253,6 +254,31 @@ describe('ServiceStack (preprod)', () => {
     });
   });
 
+  it('has a fixed service name for the on/off workflow', () => {
+    template.hasResourceProperties('AWS::ECS::Service', { ServiceName: 'api' });
+  });
+
+  it('runs on demand: no fixed task count, so a deploy keeps the service on or off', () => {
+    template.hasResourceProperties('AWS::ECS::Service', { DesiredCount: Match.absent() });
+    template.hasResourceProperties('AWS::ApplicationAutoScaling::ScalableTarget', {
+      ScalableDimension: 'ecs:service:DesiredCount',
+      MinCapacity: 0,
+      MaxCapacity: 1,
+    });
+  });
+
+  it('switches the API off every evening at 20:00 Amsterdam time', () => {
+    template.hasResourceProperties('AWS::ApplicationAutoScaling::ScalableTarget', {
+      ScheduledActions: [
+        Match.objectLike({
+          Schedule: 'cron(0 20 * * ? *)',
+          Timezone: 'Europe/Amsterdam',
+          ScalableTargetAction: { MinCapacity: 0, MaxCapacity: 0 },
+        }),
+      ],
+    });
+  });
+
   it('puts the WAF in front of the distribution', () => {
     template.hasResourceProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
@@ -272,6 +298,13 @@ describe('ServiceStack (preprod)', () => {
     const secretNames = api.Secrets.map((s: { Name: string }) => s.Name);
     expect(secretNames).not.toContain('ENTRA_CLIENT_SECRET');
     expect(JSON.stringify(template.toJSON())).not.toContain('/portal/api/*');
+  });
+});
+
+describe('ServiceStack without onDemand (always on)', () => {
+  it('keeps one task running and never scales to zero', () => {
+    portalTemplate.hasResourceProperties('AWS::ECS::Service', { DesiredCount: 1 });
+    portalTemplate.resourceCountIs('AWS::ApplicationAutoScaling::ScalableTarget', 0);
   });
 });
 

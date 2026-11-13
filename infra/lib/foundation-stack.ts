@@ -54,6 +54,8 @@ export class FoundationStack extends Stack {
     });
 
     this.cluster = new ecs.Cluster(this, 'Cluster', {
+      // Fixed name: the preprod on/off workflow addresses the API service by cluster and name.
+      clusterName: `trainmore-chatbot-${env}`,
       vpc: this.vpc,
       // Interactive sessions are not logged: operators type email addresses for deletion requests.
       executeCommandConfiguration: { logging: ecs.ExecuteCommandLogging.NONE },
