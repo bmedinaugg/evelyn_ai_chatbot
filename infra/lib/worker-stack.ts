@@ -144,7 +144,7 @@ export class WorkerStack extends Stack {
         {
           environment: {
             CLAUDE_FAST_MODEL: config.fastModel,
-            EMAIL_FROM: foundation.emailIdentity.emailIdentityName,
+            EMAIL_FROM: foundation.emailFrom,
             DAILY_REPORT_RECIPIENTS: props.dailyReport.recipients,
             DAILY_REPORT_LANG: props.dailyReport.lang,
             PORTAL_BASE_URL: props.dailyReport.portalBaseUrl,

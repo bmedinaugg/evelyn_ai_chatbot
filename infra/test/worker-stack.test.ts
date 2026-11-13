@@ -123,7 +123,7 @@ describe('WorkerStack (preprod)', () => {
       PORTAL_BASE_URL: 'https://d123.cloudfront.net',
       CLAUDE_FAST_MODEL: 'claude-haiku-5-5',
     });
-    expect(env.EMAIL_FROM).toBeDefined();
+    expect(env.EMAIL_FROM).toBe('chat@example.com');
     expect(report.Secrets.map((s: { Name: string }) => s.Name)).toContain('ANTHROPIC_API_KEY');
     expect(
       container(withReport, 'retention').Secrets.map((s: { Name: string }) => s.Name),

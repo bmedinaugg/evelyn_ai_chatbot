@@ -176,6 +176,8 @@ describe('ServiceStack (preprod)', () => {
       MAGICLINE_BASE_URL: 'http://localhost:4010',
       FRESHDESK_PORTAL_ID: '103000108492',
       CLAUDE_FAST_MODEL: 'claude-haiku-5-5',
+      // The sender address, not the SES (domain) identity.
+      EMAIL_FROM: 'chat@example.com',
     });
   });
 

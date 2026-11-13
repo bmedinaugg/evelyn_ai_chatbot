@@ -207,7 +207,7 @@ export class ServiceStack extends Stack {
         FRESHDESK_PORTAL_ID: config.freshdesk.portalId,
         FRESHDESK_FAQ_FOLDER_IDS: config.freshdesk.faqFolderIds,
         FRESHDESK_TOPIC_FIELD: config.freshdesk.topicField,
-        EMAIL_FROM: foundation.emailIdentity.emailIdentityName,
+        EMAIL_FROM: foundation.emailFrom,
         MAGICLINE_USE_MOCK: 'true',
         MAGICLINE_BASE_URL: `http://localhost:${MOCK_PORT}`,
         MOCK_MAGICLINE_KEYS,

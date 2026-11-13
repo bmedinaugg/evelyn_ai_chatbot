@@ -1,4 +1,4 @@
-import { RemovalPolicy, Stack, type StackProps, Tags } from 'aws-cdk-lib';
+import { CfnOutput, RemovalPolicy, Stack, type StackProps, Tags } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -28,7 +28,10 @@ export class FoundationStack extends Stack {
   /** JSON: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FRESHDESK_API_KEY, TURNSTILE_SECRET_KEY. */
   readonly appSecret: secretsmanager.Secret;
   readonly otpHmacSecret: secretsmanager.Secret;
+  /** SES identity for the sender's domain (Easy DKIM). */
   readonly emailIdentity: ses.EmailIdentity;
+  /** The sender address the apps put in From. */
+  readonly emailFrom: string;
   /** JSON: ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET (agent portal, set by hand). */
   readonly portalSecret: secretsmanager.Secret;
   readonly portalSessionSecret: secretsmanager.Secret;
@@ -135,9 +138,20 @@ export class FoundationStack extends Stack {
       removalPolicy: retain,
     });
 
-    // SES sandbox in preprod: the sender (and test recipients) are verified by email link.
+    // Our domains publish DMARC p=reject with strict alignment, so mail only passes when SES signs
+    // it as the sender's own domain: verify the whole domain with Easy DKIM (3 CNAME records in
+    // DNS, see the outputs) rather than the single address.
+    const domain = /^[^@\s]+@([^@\s]+\.[^@\s]+)$/.exec(props.emailFrom)?.[1];
+    if (!domain) throw new Error('emailFrom must be an email address (name@domain)');
+    this.emailFrom = props.emailFrom;
     this.emailIdentity = new ses.EmailIdentity(this, 'EmailIdentity', {
-      identity: ses.Identity.email(props.emailFrom),
+      identity: ses.Identity.domain(domain),
+    });
+    this.emailIdentity.dkimRecords.forEach((record, i) => {
+      new CfnOutput(this, `DkimRecord${i + 1}`, {
+        description: `DNS: CNAME record ${i + 1} of 3 for ${domain} (SES Easy DKIM)`,
+        value: `${record.name} CNAME ${record.value}`,
+      });
     });
   }
 }
