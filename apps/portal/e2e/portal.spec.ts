@@ -107,6 +107,18 @@ test('explains a missing portal role', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('geen rol voor dit portaal');
 });
 
+test('tells a missing report apart from a failed request', async ({ page }) => {
+  await mockPortal(page, agent, { report: 'missing' });
+  await page.goto('/portal/#/metrics');
+  const topics = page.getByRole('region', { name: /Onderwerpen in het rapport/ });
+  await expect(topics).toContainText('Er is geen rapport verstuurd');
+
+  await mockPortal(page, agent, { report: 'error' });
+  await page.reload();
+  await expect(topics.getByRole('alert')).toHaveText('Er ging iets mis. Probeer het opnieuw.');
+  await expect(topics).not.toContainText('Er is geen rapport verstuurd');
+});
+
 test('shows metrics for the last 7 days and yesterday’s report topics', async ({ page }) => {
   const api = await mockPortal(page, agent);
   await page.goto('/portal/#/metrics');
@@ -124,6 +136,8 @@ test('shows metrics for the last 7 days and yesterday’s report topics', async 
   await expect(page.locator('.tm-chart__readout')).toContainText('10 gesprekken, 6 opgelost');
   await expect(page.locator('.tm-chart__bar--active')).toHaveCount(1);
   await expect(page.getByText('Bevriezen bij zwangerschap')).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Duim omhoog' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Duim omlaag' })).toBeVisible();
   const metricsCall = api.requests.find((r) => r.path === '/portal/api/metrics');
   expect(metricsCall).toBeDefined();
 

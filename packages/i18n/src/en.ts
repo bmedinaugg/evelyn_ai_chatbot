@@ -230,6 +230,7 @@ export const en = {
         same: 'Same',
         worse: 'Worse',
         unavailable: 'The automatic second opinion is not available for this test.',
+        reasonHidden: '(reason hidden: it contained a link, personal data or markup)',
       },
     },
     metrics: {
@@ -246,6 +247,8 @@ export const en = {
       chartTitle: 'Conversations per day',
       barLabel: '{day}: {count} conversations, {resolved} resolved',
       day: 'Day',
+      thumbsUp: 'Thumbs up',
+      thumbsDown: 'Thumbs down',
       topicsTitle: 'Topics in the report of {day}',
       topicsNone: 'No report was sent for {day}.',
       notClustered: 'Grouped by flag reason (automatic grouping was unavailable).',

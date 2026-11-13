@@ -1,10 +1,10 @@
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import type { Lang } from '@trainmore/i18n';
+import { type Lang, t } from '@trainmore/i18n';
 import { maskText } from '@trainmore/shared';
 import { z } from 'zod';
 import type { CreateClient } from './claude-answerer.ts';
 import { escapeForPrompt } from './prompt.ts';
-import { hasControlCharacter } from './report/text.ts';
+import { isSafeModelText } from './report/text.ts';
 
 export const VERDICTS = ['better', 'same', 'worse'] as const;
 export type Verdict = { verdict: (typeof VERDICTS)[number]; reason: string };
@@ -41,6 +41,8 @@ const cut = (text: string) => escapeForPrompt(maskText(text).slice(0, MAX_TEXT))
 /**
  * Advisory second opinion on a replay (M5): one verdict per question, in order. Text is masked
  * and escaped before it is sent. Null when the model fails, refuses or breaks a rule; never throws.
+ * A reason with a link, markup or personal data (echoed from the untrusted texts) is replaced by a
+ * fixed text; its verdict stays.
  */
 export async function judgeReplay(
   opts: { client: CreateClient; model: string },
@@ -77,28 +79,26 @@ export async function judgeReplay(
     if (text === undefined) return null;
     const parsed = judgeOutput.safeParse(JSON.parse(text));
     if (!parsed.success) return null;
-    return ordered(parsed.data.verdicts, input.items.length);
+    return ordered(parsed.data.verdicts, input.items.length, input.lang);
   } catch {
     return null;
   }
 }
 
 const isSafeReason = (reason: string) =>
-  reason.length > 0 &&
-  reason.length <= MAX_REASON &&
-  !hasControlCharacter(reason) &&
-  !/[<>]/.test(reason) &&
-  !/:\/\/|\bwww\./i.test(reason);
+  reason.length > 0 && reason.length <= MAX_REASON && isSafeModelText(reason);
 
 function ordered(
   verdicts: z.infer<typeof judgeOutput>['verdicts'],
   count: number,
+  lang: Lang,
 ): Verdict[] | null {
   if (verdicts.length !== count) return null;
   const byIndex = new Map<number, Verdict>();
   for (const v of verdicts) {
-    if (v.i < 0 || v.i >= count || byIndex.has(v.i) || !isSafeReason(v.reason)) return null;
-    byIndex.set(v.i, { verdict: v.verdict, reason: v.reason });
+    if (v.i < 0 || v.i >= count || byIndex.has(v.i)) return null;
+    const reason = isSafeReason(v.reason) ? v.reason : t(lang, 'portal.replay.judge.reasonHidden');
+    byIndex.set(v.i, { verdict: v.verdict, reason });
   }
   return Array.from({ length: count }, (_, i) => byIndex.get(i) as Verdict);
 }
