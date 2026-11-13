@@ -71,20 +71,12 @@ describe('FoundationStack (preprod)', () => {
     });
   });
 
-  // Phase 1 of 2 (2026-11-13): CloudFormation cannot drop an export another stack still imports,
-  // so the old address identity and its export stay for one deploy while the service and worker
-  // move to the domain identity. Phase 2 removes them (and this test).
-  it('keeps the old address identity and its export for one deploy (phase 1 of 2)', () => {
-    template.resourceCountIs('AWS::SES::EmailIdentity', 2);
-    const legacy = template.findResources('AWS::SES::EmailIdentity', {
-      Properties: { EmailIdentity: 'chat@example.com' },
-    });
-    expect(Object.keys(legacy)).toEqual(['EmailIdentity7187767D']);
+  it('has only the domain identity (the old address identity and its export are gone)', () => {
+    template.resourceCountIs('AWS::SES::EmailIdentity', 1);
     const exports = Object.values(template.toJSON().Outputs ?? {}).map(
       (o) => (o as { Export?: { Name: string } }).Export?.Name,
     );
-    // The name the deployed service and worker stacks import (from the failed deploy's error).
-    expect(exports).toContain('T:ExportsOutputRefEmailIdentity7187767DE6C74978');
+    expect(exports).not.toContain('T:ExportsOutputRefEmailIdentity7187767DE6C74978');
   });
 
   it('outputs the 3 DKIM CNAME records to add to DNS', () => {
