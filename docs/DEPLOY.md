@@ -40,12 +40,18 @@ Claude usage and Supabase (see ARCHITECTURE §2).
        "Condition": {
          "StringEquals": {
            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-           "token.actions.githubusercontent.com:sub": "repo:bmedinaugg/evelyn_ai_chatbot:environment:preprod"
+           "token.actions.githubusercontent.com:sub": "<SUB_PREFIX>:environment:preprod"
          }
        }
      }]
    }
    ```
+   `<SUB_PREFIX>` is how GitHub names this repository in its login token. This repository uses
+   GitHub's immutable format (account and repository ids), currently
+   `repo:bmedinaugg@294508288/evelyn_ai_chatbot@1454449564`. Check it with
+   `gh api repos/bmedinaugg/evelyn_ai_chatbot/actions/oidc/customization/sub` (`sub_claim_prefix`).
+   With the older format, `repo:bmedinaugg/evelyn_ai_chatbot`, AWS refuses the login
+   ("Not authorized to perform sts:AssumeRoleWithWebIdentity").
 3. Give it this permissions policy. It may use the CDK bootstrap roles, push the image, and switch
    the preprod API on and off:
    ```json
