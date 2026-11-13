@@ -21,18 +21,24 @@ const foundation = new FoundationStack(app, 'TrainmoreChatbot-preprod', {
   env,
   emailFrom: context('emailFrom'),
 });
-// CloudFront web ACLs live in us-east-1; the ARN is passed across regions.
-const waf = new WafStack(app, 'TrainmoreChatbot-preprod-waf', {
-  envName: 'preprod',
-  env: { region: 'us-east-1' },
-  crossRegionReferences: true,
-});
+// WAF (CloudFront web ACLs live in us-east-1; the ARN is passed across regions). Off in preprod
+// to save about $10/month: light use, app rate limits, Turnstile and the API off most of the
+// time. On with -c waf=on (production always has it).
+const waf =
+  app.node.tryGetContext('waf') === 'on'
+    ? new WafStack(app, 'TrainmoreChatbot-preprod-waf', {
+        envName: 'preprod',
+        env: { region: 'us-east-1' },
+        crossRegionReferences: true,
+      })
+    : undefined;
 const service = new ServiceStack(app, 'TrainmoreChatbot-preprod-service', {
   envName: 'preprod',
   env,
-  crossRegionReferences: true,
-  webAclArn: waf.webAclArn,
+  ...(waf ? { crossRegionReferences: true, webAclArn: waf.webAclArn } : {}),
   foundation,
+  // The API runs only when switched on (workflow "Preprod on/off"); off every day at 20:00.
+  onDemand: { stopHour: 20 },
   imageTag: context('imageTag'),
   // Built by the deploy workflow with VITE_API_BASE_URL="" (same origin as the API).
   widgetDistPath: context('widgetDistPath'),

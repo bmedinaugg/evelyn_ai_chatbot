@@ -1,4 +1,5 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps, TimeZone } from 'aws-cdk-lib';
+import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
@@ -44,6 +45,11 @@ export type ServiceStackProps = StackProps & {
   webAclArn?: string;
   /** Agent portal (Entra ID), served under /portal/. Off until the app registration exists. */
   portal?: { distPath: string };
+  /**
+   * Light-use environments: the API runs only when switched on (workflow "Preprod on/off") and
+   * is switched off every day at `stopHour`:00 Amsterdam time. Deploys keep it on or off.
+   */
+  onDemand?: { stopHour: number };
 };
 
 /**
@@ -266,9 +272,11 @@ export class ServiceStack extends Stack {
     taskSecurityGroup.addIngressRule(albSecurityGroup, ec2.Port.tcp(API_PORT));
 
     const service = new ecs.FargateService(this, 'ApiService', {
+      serviceName: 'api',
       cluster: foundation.cluster,
       taskDefinition,
-      desiredCount: 1,
+      // On demand: no count in the template, so a deploy keeps the current one (1 on creation).
+      ...(props.onDemand ? {} : { desiredCount: 1 }),
       // No NAT: tasks get a public IP for outbound calls; inbound is closed by the security group.
       assignPublicIp: true,
       vpcSubnets: publicSubnets,
@@ -277,6 +285,16 @@ export class ServiceStack extends Stack {
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
     });
+
+    if (props.onDemand) {
+      // 0 or 1 task; the on/off workflow sets both bounds, the evening schedule sets them to 0.
+      service.autoScaleTaskCount({ minCapacity: 0, maxCapacity: 1 }).scaleOnSchedule('EveningOff', {
+        schedule: appscaling.Schedule.cron({ hour: String(props.onDemand.stopHour), minute: '0' }),
+        timeZone: TimeZone.of('Europe/Amsterdam'),
+        minCapacity: 0,
+        maxCapacity: 0,
+      });
+    }
 
     alb.addListener('Http', { port: 80, open: false }).addTargets('Api', {
       port: API_PORT,

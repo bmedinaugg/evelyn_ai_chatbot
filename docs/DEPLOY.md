@@ -7,20 +7,23 @@ deployed:
 | Stack | Region | Contents |
 |---|---|---|
 | `TrainmoreChatbot-preprod` | eu-west-1 | network, ECS cluster, ECR, encrypted logs, secrets, SES sender |
-| `TrainmoreChatbot-preprod-waf` | us-east-1 | WAF for CloudFront (managed rules, per-IP rate limit) |
-| `TrainmoreChatbot-preprod-service` | eu-west-1 | CloudFront (widget + API on one domain), S3, internal ALB, API on Fargate with mock Magicline |
+| `TrainmoreChatbot-preprod-service` | eu-west-1 | CloudFront (widget + API on one domain), S3, internal ALB, API on Fargate with mock Magicline (on demand, see below) |
 | `TrainmoreChatbot-preprod-worker` | eu-west-1 | nightly FAQ sync (02:00), topic sync (02:15), retention (03:00), Amsterdam time |
+| `TrainmoreChatbot-preprod-waf` | us-east-1 | optional (`PREPROD_WAF=true`): WAF for CloudFront (managed rules, per-IP rate limit) |
 
 Preprod always uses the **mock Magicline** with synthetic profiles. Real Magicline keys come with
-M6. Expected cost is about $55/month, excluding Claude usage (see ARCHITECTURE §2).
+M6. To keep costs low for light testing, the **API runs only when switched on** and switches off
+every day at 20:00, and there is **no WAF** by default. Expected cost is about $25/month, excluding
+Claude usage and Supabase (see ARCHITECTURE §2).
 
 ## One-time setup
 
 ### 1. AWS account
 - Use a dedicated account for the chatbot if possible (production will get its own later).
-- Bootstrap CDK in **both** regions (the WAF must live in us-east-1):
+- Bootstrap CDK in eu-west-1 (also in us-east-1 only if you turn the WAF on, which lives there).
+  AWS CloudShell (the `>_` icon in the console) has everything needed:
   ```sh
-  npx cdk bootstrap aws://<ACCOUNT_ID>/eu-west-1 aws://<ACCOUNT_ID>/us-east-1
+  npx --yes aws-cdk@2.1148.0 bootstrap aws://<ACCOUNT_ID>/eu-west-1
   ```
 
 ### 2. GitHub OIDC deploy role
@@ -43,7 +46,8 @@ M6. Expected cost is about $55/month, excluding Claude usage (see ARCHITECTURE �
      }]
    }
    ```
-3. Give it this permissions policy. It may use the CDK bootstrap roles and push the image:
+3. Give it this permissions policy. It may use the CDK bootstrap roles, push the image, and switch
+   the preprod API on and off:
    ```json
    {
      "Version": "2012-10-17",
@@ -55,6 +59,12 @@ M6. Expected cost is about $55/month, excluding Claude usage (see ARCHITECTURE �
          "Action": ["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
                     "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:DescribeImages"],
          "Resource": "arn:aws:ecr:eu-west-1:<ACCOUNT_ID>:repository/trainmore-chatbot-preprod"
+       },
+       { "Effect": "Allow", "Action": "application-autoscaling:RegisterScalableTarget", "Resource": "*" },
+       {
+         "Effect": "Allow",
+         "Action": ["ecs:DescribeServices", "ecs:UpdateService"],
+         "Resource": "arn:aws:ecs:eu-west-1:<ACCOUNT_ID>:service/trainmore-chatbot-preprod/api"
        }
      ]
    }
@@ -75,7 +85,8 @@ M6. Expected cost is about $55/month, excluding Claude usage (see ARCHITECTURE �
   `1x0000000000000000000000000000000AA`), then switch.
 
 ### 5. GitHub repository
-Settings → Environments → **preprod** (add yourself as required reviewer), then:
+Settings → Environments → **preprod**. A required reviewer is optional: it also applies to every
+"Preprod on/off" run, so each switch-on then waits for an approval. Then add:
 
 | Kind | Name | Value |
 |---|---|---|
@@ -85,6 +96,7 @@ Settings → Environments → **preprod** (add yourself as required reviewer), t
 | Variable | `PRIVACY_URL` | privacy statement URL shown in the consent notice |
 | Variable | `DAILY_REPORT_RECIPIENTS` | optional: comma-separated support addresses (no spaces, at most 50) for the 07:00 daily report; the report is only scheduled with the portal on and this set |
 | Variable | `DAILY_REPORT_LANG` | optional: `nl` (default) or `en` |
+| Variable | `PREPROD_WAF` | optional: `true` adds the WAF (about $10/month; also bootstrap us-east-1) |
 | Secret | `SUPABASE_DB_URL` | Supabase database connection string (migrations) |
 
 ## First deploy (three steps)
@@ -114,7 +126,7 @@ Settings → Environments → **preprod** (add yourself as required reviewer), t
    2. builds the widget
    3. applies the database migrations
    4. builds and pushes the ARM image (tagged with the commit)
-   5. deploys WAF, service and worker schedules
+   5. deploys the service and worker schedules (and the WAF if `PREPROD_WAF` is `true`)
 
    If the service cannot become healthy, the deployment rolls back by itself.
 
@@ -174,6 +186,17 @@ The portal (`https://dxxxx.cloudfront.net/portal/`) stays off until these steps 
 `.env`, start the API, then run `pnpm --filter @trainmore/portal dev` and open
 http://localhost:5174/portal/. The dev server forwards `/portal/api` and `/portal/auth` to the API.
 
+## Switching preprod on and off
+The API task runs only when needed (about $14/month saved). The widget files, the database and the
+nightly jobs are not affected.
+- **On:** Actions → **Preprod on/off** → `on`. Ready after about 2 minutes (the run waits for it).
+- **Off:** the same workflow with `off`, or nothing: it switches off by itself every day at
+  **20:00 Amsterdam time**.
+- **While off** the widget opens, but sending a message shows its error notice; the agent portal cannot
+  sign in.
+- **Deploys keep the current state:** deploying while off leaves it off (switch it on afterwards to
+  try the new version). The very first deploy starts it.
+
 ## Routine deploys
 Run **Deploy preprod**. Images are tagged with the commit and are immutable, so redeploying the
 same commit reuses its image.
@@ -211,5 +234,5 @@ override (those land in CloudTrail). The cluster does not log interactive sessio
 Delete the person's tickets in Freshdesk separately (ARCHITECTURE §4).
 
 ## Not automated yet
-- **Load test:** needs this deployed target first.
+- **Load test:** needs this deployed target first (switch it on before the test).
 - **Custom domains and HTTPS between CloudFront and the load balancer:** M6.
