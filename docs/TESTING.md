@@ -72,3 +72,37 @@ cent). Without those settings the script refuses to start.
    email addresses and phone numbers in your questions show as `[•••]`.
 3. In the portal, open **Statistieken / Metrics**. The numbers match your chats, and the topic link
    opens the conversations flagged on that day.
+
+## Load test (chat API)
+`packages/loadtest` simulates website visitors with Node's built-in `fetch` (no extra dependencies).
+Each visitor follows the widget flow: `POST /widget/conversations` (language nl or en; consent is
+given in the widget itself, the API has no consent call), then 1–3 fixed, generic FAQ questions in
+that language to `POST /widget/conversations/:id/messages` with the conversation's bearer token,
+waiting for each answer. The report shows requests, successes, status codes (429 and 5xx in their own
+columns), latency p50/p90/p99/max per step and error kinds; `--json` prints it as JSON.
+`--help` lists all options (`--visitors`, `--ramp-up`, `--duration` or `--conversations`,
+`--respect-retry-after`, `--seed`, …).
+
+Locally (no spend with `FAKE_AI=1`):
+```sh
+FAKE_AI=1 pnpm dev:local                                  # in one terminal
+pnpm --filter @trainmore/loadtest loadtest --visitors 5 --conversations 3 --ramp-up 5
+```
+
+Expect 429s: the API limits each client IP to 10 new conversations and 20 messages per minute, so
+a single machine soon measures the rate limiter rather than capacity. `--respect-retry-after` waits
+and retries instead (up to `--max-retries`); every attempt still counts in the report.
+
+Against preprod (costs money, ask first):
+1. Switch preprod on: Actions → **Preprod on/off** → `on` (see `docs/DEPLOY.md`).
+2. Run with the exact host confirmed; any host other than localhost is refused without it:
+   ```sh
+   LOADTEST_CONFIRM_TARGET=dons3qf04vw1f.cloudfront.net \
+     pnpm --filter @trainmore/loadtest loadtest --base-url https://dons3qf04vw1f.cloudfront.net \
+     --visitors 5 --conversations 2 --ramp-up 30
+   ```
+3. Switch preprod off again afterwards (or let it switch off at 20:00).
+
+Cost: every answered question is a paid Claude call. The cost per question has not been measured
+yet (estimates range from about $0.002 to 2 cents); the run above asks at most 5 × 2 × 3 = 30
+questions, so well under $1 either way. Check the Anthropic console after the first run. More than 50 visitors needs `--allow-high-concurrency`.
